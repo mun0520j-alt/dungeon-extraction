@@ -244,6 +244,15 @@ public static class QuestRuntimeState
         ObjectiveReady = state?.ObjectiveReady ?? false;
         Reputation = Mathf.Max(0, state?.Reputation ?? 0);
         ReputationLevel = Mathf.Clamp(state?.ReputationLevel ?? 1, 1, 3);
+        // 퀘스트 CSV에서 ID가 바뀌거나 삭제되면 진행 중 상태만 남아 새 퀘스트를 받을 수 없게 된다.
+        // 정의가 없는 진행 중 퀘스트는 해제한다. 완료 목록의 모르는 ID는 영향이 없어 그대로 둔다.
+        if (!string.IsNullOrEmpty(ActiveQuestId) && QuestDefinitionDatabase.Find(ActiveQuestId) == null)
+        {
+            Debug.LogWarning($"[Quest] 세이브의 진행 중 퀘스트 '{ActiveQuestId}'가 퀘스트 데이터에 없어 해제했습니다.");
+            ActiveQuestId = null;
+            Progress = 0;
+            ObjectiveReady = false;
+        }
         deliverySelection.Clear();
         Changed?.Invoke();
     }
