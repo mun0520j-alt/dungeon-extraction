@@ -70,7 +70,7 @@
 | `quest_id`, `order`, `route`, `type`, `prerequisite_id` | 고유 ID·순서·Common/Combat/Collection 분기·Delivery/Escape/Carry 종류·선행 조건 |
 | `target_item_id` | 단일 또는 복합 납품 조건. 복합은 `item_id:개수|item_id:개수` 형식 |
 | `target_rarity`, `target_category`, `target_count`, `target_floor`, `target_value` | 운반 등급·범주·수량·도달 층·판매가 합계 조건 |
-| `requires_found_in_raid`, `requires_boss_kill` | 인레이드 납품·보스 처치 필요 여부(0/1) |
+| `requires_found_in_raid`, `requires_boss_kill` | 인레이드 필요(납품·운반 퀘스트, 0/1)·보스 처치 필요 여부(0/1). 운반 퀘스트는 인레이드 아이템만 센다 |
 | `reward_reputation`, `reward_gold`, `reward_item_id`, `reward_item_count` | 우호도·Gold·아이템 보상 |
 | `title`, `description` | 상인 퀘스트 UI 표시 문자열 |
 

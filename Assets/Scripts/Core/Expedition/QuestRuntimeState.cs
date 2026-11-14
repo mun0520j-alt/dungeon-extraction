@@ -132,6 +132,8 @@ public static class QuestRuntimeState
     {
         if (run.ReachedFloor < quest.TargetFloor || quest.RequiresBossKill && !run.BossDefeated) return false;
         IEnumerable<LootItemInstance> candidates = items;
+        // 운반 퀘스트도 인레이드 아이템만 센다(사용자 결정 2026-11-15). 상점 구매품·보험 반환품·기본 장비로는 완료할 수 없다.
+        if (quest.RequiresFoundInRaid) candidates = candidates.Where(item => item.IsFoundInRaid);
         if (quest.TargetCategory == "Equipment") candidates = candidates.Where(item => item.Definition.Type != LootItemType.Junk && item.Definition.Type != LootItemType.Consumable);
         if (!string.IsNullOrEmpty(quest.TargetRarity) && Enum.TryParse(quest.TargetRarity, true, out LootRarity rarity))
             candidates = candidates.Where(item => item.Definition.Rarity >= rarity);

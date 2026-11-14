@@ -35,6 +35,12 @@ public static class M8QuestValidation
         ValidateDelivery("q01", "junk_coin_pouch:3", failures);
         ValidateDelivery("q04b", "junk_small_gem:2", failures);
         ValidateDelivery("q05b", "junk_old_relic:1|junk_candles:3", failures);
+        foreach (string carryId in new[] { "q03", "q05a", "q06b" })
+        {
+            QuestDefinition carry = QuestDefinitionDatabase.Find(carryId);
+            if (carry == null || carry.Type != QuestObjectiveType.Carry || !carry.RequiresFoundInRaid)
+                failures.Add($"{carryId}: 인레이드 운반 조건 불일치");
+        }
         QuestDefinition q06a = QuestDefinitionDatabase.Find("q06a");
         if (q06a == null || q06a.TargetCount != 2 || !q06a.RequiresBossKill || q06a.TargetFloor != 5)
             failures.Add("q06a 연속 보스 생환 조건 불일치");
@@ -46,7 +52,7 @@ public static class M8QuestValidation
             failures.Add("우호도 레벨 기준 불일치");
 
         string summary = failures.Count == 0
-            ? "[M8 Quest Validation] PASS — 9개 정의/선행/분기/우호도 300/복합 납품/연속 생환 검증 완료"
+            ? "[M8 Quest Validation] PASS — 9개 정의/선행/분기/우호도 300/복합 납품/인레이드 운반/누적 생환 검증 완료"
             : $"[M8 Quest Validation] FAIL {failures.Count}\n- {string.Join("\n- ", failures)}";
         if (failures.Count > 0) throw new InvalidOperationException(summary);
         return summary;
