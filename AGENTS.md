@@ -75,6 +75,7 @@ If it does not meet these conditions, do not add it.
 - Refactor before complexity becomes unmanageable.
 - When one change affects many files, review the architecture.
 - Architecture should support the product, not control it.
+- Project-specific maintainability rules (data/CSV, no new Canvas or Singleton, QA gating, save migration, Unity APIs, review checklist): `docs/MAINTAINABILITY.md`. Read it before implementing or reviewing.
 
 ## Technical Debt Rules
 
