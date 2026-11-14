@@ -37,7 +37,7 @@ public static class BuildHudInScene
         // 있으면 되므로, 기존 DungeonSceneBootstrapper 오브젝트가 있으면 거기에 같이 붙인다
         // (실제 Play 시 그 오브젝트가 이 컴포넌트들을 갖게 되는 모양과 동일하게 맞추는 것) —
         // 없으면 새로 "HUD"라는 오브젝트를 만든다.
-        var bootstrapper = Object.FindObjectOfType<DungeonSceneBootstrapper>();
+        var bootstrapper = Object.FindFirstObjectByType<DungeonSceneBootstrapper>();
         GameObject host = bootstrapper != null ? bootstrapper.gameObject : GameObject.Find("HUD");
         if (host == null)
         {

@@ -109,7 +109,7 @@ public sealed class ExpeditionDebugCommands : MonoBehaviour
         }
         if (GUILayout.Button("현재 맵 자동 검증"))
         {
-            var manager = FindObjectOfType<DungeonRunManager>();
+            var manager = FindFirstObjectByType<DungeonRunManager>();
             if (manager != null) manager.ValidateGeneratedRun();
         }
         GUILayout.Label("원정 종료 시 CSV 자동 저장:");

@@ -65,7 +65,7 @@ public class DungeonClockDisplay : MonoBehaviour
         // 참고) 씬에 하나만 있다는 전제 — FindObjectOfType으로 충분하다. Awake가 아니라 Start에서
         // 찾는 이유: DungeonSceneBootstrapper.Start()가 DungeonClock을 그 시점에 만들 수도 있어서
         // (TickManager.Instance가 없던 경우), 모든 Awake가 끝난 뒤인 Start 시점이 더 안전하다.
-        dungeonClock = FindObjectOfType<DungeonClock>();
+        dungeonClock = FindFirstObjectByType<DungeonClock>();
         if (dungeonClock == null)
         {
             Debug.LogWarning("[DungeonClockDisplay] 씬에서 DungeonClock을 못 찾았습니다 — 시계가 갱신되지 않습니다.");

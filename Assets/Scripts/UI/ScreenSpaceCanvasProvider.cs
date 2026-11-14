@@ -21,7 +21,9 @@ public static class ScreenSpaceCanvasProvider
         if (cachedCanvas != null) return cachedCanvas.transform;
 
         // 씬 리로드 등으로 캐시가 끊긴 참조를 들고 있을 수도 있어서, 실제로 씬에 있는지도 확인한다.
-        cachedCanvas = Object.FindObjectOfType<Canvas>();
+        // [2026-11-15] BUG-044 재발 방지: 아무 Canvas나 재사용하면 GraphicRaycaster 없는 Canvas(예: 표시 전용)에
+        // HUD가 붙어 모든 버튼 클릭이 막힌다. 클릭을 받을 수 있는 루트 Overlay Canvas만 재사용한다.
+        cachedCanvas = FindInteractiveOverlayCanvas();
         if (cachedCanvas == null)
         {
             var canvasGo = new GameObject("HudCanvas(AutoCreated)");
@@ -41,7 +43,7 @@ public static class ScreenSpaceCanvasProvider
         // 도달을 못 해서 EventSystem이 영영 안 생겼다. Canvas 신규/재사용 여부와 무관하게 항상
         // 확인하도록 블록 밖으로 뺐다 — 인벤토리 패널처럼 나중에 클릭 상호작용이 필요한 UI를
         // 대비해서 미리 준비해두는 용도(3단계 아이템 슬롯 클릭에서 실제로 쓰일 예정).
-        if (Object.FindObjectOfType<EventSystem>() == null)
+        if (Object.FindFirstObjectByType<EventSystem>() == null)
         {
             var eventSystemGo = new GameObject("EventSystem(AutoCreated)");
             eventSystemGo.AddComponent<EventSystem>();
@@ -49,5 +51,16 @@ public static class ScreenSpaceCanvasProvider
         }
 
         return cachedCanvas.transform;
+    }
+
+    private static Canvas FindInteractiveOverlayCanvas()
+    {
+        foreach (Canvas canvas in Object.FindObjectsByType<Canvas>(FindObjectsSortMode.None))
+        {
+            if (canvas.isRootCanvas && canvas.renderMode == RenderMode.ScreenSpaceOverlay
+                && canvas.GetComponent<GraphicRaycaster>() != null)
+                return canvas;
+        }
+        return null;
     }
 }
