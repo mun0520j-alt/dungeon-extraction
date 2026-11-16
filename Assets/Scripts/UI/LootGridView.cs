@@ -197,6 +197,14 @@ public sealed class LootGridView : MonoBehaviour
 
     // 보험에 든 장비는 청록 테두리로 표시한다 (선택 표시의 노랑과 구분).
     public static readonly Color InsuredColor = new Color(0.25f, 0.95f, 0.85f, 1f);
+    // 격자 마커와 목록의 ★가 같은 권위 색을 사용한다.
+    public static readonly Color FoundInRaidColor = new Color(0.25f, 0.95f, 0.45f, 1f);
+    public static string FoundInRaidStarRichText => $"<color=#{ColorUtility.ToHtmlStringRGB(FoundInRaidColor)}>★</color>";
+    public static string FormatFoundInRaidName(LootItemInstance item, string prefix = "")
+    {
+        if (item?.Definition == null) return prefix;
+        return prefix + (item.IsFoundInRaid ? FoundInRaidStarRichText + " " : "") + item.Definition.Name;
+    }
 
     private static void CreateInsuredFrame(Transform parent)
     {
@@ -226,7 +234,7 @@ public sealed class LootGridView : MonoBehaviour
         rect.anchoredPosition = new Vector2(4f, -4f);
         rect.sizeDelta = new Vector2(12f, 12f);
         Image image = marker.GetComponent<Image>();
-        image.color = new Color(0.25f, 0.95f, 0.45f, 1f);
+        image.color = FoundInRaidColor;
         image.raycastTarget = false;
     }
 
