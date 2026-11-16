@@ -7,15 +7,20 @@ using UnityEngine;
 public sealed class BaseCampManagementPanel : MonoBehaviour
 {
     private enum SortMode { Acquired, RarityHigh, RarityLow, Type }
-    private enum MerchantMode { Sell, Buy }
+    private enum MerchantMode { Sell, Buy, Quest }
+    private enum FoundInRaidFilter { All, FoundOnly, NotFound }
     private SortMode sortMode;
     private MerchantMode merchantMode;
     private LootItemType? typeFilter;
     private LootRarity? rarityFilter;
+    private FoundInRaidFilter foundInRaidFilter;
     private Vector2 merchantScroll;
     private Vector2 stashScroll;
     private string notice;
     private string pendingUniqueSale;
+    private bool pendingLevelUp;
+    private GUIStyle foundInRaidStarStyle;
+    private GUIStyle itemRichTextStyle;
 
     private void OnGUI()
     {
@@ -32,21 +37,24 @@ public sealed class BaseCampManagementPanel : MonoBehaviour
         GUILayout.BeginHorizontal();
         if (GUILayout.Toggle(merchantMode == MerchantMode.Sell, "판매", GUI.skin.button)) merchantMode = MerchantMode.Sell;
         if (GUILayout.Toggle(merchantMode == MerchantMode.Buy, "구매", GUI.skin.button)) merchantMode = MerchantMode.Buy;
+        if (GUILayout.Toggle(merchantMode == MerchantMode.Quest, "퀘스트", GUI.skin.button)) merchantMode = MerchantMode.Quest;
         GUILayout.EndHorizontal();
 
         merchantScroll = GUILayout.BeginScrollView(merchantScroll);
         if (merchantMode == MerchantMode.Sell)
         {
+            DrawFoundInRaidLegend();
             GUILayout.Label("Stash");
             foreach (var item in LootRuntimeState.Stash.ToArray()) DrawSaleItem(item, "Stash");
             GUILayout.Space(6);
             GUILayout.Label("출격 가방");
             foreach (var item in LootRuntimeState.RunBag.ToArray()) DrawSaleItem(item, "가방");
         }
-        else
+        else if (merchantMode == MerchantMode.Buy)
         {
             foreach (LootItemData item in LootItemDatabase.Items.Where(LootRuntimeState.IsMerchantPurchaseItem)) DrawPurchaseItem(item);
         }
+        else DrawQuestPanel();
         GUILayout.EndScrollView();
 
         DrawUniqueSaleConfirmation();
@@ -66,7 +74,10 @@ public sealed class BaseCampManagementPanel : MonoBehaviour
         if (GUILayout.Button($"부위: {(typeFilter?.ToString() ?? "전체")}")) CycleType();
         if (GUILayout.Button($"등급: {(rarityFilter?.ToString() ?? "전체")}")) CycleRarity();
         GUILayout.EndHorizontal();
+        if (GUILayout.Button(FoundInRaidFilterLabel()))
+            foundInRaidFilter = (FoundInRaidFilter)(((int)foundInRaidFilter + 1) % 3);
 
+        DrawFoundInRaidLegend();
         GUILayout.Label("Stash");
         stashScroll = GUILayout.BeginScrollView(stashScroll);
         foreach (var item in FilteredStash()) DrawStorageItem(item, true);
@@ -82,7 +93,10 @@ public sealed class BaseCampManagementPanel : MonoBehaviour
         foreach (var item in LootRuntimeState.InsurableCandidates.ToArray())
         {
             bool selected = LootRuntimeState.IsInsuranceSelected(item.InstanceId);
+            GUILayout.BeginHorizontal();
+            DrawFoundInRaidStar(item);
             bool next = GUILayout.Toggle(selected, $"{item.Definition.Name} ({Mathf.CeilToInt(item.Definition.SellPrice * M7EconomyConfig.InsurancePremiumRate)}G)");
+            GUILayout.EndHorizontal();
             if (next != selected) LootRuntimeState.ToggleInsuranceSelection(item.InstanceId);
         }
         if (LootRuntimeState.SelectedInsurancePremium > 0
@@ -120,7 +134,7 @@ public sealed class BaseCampManagementPanel : MonoBehaviour
     {
         if (item?.Definition == null) return;
         GUILayout.BeginHorizontal();
-        GUILayout.Label($"[{item.Definition.Rarity}] {(LootRuntimeState.IsInsured(item.InstanceId) ? "[보험] " : "")}{item.Definition.Name}", GUILayout.Width(170));
+        DrawItemIdentity(item, null, 170f);
         if (GUILayout.Button(inStash ? "가방" : "Stash", GUILayout.Width(60)))
         {
             bool ok = inStash ? LootRuntimeState.MoveStashItemToBag(item.InstanceId) : LootRuntimeState.MoveBagItemToStash(item.InstanceId);
@@ -140,7 +154,7 @@ public sealed class BaseCampManagementPanel : MonoBehaviour
 
     private void DrawPurchaseItem(LootItemData item)
     {
-        int price = item.SellPrice * M7EconomyConfig.PurchasePriceMultiplier;
+        int price = LootRuntimeState.GetPurchasePrice(item);
         GUILayout.BeginHorizontal();
         GUILayout.Label($"[{item.Rarity}] {item.Name}");
         GUI.enabled = LootRuntimeState.Gold >= price;
@@ -157,13 +171,103 @@ public sealed class BaseCampManagementPanel : MonoBehaviour
     {
         if (item?.Definition == null) return;
         GUILayout.BeginHorizontal();
-        GUILayout.Label($"[{source}] [{item.Definition.Rarity}] {(LootRuntimeState.IsInsured(item.InstanceId) ? "[보험] " : "")}{item.Definition.Name}");
-        if (GUILayout.Button($"{item.Definition.SellPrice}G", GUILayout.Width(70)))
+        DrawItemIdentity(item, source);
+        if (GUILayout.Button($"{LootRuntimeState.GetSellPrice(item.Definition)}G", GUILayout.Width(70)))
         {
             if (item.Definition.Rarity >= LootRarity.Unique) pendingUniqueSale = item.InstanceId;
             else if (LootRuntimeState.TrySell(item.InstanceId)) notice = $"{item.Definition.Name} 판매 완료";
         }
         GUILayout.EndHorizontal();
+    }
+
+    private void DrawQuestPanel()
+    {
+        GUILayout.Label($"우호도 Lv.{QuestRuntimeState.ReputationLevel}  {QuestRuntimeState.Reputation}점");
+        int levelBonus = QuestRuntimeState.ReputationLevel - 1;
+        GUILayout.Label($"판매 +{Mathf.RoundToInt(levelBonus * M8EconomyConfig.SellBonusPerLevel * 100f)}% / "
+            + $"구매 -{Mathf.RoundToInt(levelBonus * M8EconomyConfig.BuyDiscountPerLevel * 100f)}% / "
+            + $"보험 반환 +{Mathf.RoundToInt(levelBonus * M8EconomyConfig.InsuranceBonusPerLevel * 100f)}%");
+        if (QuestRuntimeState.CanLevelUp && GUILayout.Button($"우호도 레벨업 ({QuestRuntimeState.NextLevelGoldCost}G)")) pendingLevelUp = true;
+        if (pendingLevelUp)
+        {
+            GUILayout.Label($"{QuestRuntimeState.NextLevelGoldCost} Gold를 지불하고 레벨업할까요?");
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("확정"))
+            {
+                notice = QuestRuntimeState.TryLevelUp() ? "우호도 레벨 상승" : LootRuntimeState.LastFailureReason;
+                pendingLevelUp = false;
+            }
+            if (GUILayout.Button("취소")) pendingLevelUp = false;
+            GUILayout.EndHorizontal();
+        }
+
+        if (QuestRuntimeState.SelectedRoute == QuestRoute.Common && QuestRuntimeState.CompletedQuestIds.Contains("q03"))
+        {
+            GUILayout.Label("진행할 루트를 선택하세요. 선택 후 되돌릴 수 없습니다.");
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("전투 루트")) QuestRuntimeState.TrySelectRoute(QuestRoute.Combat);
+            if (GUILayout.Button("수집 루트")) QuestRuntimeState.TrySelectRoute(QuestRoute.Collection);
+            GUILayout.EndHorizontal();
+        }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        GUILayout.Space(8);
+        GUILayout.Label("QA 전용 (공개 빌드 제외)");
+        GUILayout.BeginHorizontal();
+        if (GUILayout.Button("납품품 지급")) notice = QuestRuntimeState.DebugGrantDeliveryRequirements() ? "인레이드 납품품 지급" : "현재 납품 퀘스트가 아닙니다.";
+        if (GUILayout.Button("현재 목표 완료")) notice = QuestRuntimeState.DebugCompleteActiveObjective() ? "목표 완료 처리" : "진행 중 퀘스트 없음";
+        GUILayout.EndHorizontal();
+        GUILayout.BeginHorizontal();
+        if (GUILayout.Button("우호도·Gold 지급")) { QuestRuntimeState.DebugGrantEconomy(); notice = "우호도 300·Gold 2000 확보"; }
+        if (GUILayout.Button("퀘스트 초기화")) { QuestRuntimeState.DebugResetAll(); notice = "퀘스트 상태 초기화"; }
+        GUILayout.EndHorizontal();
+#endif
+
+        QuestDefinition active = QuestRuntimeState.ActiveQuest;
+        if (active == null)
+        {
+            GUILayout.Label("수락 가능한 퀘스트");
+            foreach (QuestDefinition quest in QuestDefinitionDatabase.All.Where(QuestRuntimeState.CanAccept))
+            {
+                GUILayout.BeginHorizontal();
+                GUILayout.Label($"{quest.Title}\n{quest.Description}");
+                if (GUILayout.Button("수락", GUILayout.Width(55))) QuestRuntimeState.TryAccept(quest.Id);
+                GUILayout.EndHorizontal();
+            }
+            return;
+        }
+
+        GUILayout.Space(8);
+        GUILayout.Label($"진행 중: {active.Title}");
+        GUILayout.Label(active.Description);
+        if (active.Id == "q06a") GUILayout.Label($"연속 진행 {QuestRuntimeState.Progress}/{active.TargetCount}");
+
+        if (active.Type == QuestObjectiveType.Delivery && !QuestRuntimeState.ObjectiveReady)
+        {
+            DrawFoundInRaidLegend();
+            foreach (LootItemInstance item in QuestRuntimeState.EligibleDeliveryItems().ToArray())
+            {
+                bool selected = QuestRuntimeState.DeliverySelection.Contains(item.InstanceId);
+                GUILayout.BeginHorizontal();
+                DrawFoundInRaidStar(item);
+                bool next = GUILayout.Toggle(selected, $"{(LootRuntimeState.IsInsured(item.InstanceId) ? "[보험] " : "")}{item.Definition.Name}");
+                GUILayout.EndHorizontal();
+                if (next != selected)
+                {
+                    QuestRuntimeState.ToggleDeliverySelection(item.InstanceId);
+                    if (next && LootRuntimeState.IsInsured(item.InstanceId)) notice = "보험 장비입니다. 납품하면 보험이 종료됩니다.";
+                }
+            }
+            bool canSubmit = QuestRuntimeState.CanSubmitDelivery(out string reason);
+            GUI.enabled = canSubmit;
+            if (GUILayout.Button("선택 아이템 납품")) notice = QuestRuntimeState.TrySubmitDelivery() ? "납품 완료 — 보상을 수령하세요." : "납품 실패";
+            GUI.enabled = true;
+            if (!canSubmit) GUILayout.Label(reason);
+        }
+
+        if (QuestRuntimeState.ObjectiveReady && GUILayout.Button("보상 수령"))
+            notice = QuestRuntimeState.TryClaimReward() ? "퀘스트 완료" : "보상 수령 실패";
+
     }
 
     private void DrawUniqueSaleConfirmation()
@@ -185,6 +289,8 @@ public sealed class BaseCampManagementPanel : MonoBehaviour
         IEnumerable<LootItemInstance> items = LootRuntimeState.Stash;
         if (typeFilter.HasValue) items = items.Where(x => x.Definition.Type == typeFilter.Value);
         if (rarityFilter.HasValue) items = items.Where(x => x.Definition.Rarity == rarityFilter.Value);
+        if (foundInRaidFilter == FoundInRaidFilter.FoundOnly) items = items.Where(x => x.IsFoundInRaid);
+        else if (foundInRaidFilter == FoundInRaidFilter.NotFound) items = items.Where(x => !x.IsFoundInRaid);
         switch (sortMode)
         {
             case SortMode.RarityHigh: return items.OrderByDescending(x => x.Definition.Rarity).ThenBy(x => x.Definition.Name).ToArray();
@@ -211,5 +317,51 @@ public sealed class BaseCampManagementPanel : MonoBehaviour
         else if (rarityFilter == LootRarity.Rare) rarityFilter = LootRarity.Epic;
         else if (rarityFilter == LootRarity.Epic) rarityFilter = LootRarity.Unique;
         else rarityFilter = null;
+    }
+
+    private void DrawFoundInRaidLegend()
+    {
+        EnsureFoundInRaidStyle();
+        GUILayout.BeginHorizontal();
+        GUILayout.Label("★", foundInRaidStarStyle, GUILayout.Width(18f));
+        GUILayout.Label("= 인레이드", GUILayout.ExpandWidth(false));
+        GUILayout.EndHorizontal();
+    }
+
+    private void DrawItemIdentity(LootItemInstance item, string source = null, float totalWidth = 0f)
+    {
+        string prefix = (string.IsNullOrEmpty(source) ? "" : $"[{source}] ")
+            + $"[{item.Definition.Rarity}] "
+            + (LootRuntimeState.IsInsured(item.InstanceId) ? "[보험] " : "");
+        EnsureFoundInRaidStyle();
+        string label = LootGridView.FormatFoundInRaidName(item, prefix);
+        if (totalWidth > 0f) GUILayout.Label(label, itemRichTextStyle, GUILayout.Width(totalWidth));
+        else GUILayout.Label(label, itemRichTextStyle);
+    }
+
+    private void DrawFoundInRaidStar(LootItemInstance item)
+    {
+        if (item == null || !item.IsFoundInRaid) return;
+        EnsureFoundInRaidStyle();
+        GUILayout.Label("★", foundInRaidStarStyle, GUILayout.Width(18f));
+    }
+
+    private void EnsureFoundInRaidStyle()
+    {
+        if (foundInRaidStarStyle != null) return;
+        foundInRaidStarStyle = new GUIStyle(GUI.skin.label);
+        foundInRaidStarStyle.normal.textColor = LootGridView.FoundInRaidColor;
+        foundInRaidStarStyle.fontStyle = FontStyle.Bold;
+        itemRichTextStyle = new GUIStyle(GUI.skin.label) { richText = true };
+    }
+
+    private string FoundInRaidFilterLabel()
+    {
+        switch (foundInRaidFilter)
+        {
+            case FoundInRaidFilter.FoundOnly: return "★만";
+            case FoundInRaidFilter.NotFound: return "★ 아님";
+            default: return "★: 전체";
+        }
     }
 }

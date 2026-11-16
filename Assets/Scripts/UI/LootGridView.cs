@@ -109,6 +109,7 @@ public sealed class LootGridView : MonoBehaviour
         selectionOutline.enabled = placement.Item.InstanceId == selectedInstanceId;
         selectionOutlines[placement.Item.InstanceId] = selectionOutline;
         if (LootRuntimeState.IsInsured(placement.Item.InstanceId)) CreateInsuredFrame(itemObject.transform);
+        if (placement.Item.IsFoundInRaid) CreateFoundInRaidMarker(itemObject.transform);
 
         var labelObject = new GameObject("ShortLabel", typeof(RectTransform), typeof(Text));
         labelObject.transform.SetParent(itemObject.transform, false);
@@ -196,6 +197,14 @@ public sealed class LootGridView : MonoBehaviour
 
     // 보험에 든 장비는 청록 테두리로 표시한다 (선택 표시의 노랑과 구분).
     public static readonly Color InsuredColor = new Color(0.25f, 0.95f, 0.85f, 1f);
+    // 격자 마커와 목록의 ★가 같은 권위 색을 사용한다.
+    public static readonly Color FoundInRaidColor = new Color(0.25f, 0.95f, 0.45f, 1f);
+    public static string FoundInRaidStarRichText => $"<color=#{ColorUtility.ToHtmlStringRGB(FoundInRaidColor)}>★</color>";
+    public static string FormatFoundInRaidName(LootItemInstance item, string prefix = "")
+    {
+        if (item?.Definition == null) return prefix;
+        return prefix + (item.IsFoundInRaid ? FoundInRaidStarRichText + " " : "") + item.Definition.Name;
+    }
 
     private static void CreateInsuredFrame(Transform parent)
     {
@@ -215,12 +224,27 @@ public sealed class LootGridView : MonoBehaviour
         outline.useGraphicAlpha = false;
     }
 
+    private static void CreateFoundInRaidMarker(Transform parent)
+    {
+        var marker = new GameObject("FoundInRaidMarker", typeof(RectTransform), typeof(Image));
+        marker.transform.SetParent(parent, false);
+        RectTransform rect = marker.GetComponent<RectTransform>();
+        rect.anchorMin = rect.anchorMax = new Vector2(0f, 1f);
+        rect.pivot = new Vector2(0f, 1f);
+        rect.anchoredPosition = new Vector2(4f, -4f);
+        rect.sizeDelta = new Vector2(12f, 12f);
+        Image image = marker.GetComponent<Image>();
+        image.color = FoundInRaidColor;
+        image.raycastTarget = false;
+    }
+
     internal void ShowTooltip(LootGridItemView item, Vector2 screenPosition)
     {
         if (dragged != null || tooltip == null || item?.Item?.Definition == null) return;
         LootItemData data = item.Item.Definition;
         tooltip.text = $"{data.Name} [{data.Rarity}]\n크기 {data.GridWidth}×{data.GridHeight}"
             + $"\n공격 +{data.AttackBonus} / 방어 +{data.DefenseBonus}"
+            + (item.Item.IsFoundInRaid ? "\n인레이드" : string.Empty)
             + (LootRuntimeState.IsInsured(item.Item.InstanceId) ? "\n보험됨" : string.Empty);
         tooltip.transform.parent.gameObject.SetActive(true);
         PositionTooltip(screenPosition);

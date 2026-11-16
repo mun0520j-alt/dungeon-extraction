@@ -25,11 +25,11 @@ public static class ExpeditionRuntimeBootstrap
     private static void EnsureForScene(Scene scene)
     {
         if (scene.name != "BaseCamp") return;
-        if (Object.FindObjectOfType<ExpeditionResultPanel>() == null)
+        if (Object.FindFirstObjectByType<ExpeditionResultPanel>() == null)
             new GameObject("ExpeditionResultPanel(AutoCreated)").AddComponent<ExpeditionResultPanel>();
         // BaseCamp storage is owned by BaseCampManagementPanel.
         // Remove the legacy auto-created panel so two Stash UIs cannot overlap.
-        var legacyStashPanel = Object.FindObjectOfType<StashPanel>();
+        var legacyStashPanel = Object.FindFirstObjectByType<StashPanel>();
         if (legacyStashPanel != null)
             Object.Destroy(legacyStashPanel.gameObject);
     }

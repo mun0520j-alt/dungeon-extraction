@@ -17,7 +17,11 @@ public sealed class PauseMenuController : MonoBehaviour
     private EventSystem suspendedEventSystem;
 
     public static bool IsOpen => instance != null && instance.view != View.Closed;
-    public static bool BlocksWorldInput => IsOpen || (instance != null && instance.escapeConsumedFrame == Time.frameCount);
+    // 일시정지 메뉴만의 입력 차단. QA 디버그 패널은 이것만 보고 자기 단축키(F6·F9 닫기)를 계속 받는다.
+    public static bool BlocksForPauseMenu => IsOpen || (instance != null && instance.escapeConsumedFrame == Time.frameCount);
+    // QA 디버그 패널(F6·F9)이 열려 있으면 이동·상호작용 등 월드 입력을 막는다. 공개 빌드에서는 항상 false.
+    public static bool DebugPanelOpen { get; set; }
+    public static bool BlocksWorldInput => BlocksForPauseMenu || DebugPanelOpen;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void EnsureCreated()

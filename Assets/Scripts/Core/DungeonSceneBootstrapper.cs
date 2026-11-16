@@ -37,7 +37,7 @@ public class DungeonSceneBootstrapper : MonoBehaviour
         tickManager.SynchronizeTimeline(ExpeditionSession.ElapsedTicks);
         dungeonClock.RestoreForActiveRun(ExpeditionSession.ElapsedTicks);
 
-        var expeditionManager = FindObjectOfType<ExpeditionManager>();
+        var expeditionManager = FindFirstObjectByType<ExpeditionManager>();
         if (expeditionManager == null) expeditionManager = gameObject.AddComponent<ExpeditionManager>();
         expeditionManager.Initialize(dungeonClock);
 
@@ -54,16 +54,16 @@ public class DungeonSceneBootstrapper : MonoBehaviour
         // 같은 오브젝트에 컴포넌트가 중복으로 붙어서 Awake가 두 번 도는 꼴이 된다(각 컴포넌트의
         // Build()가 자체적으로 멱등하게 짜여있어도,애초에 중복 컴포넌트 자체가 지저분하다).
         // FindObjectOfType으로 이미 있는지 먼저 확인해서 없을 때만 새로 붙인다.
-        if (FindObjectOfType<DungeonClockDisplay>() == null) gameObject.AddComponent<DungeonClockDisplay>();
-        if (FindObjectOfType<InventoryPanel>() == null) gameObject.AddComponent<InventoryPanel>();
-        if (FindObjectOfType<LootingPanel>() == null) gameObject.AddComponent<LootingPanel>();
-        var legacyBagPanel = FindObjectOfType<M2BagPanel>();
+        if (FindFirstObjectByType<DungeonClockDisplay>() == null) gameObject.AddComponent<DungeonClockDisplay>();
+        if (FindFirstObjectByType<InventoryPanel>() == null) gameObject.AddComponent<InventoryPanel>();
+        if (FindFirstObjectByType<LootingPanel>() == null) gameObject.AddComponent<LootingPanel>();
+        var legacyBagPanel = FindFirstObjectByType<M2BagPanel>();
         if (legacyBagPanel != null) Destroy(legacyBagPanel);
-        if (FindObjectOfType<MinimapController>() == null) gameObject.AddComponent<MinimapController>();
-        if (FindObjectOfType<DungeonInteractionMenu>() == null) gameObject.AddComponent<DungeonInteractionMenu>();
+        if (FindFirstObjectByType<MinimapController>() == null) gameObject.AddComponent<MinimapController>();
+        if (FindFirstObjectByType<DungeonInteractionMenu>() == null) gameObject.AddComponent<DungeonInteractionMenu>();
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-        if (FindObjectOfType<ExpeditionDebugCommands>() == null) gameObject.AddComponent<ExpeditionDebugCommands>();
+        if (FindFirstObjectByType<ExpeditionDebugCommands>() == null) gameObject.AddComponent<ExpeditionDebugCommands>();
 #endif
 
         CreateFloorExit();

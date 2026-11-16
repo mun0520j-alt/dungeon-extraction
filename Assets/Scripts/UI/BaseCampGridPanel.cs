@@ -141,7 +141,9 @@ public sealed class BaseCampGridPanel : MonoBehaviour
             slot.icon.color = item?.Definition != null ? LootGridView.RarityColor(item.Definition.Rarity) : EmptyIconColor;
             slot.frame.enabled = insured;
             string name = item?.Definition != null ? item.Definition.Name : $"{slotLabel} 없음";
-            slot.label.text = (insured ? "[보험] " : "") + name;
+            slot.label.text = item == null
+                ? name
+                : LootGridView.FormatFoundInRaidName(item, insured ? "[보험] " : "");
             slot.label.color = item == null ? EmptyLabelColor : insured ? LootGridView.InsuredColor : Color.white;
             slot.unequip.gameObject.SetActive(item != null);
         }
