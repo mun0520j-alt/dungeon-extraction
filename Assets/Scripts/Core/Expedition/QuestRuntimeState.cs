@@ -31,6 +31,7 @@ public static class QuestRuntimeState
     }
 
     public static IReadOnlyCollection<string> CompletedQuestIds => completed;
+    public static bool HasCompleted(string questId) => !string.IsNullOrEmpty(questId) && completed.Contains(questId);
     public static IReadOnlyCollection<string> DeliverySelection => deliverySelection;
     public static QuestDefinition ActiveQuest => QuestDefinitionDatabase.Find(ActiveQuestId);
 

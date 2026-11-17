@@ -5,9 +5,12 @@ using UnityEngine.UI;
 public sealed class BaseCampGridPanel : MonoBehaviour
 {
     private LootGridView gridView;
+    private LootGridView stashGridView;
     private Text title;
+    private Text stashTitle;
     private Text notice;
     private LootItemInstance selected;
+    private int filterVersion = -1;
 
     // 던전 인벤토리와 같은 장착 슬롯 표시 (무기·방패·갑옷·가방). 보험 장비는 청록 표시.
     private static readonly (LootItemType type, string label)[] SlotOrder =
@@ -33,6 +36,13 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         LootRuntimeState.Changed -= Refresh;
     }
 
+    private void Update()
+    {
+        if (stashGridView == null || filterVersion == BaseCampManagementPanel.StashFilterVersion) return;
+        filterVersion = BaseCampManagementPanel.StashFilterVersion;
+        stashGridView.SetDimPredicate(BaseCampManagementPanel.ShouldDimStashItem);
+    }
+
     private void Build()
     {
         Transform hud = ScreenSpaceCanvasProvider.GetOrCreateHudRoot();
@@ -42,7 +52,7 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         rect.anchorMin = new Vector2(1f, 0f);
         rect.anchorMax = new Vector2(1f, 1f);
         rect.pivot = new Vector2(1f, 0.5f);
-        rect.sizeDelta = new Vector2(400f, -40f);
+        rect.sizeDelta = new Vector2(620f, -40f);
         rect.anchoredPosition = new Vector2(-20f, 0f);
         root.GetComponent<Image>().color = new Color(0.04f, 0.05f, 0.08f, 0.97f);
 
@@ -54,18 +64,31 @@ public sealed class BaseCampGridPanel : MonoBehaviour
             CreateSlot(root.transform, SlotOrder[i].type, min, min + new Vector2(0.45f, 0.065f));
         }
 
-        title = CreateText(root.transform, "Title", "출격 가방", 18, new Vector2(0f, 0.66f), new Vector2(1f, 0.71f));
+        title = CreateText(root.transform, "Title", "출격 가방", 18, new Vector2(0f, 0.69f), new Vector2(1f, 0.74f));
         var gridObject = new GameObject("Grid", typeof(RectTransform));
         gridObject.transform.SetParent(root.transform, false);
         RectTransform gridRect = gridObject.GetComponent<RectTransform>();
-        gridRect.anchorMin = gridRect.anchorMax = new Vector2(0.5f, 0.65f);
+        gridRect.anchorMin = gridRect.anchorMax = new Vector2(0.5f, 0.68f);
         gridRect.pivot = new Vector2(0.5f, 1f);
         gridView = gridObject.AddComponent<LootGridView>();
+
+        stashTitle = CreateText(root.transform, "StashTitle", "Stash", 18,
+            new Vector2(0f, 0.54f), new Vector2(1f, 0.59f));
+        var stashObject = new GameObject("StashGrid", typeof(RectTransform));
+        stashObject.transform.SetParent(root.transform, false);
+        RectTransform stashRect = stashObject.GetComponent<RectTransform>();
+        stashRect.anchorMin = stashRect.anchorMax = new Vector2(0.5f, 0.53f);
+        stashRect.pivot = new Vector2(0.5f, 1f);
+        stashGridView = stashObject.AddComponent<LootGridView>();
 
         notice = CreateText(root.transform, "Notice", "아이템을 선택하세요", 13,
             new Vector2(0.06f, 0.20f), new Vector2(0.94f, 0.30f));
         CreateButton(root.transform, "ToStash", "Stash로 이동", new Vector2(0.08f, 0.10f), MoveToStash);
         CreateButton(root.transform, "Equip", "장착", new Vector2(0.53f, 0.10f), Equip);
+        CreateButton(root.transform, "SortRarity", "등급순 정렬", new Vector2(0.08f, 0.02f),
+            () => LootRuntimeState.SortStashByRarity());
+        CreateButton(root.transform, "SortType", "종류순 정렬", new Vector2(0.53f, 0.02f),
+            () => LootRuntimeState.SortStashByType());
     }
 
     private void Refresh()
@@ -76,6 +99,10 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         gridView.SetItemClickHandler(Select);
         gridView.SetItemDoubleClickHandler(MoveToStash);
         title.text = $"출격 가방 {LootRuntimeState.RunBagGrid.Width}×{LootRuntimeState.RunBagGrid.Height}";
+        stashGridView.Bind(LootRuntimeState.StashGrid, LootRuntimeState.MoveStashItem);
+        stashGridView.SetDimPredicate(BaseCampManagementPanel.ShouldDimStashItem);
+        stashGridView.SetItemDoubleClickHandler(item => LootRuntimeState.MoveStashItemToBag(item.InstanceId));
+        stashTitle.text = $"Stash {LootRuntimeState.StashGrid.Width}×{LootRuntimeState.StashGrid.Height}";
         if (selected != null && LootRuntimeState.RunBagGrid.Find(selected.InstanceId) == null) selected = null;
         if (selected == null) gridView.ClearSelection();
         notice.text = selected?.Definition != null ? selected.Definition.Name : "아이템을 선택하세요";

@@ -13,6 +13,7 @@ public sealed class LootGridView : MonoBehaviour
     private Func<string, int, int, bool, bool> moveHandler;
     private Action<LootItemInstance> itemClickHandler;
     private Action<LootItemInstance> itemDoubleClickHandler;
+    private Func<LootItemInstance, bool> dimPredicate;
     private RectTransform gridRoot;
     private RectTransform preview;
     private Text tooltip;
@@ -43,6 +44,12 @@ public sealed class LootGridView : MonoBehaviour
     public void SetItemDoubleClickHandler(Action<LootItemInstance> handler)
     {
         itemDoubleClickHandler = handler;
+    }
+
+    public void SetDimPredicate(Func<LootItemInstance, bool> predicate)
+    {
+        dimPredicate = predicate;
+        Refresh();
     }
 
     private void Update()
@@ -102,6 +109,7 @@ public sealed class LootGridView : MonoBehaviour
         SetItemRect(rect, placement.X, placement.Y, placement.Width, placement.Height);
         Image image = itemObject.GetComponent<Image>();
         image.color = RarityColor(placement.Item.Definition.Rarity);
+        itemObject.GetComponent<CanvasGroup>().alpha = dimPredicate != null && dimPredicate(placement.Item) ? 0.28f : 1f;
         Outline selectionOutline = itemObject.AddComponent<Outline>();
         selectionOutline.effectColor = new Color(1f, 0.82f, 0.18f, 1f);
         selectionOutline.effectDistance = new Vector2(3f, -3f);

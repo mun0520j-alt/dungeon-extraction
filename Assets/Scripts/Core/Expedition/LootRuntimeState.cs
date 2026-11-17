@@ -14,6 +14,7 @@ public static class LootRuntimeState
     private static readonly Dictionary<LootItemType, LootItemInstance> equippedLoot = new Dictionary<LootItemType, LootItemInstance>();
     private static readonly HashSet<LootItemType> unequippedBasicSlots = new HashSet<LootItemType>();
     private static LootGridModel runBagGrid = new LootGridModel(BaseBagGridWidth, BaseBagGridHeight);
+    private static LootGridModel stashGrid;
     private static readonly HashSet<string> insuranceSelection = new HashSet<string>();
     private static readonly HashSet<string> insuredThisRun = new HashSet<string>();
     private static readonly Dictionary<string, string> insuredItemIds = new Dictionary<string, string>();
@@ -24,6 +25,7 @@ public static class LootRuntimeState
     public static IReadOnlyList<LootItemInstance> Stash => stash;
     public static IReadOnlyDictionary<LootItemType, LootItemInstance> EquippedLoot => equippedLoot;
     public static LootGridModel RunBagGrid => runBagGrid;
+    public static LootGridModel StashGrid { get { EnsureStashGrid(); return stashGrid; } }
     public static int EquippedBagCapacityBonus { get; private set; }
     public static bool HasBasicLoadout { get; private set; }
     public static int Gold { get; private set; }
@@ -47,6 +49,7 @@ public static class LootRuntimeState
         runBag.Clear();
         runBagGrid = new LootGridModel(BaseBagGridWidth, BaseBagGridHeight);
         stash.Clear();
+        stashGrid = null;
         equippedLoot.Clear();
         unequippedBasicSlots.Clear();
         EquippedBagCapacityBonus = 0;
@@ -249,6 +252,23 @@ public static class LootRuntimeState
         Changed?.Invoke();
         return true;
     }
+
+    public static bool MoveStashItem(string instanceId, int x, int y, bool rotated)
+    {
+        EnsureStashGrid();
+        if (!stashGrid.Move(instanceId, x, y, rotated)) return Fail("해당 위치에 놓을 수 없습니다");
+        LastFailureReason = null;
+        Changed?.Invoke();
+        return true;
+    }
+
+    public static bool SortStashByRarity() => RepackStash(stash
+        .OrderByDescending(item => item?.Definition?.Rarity ?? LootRarity.Normal)
+        .ThenByDescending(ItemArea).ThenBy(item => item?.Definition?.Name));
+
+    public static bool SortStashByType() => RepackStash(stash
+        .OrderBy(item => item?.Definition?.Type ?? LootItemType.Junk)
+        .ThenByDescending(ItemArea).ThenBy(item => item?.Definition?.Name));
 
     public static bool TryEquipFromStash(string instanceId)
     {
@@ -654,6 +674,45 @@ public static class LootRuntimeState
         if (runBag.Count > 0) stash.AddRange(runBag);
         runBag.Clear();
         runBagGrid = new LootGridModel(BaseBagGridWidth, BaseBagGridHeight);
+    }
+
+    private static int CurrentStashHeight()
+    {
+        int height = M9StashConfig.BaseHeight;
+        if (QuestRuntimeState.HasCompleted("q03")) height += M9StashConfig.RowsAfterQ03;
+        if (QuestRuntimeState.HasCompleted("q06a") || QuestRuntimeState.HasCompleted("q06b")) height += M9StashConfig.RowsAfterQ06;
+        return height;
+    }
+
+    private static void EnsureStashGrid()
+    {
+        int width = M9StashConfig.BaseWidth;
+        int height = CurrentStashHeight();
+        if (stashGrid != null && stashGrid.Width == width && stashGrid.Height == height
+            && stashGrid.Placements.Count == stash.Count) return;
+        var rebuilt = new LootGridModel(width, height);
+        var pending = new List<LootItemInstance>();
+        foreach (LootItemInstance item in stash)
+        {
+            LootGridPlacement previous = stashGrid?.Find(item?.InstanceId);
+            if (item != null && previous != null && rebuilt.TryPlace(item, previous.X, previous.Y, previous.Rotated)) continue;
+            if (item != null) pending.Add(item);
+        }
+        foreach (LootItemInstance item in pending.OrderByDescending(ItemArea))
+            if (!rebuilt.TryAutoPlace(item, out _))
+                Debug.LogWarning($"[M9 Stash] 격자에 배치하지 못한 아이템: {item.Definition?.Name ?? item.InstanceId}");
+        stashGrid = rebuilt;
+    }
+
+    private static bool RepackStash(IEnumerable<LootItemInstance> ordered)
+    {
+        var candidate = new LootGridModel(M9StashConfig.BaseWidth, CurrentStashHeight());
+        foreach (LootItemInstance item in ordered)
+            if (item == null || !candidate.TryAutoPlace(item, out _)) return Fail("Stash 공간이 부족합니다.");
+        stashGrid = candidate;
+        LastFailureReason = null;
+        Changed?.Invoke();
+        return true;
     }
 
     private static bool Fail(string reason)

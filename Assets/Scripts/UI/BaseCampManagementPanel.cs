@@ -6,6 +6,8 @@ using UnityEngine;
 // BaseCamp 전용 영지 정비 UI. 데이터 변경은 LootRuntimeState가 소유한다.
 public sealed class BaseCampManagementPanel : MonoBehaviour
 {
+    public static int StashFilterVersion { get; private set; }
+    private static BaseCampManagementPanel activeInstance;
     private enum SortMode { Acquired, RarityHigh, RarityLow, Type }
     private enum MerchantMode { Sell, Buy, Quest }
     private enum FoundInRaidFilter { All, FoundOnly, NotFound }
@@ -22,11 +24,14 @@ public sealed class BaseCampManagementPanel : MonoBehaviour
     private GUIStyle foundInRaidStarStyle;
     private GUIStyle itemRichTextStyle;
 
+    private void OnEnable() => activeInstance = this;
+    private void OnDisable() { if (activeInstance == this) activeInstance = null; }
+
     private void OnGUI()
     {
         float sideWidth = Mathf.Clamp(Screen.width * 0.24f, 360f, 480f);
         DrawMerchantPanel(new Rect(20, 20, sideWidth, Screen.height - 40));
-        float gridReserve = Mathf.Clamp(Screen.width * 0.25f, 300f, 420f);
+        float gridReserve = Mathf.Clamp(Screen.width * 0.34f, 520f, 650f);
         DrawStashPanel(new Rect(Screen.width - sideWidth - gridReserve - 40, 20, sideWidth, Screen.height - 40));
     }
 
@@ -70,12 +75,15 @@ public sealed class BaseCampManagementPanel : MonoBehaviour
 
         GUILayout.Space(6);
         GUILayout.BeginHorizontal();
-        if (GUILayout.Button($"정렬: {sortMode}")) sortMode = (SortMode)(((int)sortMode + 1) % 4);
-        if (GUILayout.Button($"부위: {(typeFilter?.ToString() ?? "전체")}")) CycleType();
-        if (GUILayout.Button($"등급: {(rarityFilter?.ToString() ?? "전체")}")) CycleRarity();
+        if (GUILayout.Button($"정렬: {sortMode}")) { sortMode = (SortMode)(((int)sortMode + 1) % 4); StashFilterVersion++; }
+        if (GUILayout.Button($"부위: {(typeFilter?.ToString() ?? "전체")}")) { CycleType(); StashFilterVersion++; }
+        if (GUILayout.Button($"등급: {(rarityFilter?.ToString() ?? "전체")}")) { CycleRarity(); StashFilterVersion++; }
         GUILayout.EndHorizontal();
         if (GUILayout.Button(FoundInRaidFilterLabel()))
+        {
             foundInRaidFilter = (FoundInRaidFilter)(((int)foundInRaidFilter + 1) % 3);
+            StashFilterVersion++;
+        }
 
         DrawFoundInRaidLegend();
         GUILayout.Label("Stash");
@@ -298,6 +306,16 @@ public sealed class BaseCampManagementPanel : MonoBehaviour
             case SortMode.Type: return items.OrderBy(x => x.Definition.Type).ThenByDescending(x => x.Definition.Rarity).ToArray();
             default: return items.ToArray();
         }
+    }
+
+    public static bool ShouldDimStashItem(LootItemInstance item)
+    {
+        BaseCampManagementPanel panel = activeInstance;
+        if (panel == null || item?.Definition == null) return false;
+        if (panel.typeFilter.HasValue && item.Definition.Type != panel.typeFilter.Value) return true;
+        if (panel.rarityFilter.HasValue && item.Definition.Rarity != panel.rarityFilter.Value) return true;
+        if (panel.foundInRaidFilter == FoundInRaidFilter.FoundOnly && !item.IsFoundInRaid) return true;
+        return panel.foundInRaidFilter == FoundInRaidFilter.NotFound && item.IsFoundInRaid;
     }
 
     private void CycleType()

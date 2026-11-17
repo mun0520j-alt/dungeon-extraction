@@ -1,6 +1,6 @@
 # 아이템 CSV 데이터 사전
 
-> 원본: `Assets/Resources/Data/items.csv`. M6부터 출격 가방 격자 크기의 권위 데이터도 이 파일에 둔다. M7 경제 수치는 `Assets/Resources/Data/m7_economy.csv`, M8 퀘스트·우호도 수치는 `m8_quests.csv`와 `m8_economy.csv`에서 관리한다.
+> 원본: `Assets/Resources/Data/items.csv`. M6부터 출격 가방 격자 크기의 권위 데이터도 이 파일에 둔다. M7 경제 수치는 `Assets/Resources/Data/m7_economy.csv`, M8 퀘스트·우호도 수치는 `m8_quests.csv`와 `m8_economy.csv`, M9 Stash 크기는 `m9_stash.csv`에서 관리한다.
 
 ## 컬럼
 
@@ -84,6 +84,20 @@
 
 - Lv2/Lv3 필요 우호도와 Gold, 레벨당 판매 보너스·구매 할인·보험 반환 보너스를 관리한다.
 - 런타임 가격과 보험 판정은 UI가 아니라 `LootRuntimeState`에서 이 설정을 적용한다.
+
+## M9 Stash CSV
+
+원본: `Assets/Resources/Data/m9_stash.csv`
+
+| 키 | 의미 | 현재값 |
+|---|---|---:|
+| `base_width` | Stash 기본 가로 | 10 |
+| `base_height` | Stash 기본 세로 | 8 |
+| `rows_after_q03` | q03 완료 확장 행 | 2 |
+| `rows_after_q06` | q06a 또는 q06b 완료 확장 행 | 2 |
+
+- 최대 크기는 10×12이며 Gold 확장은 없다.
+- 확장 여부는 세이브에 중복 저장하지 않고 완료 퀘스트에서 계산한다.
 
 ## 알려진 제한
 
