@@ -6,13 +6,18 @@ using UnityEngine.UI;
 public sealed class ExpeditionResultPanel : MonoBehaviour
 {
     private RectTransform panelRect;
+    private Button startButton;
+    private Text startLabel;
 
     private void Start()
     {
         Build();
+        LootRuntimeState.Changed += RefreshStartButton;
         if (GetComponent<BaseCampManagementPanel>() == null) gameObject.AddComponent<BaseCampManagementPanel>();
         if (GetComponent<BaseCampGridPanel>() == null) gameObject.AddComponent<BaseCampGridPanel>();
     }
+
+    private void OnDestroy() => LootRuntimeState.Changed -= RefreshStartButton;
 
     private void Build()
     {
@@ -55,25 +60,26 @@ public sealed class ExpeditionResultPanel : MonoBehaviour
         var buttonGo = CreateUiObject("StartExpeditionButton", panel.transform);
         var buttonImage = buttonGo.AddComponent<Image>();
         buttonImage.color = new Color(0.18f, 0.48f, 0.28f, 1f);
-        var button = buttonGo.AddComponent<Button>();
-        button.targetGraphic = buttonImage;
-        button.onClick.AddListener(StartExpedition);
+        startButton = buttonGo.AddComponent<Button>();
+        startButton.targetGraphic = buttonImage;
+        startButton.onClick.AddListener(StartExpedition);
         var buttonRect = buttonGo.GetComponent<RectTransform>();
         buttonRect.anchorMin = new Vector2(0.3f, 0.08f);
         buttonRect.anchorMax = new Vector2(0.7f, 0.22f);
         buttonRect.offsetMin = buttonRect.offsetMax = Vector2.zero;
 
         var labelGo = CreateUiObject("Label", buttonGo.transform);
-        var label = labelGo.AddComponent<Text>();
-        label.font = HudFont.GetDefault();
-        label.fontSize = 28;
-        label.alignment = TextAnchor.MiddleCenter;
-        label.color = Color.white;
-        label.text = result == null ? "출격" : "다시 출격";
+        startLabel = labelGo.AddComponent<Text>();
+        startLabel.font = HudFont.GetDefault();
+        startLabel.fontSize = 28;
+        startLabel.alignment = TextAnchor.MiddleCenter;
+        startLabel.color = Color.white;
+        startLabel.text = result == null ? "출격" : "다시 출격";
         var labelRect = labelGo.GetComponent<RectTransform>();
         labelRect.anchorMin = Vector2.zero;
         labelRect.anchorMax = Vector2.one;
         labelRect.offsetMin = labelRect.offsetMax = Vector2.zero;
+        RefreshStartButton();
     }
 
     private void Update() => ApplyLayout();
@@ -92,8 +98,19 @@ public sealed class ExpeditionResultPanel : MonoBehaviour
 
     private static void StartExpedition()
     {
+        if (!LootRuntimeState.CanStartExpedition) return;
         M5SaveService.PrepareForExpedition();
         ExpeditionSession.BeginNewRun();
         SceneManager.LoadScene("InDungeon");
+    }
+
+    private void RefreshStartButton()
+    {
+        if (startButton == null || startLabel == null) return;
+        startButton.interactable = LootRuntimeState.CanStartExpedition;
+        startLabel.text = LootRuntimeState.CanStartExpedition
+            ? (ExpeditionSession.LastResult == null ? "출격" : "다시 출격")
+            : "임시 보관함을 정리하세요";
+        startLabel.fontSize = LootRuntimeState.CanStartExpedition ? 28 : 15;
     }
 }

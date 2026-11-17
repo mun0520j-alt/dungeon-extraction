@@ -15,6 +15,9 @@ public sealed class BaseCampGridPanel : MonoBehaviour
     private Text typeFilterLabel;
     private Text rarityFilterLabel;
     private Text raidFilterLabel;
+    private Text temporaryLabel;
+    private int temporaryIndex;
+    private bool confirmTemporaryDelete;
     private RectTransform loadoutRoot;
     private RectTransform stashRoot;
     private int filterVersion = -1;
@@ -86,7 +89,7 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         var viewport = new GameObject("StashViewport", typeof(RectTransform), typeof(Image), typeof(RectMask2D), typeof(ScrollRect));
         viewport.transform.SetParent(stashPanel.transform, false);
         RectTransform viewportRect = viewport.GetComponent<RectTransform>();
-        viewportRect.anchorMin = new Vector2(0.02f, 0.10f);
+        viewportRect.anchorMin = new Vector2(0.02f, 0.18f);
         viewportRect.anchorMax = new Vector2(0.98f, 0.70f);
         viewportRect.offsetMin = viewportRect.offsetMax = Vector2.zero;
         viewport.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.18f);
@@ -122,6 +125,14 @@ public sealed class BaseCampGridPanel : MonoBehaviour
             BaseCampManagementPanel.CycleRaidFilterFromGrid, 0.24f).GetComponentInChildren<Text>();
         CreateButton(stashPanel.transform, "FilterReset", "필터 초기화", new Vector2(0.76f, 0.78f),
             BaseCampManagementPanel.ResetFiltersFromGrid, 0.22f);
+        temporaryLabel = CreateText(stashPanel.transform, "TemporaryStorage", "임시 보관함 비어 있음", 12,
+            new Vector2(0.02f, 0.11f), new Vector2(0.98f, 0.17f));
+        temporaryLabel.color = new Color(1f, 0.72f, 0.32f, 1f);
+        CreateButton(stashPanel.transform, "TempPrev", "◀", new Vector2(0.02f, 0.03f), PreviousTemporary, 0.08f);
+        CreateButton(stashPanel.transform, "TempNext", "▶", new Vector2(0.11f, 0.03f), NextTemporary, 0.08f);
+        CreateButton(stashPanel.transform, "TempToStash", "Stash로", new Vector2(0.21f, 0.03f), MoveTemporaryToStash, 0.20f);
+        CreateButton(stashPanel.transform, "TempToBag", "열린 가방으로", new Vector2(0.43f, 0.03f), MoveTemporaryToOpenedBag, 0.27f);
+        CreateButton(stashPanel.transform, "TempDelete", "삭제", new Vector2(0.72f, 0.03f), DeleteTemporary, 0.12f);
         RefreshFilterLabels();
         ApplyLayout();
     }
@@ -159,9 +170,80 @@ public sealed class BaseCampGridPanel : MonoBehaviour
             ? $"Stash {shownGrid.Width}×{shownGrid.Height}"
             : $"{openedBag.Definition.Name} {shownGrid.Width}×{shownGrid.Height} · 깊이 {LootRuntimeState.GetStashBagDepth(openedBag.InstanceId)}";
         if (bagBackButton != null) bagBackButton.gameObject.SetActive(openedBag != null);
+        RefreshTemporaryStorage();
         if (selected != null && LootRuntimeState.RunBagGrid.Find(selected.InstanceId) == null) selected = null;
         if (selected == null) gridView.ClearSelection();
         notice.text = selected?.Definition != null ? selected.Definition.Name : "아이템을 선택하세요";
+    }
+
+    private LootItemInstance SelectedTemporary()
+    {
+        if (LootRuntimeState.TemporaryStorage.Count == 0) return null;
+        temporaryIndex = Mathf.Clamp(temporaryIndex, 0, LootRuntimeState.TemporaryStorage.Count - 1);
+        return LootRuntimeState.TemporaryStorage[temporaryIndex];
+    }
+
+    private void RefreshTemporaryStorage()
+    {
+        if (temporaryLabel == null) return;
+        LootItemInstance item = SelectedTemporary();
+        temporaryLabel.text = item == null
+            ? "임시 보관함 비어 있음"
+            : $"임시 보관함 {temporaryIndex + 1}/{LootRuntimeState.TemporaryStorage.Count} · {item.Definition?.Name}";
+    }
+
+    private void PreviousTemporary()
+    {
+        confirmTemporaryDelete = false;
+        if (LootRuntimeState.TemporaryStorage.Count > 0)
+            temporaryIndex = (temporaryIndex - 1 + LootRuntimeState.TemporaryStorage.Count) % LootRuntimeState.TemporaryStorage.Count;
+        RefreshTemporaryStorage();
+    }
+
+    private void NextTemporary()
+    {
+        confirmTemporaryDelete = false;
+        if (LootRuntimeState.TemporaryStorage.Count > 0)
+            temporaryIndex = (temporaryIndex + 1) % LootRuntimeState.TemporaryStorage.Count;
+        RefreshTemporaryStorage();
+    }
+
+    private void MoveTemporaryToStash()
+    {
+        LootItemInstance item = SelectedTemporary();
+        if (item == null) return;
+        bool ok = LootRuntimeState.MoveTemporaryItemToStash(item.InstanceId);
+        notice.text = ok ? "Stash로 이동했습니다." : LootRuntimeState.LastFailureReason;
+        confirmTemporaryDelete = false;
+    }
+
+    private void MoveTemporaryToOpenedBag()
+    {
+        LootItemInstance item = SelectedTemporary();
+        if (item == null || openedBag == null)
+        {
+            notice.text = "먼저 Stash에서 대상 가방을 여세요.";
+            return;
+        }
+        bool ok = LootRuntimeState.MoveTemporaryItemIntoBag(item.InstanceId, openedBag.InstanceId);
+        notice.text = ok ? "열린 가방으로 이동했습니다." : LootRuntimeState.LastFailureReason;
+        confirmTemporaryDelete = false;
+    }
+
+    private void DeleteTemporary()
+    {
+        LootItemInstance item = SelectedTemporary();
+        if (item == null) return;
+        bool hasContents = item.Definition?.Type == LootItemType.Bag && item.BagGrid.Placements.Count > 0;
+        if (!confirmTemporaryDelete)
+        {
+            confirmTemporaryDelete = true;
+            notice.text = hasContents ? "가방 안 아이템도 삭제됩니다. 삭제를 다시 누르세요." : "삭제하려면 버튼을 다시 누르세요.";
+            return;
+        }
+        bool ok = LootRuntimeState.DeleteTemporaryItem(item.InstanceId, confirmedNestedContents: true);
+        notice.text = ok ? "임시 보관함 아이템을 삭제했습니다." : LootRuntimeState.LastFailureReason;
+        confirmTemporaryDelete = false;
     }
 
     private void CreateSlot(Transform parent, LootItemType type, Vector2 min, Vector2 max)
