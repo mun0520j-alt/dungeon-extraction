@@ -1,0 +1,18 @@
+{
+    "save_version": 4,
+    "saved_at": "2026-11-16T09:24:18.0992941Z",
+    "stash": [],
+    "run_bag": [],
+    "equipped": [],
+    "has_basic_loadout": false,
+    "unequipped_basic_slots": [],
+    "settings": {
+        "fullscreen": true,
+        "resolution_width": 1920,
+        "resolution_height": 1080
+    },
+    "expedition_in_progress": true,
+    "gold": 0,
+    "insurance_returns": [],
+    "insured_this_run": []
+}
