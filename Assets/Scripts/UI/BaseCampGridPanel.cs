@@ -12,6 +12,9 @@ public sealed class BaseCampGridPanel : MonoBehaviour
     private LootItemInstance selected;
     private LootItemInstance openedBag;
     private Button bagBackButton;
+    private Text typeFilterLabel;
+    private Text rarityFilterLabel;
+    private Text raidFilterLabel;
     private RectTransform loadoutRoot;
     private RectTransform stashRoot;
     private int filterVersion = -1;
@@ -46,6 +49,7 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         if (stashGridView == null || filterVersion == BaseCampManagementPanel.StashFilterVersion) return;
         filterVersion = BaseCampManagementPanel.StashFilterVersion;
         stashGridView.SetDimPredicate(BaseCampManagementPanel.ShouldDimStashItem);
+        RefreshFilterLabels();
     }
 
     private void Build()
@@ -83,7 +87,7 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         viewport.transform.SetParent(stashPanel.transform, false);
         RectTransform viewportRect = viewport.GetComponent<RectTransform>();
         viewportRect.anchorMin = new Vector2(0.02f, 0.10f);
-        viewportRect.anchorMax = new Vector2(0.98f, 0.78f);
+        viewportRect.anchorMax = new Vector2(0.98f, 0.70f);
         viewportRect.offsetMin = viewportRect.offsetMax = Vector2.zero;
         viewport.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.18f);
         var stashObject = new GameObject("StashGrid", typeof(RectTransform));
@@ -104,14 +108,21 @@ public sealed class BaseCampGridPanel : MonoBehaviour
             new Vector2(0.06f, 0.20f), new Vector2(0.94f, 0.30f));
         CreateButton(root.transform, "ToStash", "Stash로 이동", new Vector2(0.08f, 0.10f), MoveToStash);
         CreateButton(root.transform, "Equip", "장착", new Vector2(0.53f, 0.10f), Equip);
-        CreateButton(stashPanel.transform, "SortRarity", "등급순", new Vector2(0.02f, 0.86f),
-            () => LootRuntimeState.SortStashByRarity(), 0.18f);
-        CreateButton(stashPanel.transform, "SortType", "종류순", new Vector2(0.23f, 0.86f),
-            () => LootRuntimeState.SortStashByType(), 0.18f);
-        CreateButton(stashPanel.transform, "FilterType", "부위", new Vector2(0.44f, 0.86f), BaseCampManagementPanel.CycleTypeFilterFromGrid, 0.18f);
-        CreateButton(stashPanel.transform, "FilterRarity", "등급", new Vector2(0.65f, 0.86f), BaseCampManagementPanel.CycleRarityFilterFromGrid, 0.18f);
-        CreateButton(stashPanel.transform, "FilterRaid", "★ 필터", new Vector2(0.80f, 0.86f), BaseCampManagementPanel.CycleRaidFilterFromGrid, 0.18f);
-        bagBackButton = CreateButton(stashPanel.transform, "BagBack", "상위 보관함", new Vector2(0.53f, 0.79f), CloseOpenedBag);
+        CreateButton(stashPanel.transform, "SortRarity", "정렬: 등급 높은순", new Vector2(0.02f, 0.86f),
+            () => LootRuntimeState.SortStashByRarity(), 0.31f);
+        CreateButton(stashPanel.transform, "SortType", "정렬: 종류별", new Vector2(0.35f, 0.86f),
+            () => LootRuntimeState.SortStashByType(), 0.31f);
+        bagBackButton = CreateButton(stashPanel.transform, "BagBack", "상위 보관함", new Vector2(0.68f, 0.86f), CloseOpenedBag, 0.30f);
+
+        typeFilterLabel = CreateButton(stashPanel.transform, "FilterType", "부위: 전체", new Vector2(0.02f, 0.78f),
+            BaseCampManagementPanel.CycleTypeFilterFromGrid, 0.22f).GetComponentInChildren<Text>();
+        rarityFilterLabel = CreateButton(stashPanel.transform, "FilterRarity", "등급: 전체", new Vector2(0.26f, 0.78f),
+            BaseCampManagementPanel.CycleRarityFilterFromGrid, 0.22f).GetComponentInChildren<Text>();
+        raidFilterLabel = CreateButton(stashPanel.transform, "FilterRaid", "인레이드: 전체", new Vector2(0.50f, 0.78f),
+            BaseCampManagementPanel.CycleRaidFilterFromGrid, 0.24f).GetComponentInChildren<Text>();
+        CreateButton(stashPanel.transform, "FilterReset", "필터 초기화", new Vector2(0.76f, 0.78f),
+            BaseCampManagementPanel.ResetFiltersFromGrid, 0.22f);
+        RefreshFilterLabels();
         ApplyLayout();
     }
 
@@ -120,6 +131,13 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         BaseCampLayoutRects layout = BaseCampLayout.Calculate();
         BaseCampLayout.ApplyTo(loadoutRoot, layout.Loadout);
         BaseCampLayout.ApplyTo(stashRoot, layout.Stash);
+    }
+
+    private void RefreshFilterLabels()
+    {
+        if (typeFilterLabel != null) typeFilterLabel.text = $"부위: {BaseCampManagementPanel.CurrentTypeFilterLabel}";
+        if (rarityFilterLabel != null) rarityFilterLabel.text = $"등급: {BaseCampManagementPanel.CurrentRarityFilterLabel}";
+        if (raidFilterLabel != null) raidFilterLabel.text = $"인레이드: {BaseCampManagementPanel.CurrentRaidFilterLabel}";
     }
 
     private void Refresh()
@@ -326,7 +344,10 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         rect.offsetMin = rect.offsetMax = Vector2.zero;
         go.GetComponent<Image>().color = new Color(0.16f, 0.36f, 0.48f, 0.95f);
         go.GetComponent<Button>().onClick.AddListener(action);
-        CreateText(go.transform, "Label", label, 13, Vector2.zero, Vector2.one);
+        Text buttonLabel = CreateText(go.transform, "Label", label, 13, Vector2.zero, Vector2.one);
+        buttonLabel.resizeTextForBestFit = true;
+        buttonLabel.resizeTextMinSize = 9;
+        buttonLabel.resizeTextMaxSize = 13;
         return go.GetComponent<Button>();
     }
 }

@@ -7,6 +7,9 @@ using UnityEngine;
 public sealed class BaseCampManagementPanel : MonoBehaviour
 {
     public static int StashFilterVersion { get; private set; }
+    public static string CurrentTypeFilterLabel => activeInstance?.TypeFilterLabel() ?? "전체";
+    public static string CurrentRarityFilterLabel => activeInstance?.rarityFilter?.ToString() ?? "전체";
+    public static string CurrentRaidFilterLabel => activeInstance?.RaidFilterLabel() ?? "전체";
     private static BaseCampManagementPanel activeInstance;
     private enum SortMode { Acquired, RarityHigh, RarityLow, Type }
     private enum MerchantMode { Sell, Buy, Quest }
@@ -344,6 +347,39 @@ public sealed class BaseCampManagementPanel : MonoBehaviour
         if (activeInstance == null) return;
         activeInstance.foundInRaidFilter = (FoundInRaidFilter)(((int)activeInstance.foundInRaidFilter + 1) % 3);
         StashFilterVersion++;
+    }
+
+    public static void ResetFiltersFromGrid()
+    {
+        if (activeInstance == null) return;
+        activeInstance.typeFilter = null;
+        activeInstance.rarityFilter = null;
+        activeInstance.foundInRaidFilter = FoundInRaidFilter.All;
+        StashFilterVersion++;
+    }
+
+    private string TypeFilterLabel()
+    {
+        if (!typeFilter.HasValue) return "전체";
+        switch (typeFilter.Value)
+        {
+            case LootItemType.Weapon: return "무기";
+            case LootItemType.Shield: return "방패";
+            case LootItemType.Armor: return "갑옷";
+            case LootItemType.Bag: return "가방";
+            case LootItemType.Junk: return "잡동사니";
+            default: return typeFilter.Value.ToString();
+        }
+    }
+
+    private string RaidFilterLabel()
+    {
+        switch (foundInRaidFilter)
+        {
+            case FoundInRaidFilter.FoundOnly: return "★만";
+            case FoundInRaidFilter.NotFound: return "비인레이드";
+            default: return "전체";
+        }
     }
 
     private void CycleType()
