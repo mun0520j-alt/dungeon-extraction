@@ -8,13 +8,14 @@ using UnityEngine;
 // LootRuntimeState가 상태를 소유하고, 이 클래스는 저장 파일 직렬화와 교체만 담당한다.
 public static class M5SaveService
 {
-    private const int CurrentSaveVersion = 5;
+    private const int CurrentSaveVersion = 6;
     private const string SaveFolderName = "Save";
     private const string SaveFileName = "save.json";
     private const string BackupFileName = "save.bak";
     private const string LegacyV2BackupFileName = "save_v2.bak";
     private const string LegacyV3BackupFileName = "save_v3.bak";
     private const string LegacyV4BackupFileName = "save_v4.bak";
+    private const string LegacyV5BackupFileName = "save_v5.bak";
     private const string TempFileName = "save.tmp";
 
     private static bool isRestoring;
@@ -27,6 +28,7 @@ public static class M5SaveService
     public static string LegacyV2BackupPath => Path.Combine(SaveDirectory, LegacyV2BackupFileName);
     public static string LegacyV3BackupPath => Path.Combine(SaveDirectory, LegacyV3BackupFileName);
     public static string LegacyV4BackupPath => Path.Combine(SaveDirectory, LegacyV4BackupFileName);
+    public static string LegacyV5BackupPath => Path.Combine(SaveDirectory, LegacyV5BackupFileName);
     public static bool Fullscreen => currentSettings.fullscreen;
     public static int ResolutionWidth => currentSettings.resolution_width;
     public static int ResolutionHeight => currentSettings.resolution_height;
@@ -140,6 +142,11 @@ public static class M5SaveService
             Debug.LogError("[Save] v4 원본 백업에 실패해 v5 마이그레이션을 중단했습니다. 기존 파일은 변경하지 않습니다.");
             return;
         }
+        if (data.save_version == 5 && !TryPreserveLegacyV5Save(loadedPath))
+        {
+            Debug.LogError("[Save] v5 원본 백업에 실패해 v6 마이그레이션을 중단했습니다. 기존 파일은 변경하지 않습니다.");
+            return;
+        }
         Restore(data);
         if (!data.expedition_in_progress)
         {
@@ -154,16 +161,8 @@ public static class M5SaveService
         recoveryNotice = "이전 원정이 종료되어 MIA 처리되었습니다.";
         QuestRuntimeState.RecordInterruptedMIA();
         LootRuntimeState.ClearConfirmedInsuranceWithoutReturn();
-        data.save_version = CurrentSaveVersion;
-        data.expedition_in_progress = false;
-        data.saved_at = DateTime.UtcNow.ToString("O");
-        // 보험은 장비에 걸린다. MIA로 사라진 장비의 보험만 정리하고 남은 장비의 보험은 유지한다.
-        data.insured_this_run = LootRuntimeState.InsuredThisRunIds.Select(instanceId => new LootRuntimeState.InsurancePolicy
-        {
-            InstanceId = instanceId,
-            ItemId = LootRuntimeState.GetInsuredItemId(instanceId)
-        }).ToList();
-        Write(data);
+        // 복원된 런타임 상태를 다시 캡처해 v6 재귀 구조와 임시 보관함까지 일관되게 기록한다.
+        Write(Capture(expeditionInProgress: false, includeExpeditionItems: true));
         Debug.LogWarning("[Save] 종료되지 않은 원정을 MIA로 처리했습니다.");
     }
 
@@ -218,6 +217,23 @@ public static class M5SaveService
         }
     }
 
+    private static bool TryPreserveLegacyV5Save(string sourcePath)
+    {
+        try
+        {
+            Directory.CreateDirectory(SaveDirectory);
+            if (File.Exists(LegacyV5BackupPath)) return true;
+            File.Copy(sourcePath, LegacyV5BackupPath, false);
+            Debug.Log($"[Save] v5 원본을 별도 백업으로 보존했습니다: {LegacyV5BackupPath}");
+            return true;
+        }
+        catch (Exception exception)
+        {
+            Debug.LogError($"[Save] v5 원본 백업 실패: {LegacyV5BackupPath}\n{exception.Message}");
+            return false;
+        }
+    }
+
     private static SaveData TryRead(string path)
     {
         if (!File.Exists(path)) return null;
@@ -244,16 +260,24 @@ public static class M5SaveService
         isRestoring = true;
         try
         {
+            // Stash 높이는 완료 퀘스트(q03/q06)에서 계산하므로 아이템 배치보다 먼저 복원한다.
+            QuestRuntimeState.RestorePersistentState(data.quest_state);
+            var context = new RestoreContext(data.save_version);
+            List<LootGridRestoreItem> restoredStash = RestoreGridItems(data.stash, context, bagDepth: 0,
+                placementSupported: data.save_version >= 6);
+            List<LootItemInstance> restoredEquipment = RestoreItems(data.equipped, context, bagDepth: 0);
             LootRuntimeState.RestorePersistentState(
-                RestoreRunBag(data.run_bag, data.save_version),
-                RestoreItems(data.stash, data.save_version),
-                RestoreItems(data.equipped, data.save_version),
+                RestoreRunBag(data.run_bag, context),
+                Array.Empty<LootItemInstance>(),
+                restoredEquipment,
                 RestoreBasicSlots(data.unequipped_basic_slots),
                 data.has_basic_loadout,
                 data.gold);
+            var restoredTemporary = RestoreItems(data.temporary_storage, context, bagDepth: 0);
+            restoredTemporary.AddRange(context.Overflow);
+            LootRuntimeState.RestoreM9Storage(restoredStash, restoredTemporary);
             LootRuntimeState.RestoreInsurance(data.insurance_returns);
             LootRuntimeState.RestoreConfirmedInsurance(data.insured_this_run);
-            QuestRuntimeState.RestorePersistentState(data.quest_state);
             currentSettings = data.settings != null ? data.settings.Normalized() : SaveSettings.Default();
         }
         finally
@@ -262,39 +286,74 @@ public static class M5SaveService
         }
     }
 
-    private static List<LootGridRestoreItem> RestoreRunBag(List<SavedItem> savedItems, int saveVersion)
+    private static List<LootGridRestoreItem> RestoreRunBag(List<SavedItem> savedItems, RestoreContext context)
+    {
+        return RestoreGridItems(savedItems, context, bagDepth: 0, placementSupported: context.SaveVersion >= 3);
+    }
+
+    private static List<LootGridRestoreItem> RestoreGridItems(List<SavedItem> savedItems, RestoreContext context,
+        int bagDepth, bool placementSupported)
     {
         var result = new List<LootGridRestoreItem>();
         if (savedItems == null) return result;
-        foreach (var saved in savedItems)
+        foreach (SavedItem saved in savedItems)
         {
-            LootItemData definition = ResolveDefinition(saved.item_id);
-            if (definition == null)
-            {
-                Debug.LogWarning($"[Save] CSV에 없는 item_id를 건너뜁니다: {saved.item_id}");
-                continue;
-            }
-            var item = new LootItemInstance(definition, saved.instance_id, saveVersion >= 5 && saved.found_in_raid);
-            result.Add(new LootGridRestoreItem(item, saved.x, saved.y, saved.rotated, saveVersion >= 3));
+            LootItemInstance item = RestoreItem(saved, context, bagDepth);
+            if (item != null) result.Add(new LootGridRestoreItem(item, saved.x, saved.y, saved.rotated, placementSupported));
         }
         return result;
     }
 
-    private static List<LootItemInstance> RestoreItems(List<SavedItem> savedItems, int saveVersion)
+    private static List<LootItemInstance> RestoreItems(List<SavedItem> savedItems, RestoreContext context, int bagDepth)
     {
         var result = new List<LootItemInstance>();
         if (savedItems == null) return result;
-        foreach (var saved in savedItems)
+        foreach (SavedItem saved in savedItems)
         {
-            LootItemData definition = ResolveDefinition(saved.item_id);
-            if (definition == null)
-            {
-                Debug.LogWarning($"[Save] CSV에 없는 item_id를 건너뜁니다: {saved.item_id}");
-                continue;
-            }
-            result.Add(new LootItemInstance(definition, saved.instance_id, saveVersion >= 5 && saved.found_in_raid));
+            LootItemInstance item = RestoreItem(saved, context, bagDepth);
+            if (item != null) result.Add(item);
         }
         return result;
+    }
+
+    private static LootItemInstance RestoreItem(SavedItem saved, RestoreContext context, int bagDepth)
+    {
+        if (saved == null) return null;
+        LootItemData definition = ResolveDefinition(saved.item_id);
+        if (definition == null)
+        {
+            Debug.LogWarning($"[Save] CSV에 없는 item_id를 건너뜁니다: {saved.item_id}");
+            return null;
+        }
+        string instanceId = string.IsNullOrWhiteSpace(saved.instance_id) ? Guid.NewGuid().ToString("N") : saved.instance_id;
+        if (!context.InstanceIds.Add(instanceId))
+        {
+            Debug.LogWarning($"[Save] 중복 instance_id를 건너뜁니다: {instanceId}");
+            return null;
+        }
+        var item = new LootItemInstance(definition, instanceId, context.SaveVersion >= 5 && saved.found_in_raid);
+        if (definition.Type != LootItemType.Bag || saved.children == null) return item;
+
+        int currentDepth = bagDepth + 1;
+        foreach (SavedItem childSaved in saved.children)
+        {
+            LootItemInstance child = RestoreItem(childSaved, context, currentDepth);
+            if (child == null) continue;
+            if (child.Definition?.Type == LootItemType.Bag && currentDepth >= LootRuntimeState.MaxBagNestingDepth)
+            {
+                context.Overflow.Add(child);
+                Debug.LogWarning($"[Save] 가방 중첩 4단계 초과 아이템을 임시 보관함으로 이동했습니다: {child.Definition.Name}");
+                continue;
+            }
+            bool placed = item.BagGrid.TryPlace(child, childSaved.x, childSaved.y, childSaved.rotated)
+                || item.BagGrid.TryAutoPlace(child, out _);
+            if (!placed)
+            {
+                context.Overflow.Add(child);
+                Debug.LogWarning($"[Save] 가방 내부 배치 실패 아이템을 임시 보관함으로 이동했습니다: {child.Definition?.Name}");
+            }
+        }
+        return item;
     }
 
     private static IEnumerable<LootItemType> RestoreBasicSlots(List<string> slots)
@@ -333,12 +392,14 @@ public static class M5SaveService
 
     private static SaveData Capture(bool expeditionInProgress, bool includeExpeditionItems)
     {
+        bool equippedBagOwnsRunBag = LootRuntimeState.GetEquipped(LootItemType.Bag) != null;
         return new SaveData
         {
             save_version = CurrentSaveVersion,
             saved_at = DateTime.UtcNow.ToString("O"),
-            stash = SaveItems(LootRuntimeState.Stash),
-            run_bag = includeExpeditionItems ? SaveRunBagItems() : new List<SavedItem>(),
+            stash = SaveGridItems(LootRuntimeState.Stash, LootRuntimeState.StashGrid),
+            temporary_storage = SaveItems(LootRuntimeState.TemporaryStorage),
+            run_bag = includeExpeditionItems && !equippedBagOwnsRunBag ? SaveRunBagItems() : new List<SavedItem>(),
             equipped = includeExpeditionItems ? SaveItems(LootRuntimeState.EquippedLoot.Values) : new List<SavedItem>(),
             has_basic_loadout = includeExpeditionItems && LootRuntimeState.HasBasicLoadout,
             unequipped_basic_slots = includeExpeditionItems
@@ -376,27 +437,44 @@ public static class M5SaveService
             if (item?.Definition == null) continue;
             LootGridPlacement placement = LootRuntimeState.RunBagGrid.Find(item.InstanceId);
             if (placement == null) continue;
-            result.Add(new SavedItem
-            {
-                item_id = item.Definition.Id,
-                instance_id = item.InstanceId,
-                x = placement.X,
-                y = placement.Y,
-                rotated = placement.Rotated
-                ,found_in_raid = item.IsFoundInRaid
-            });
+            result.Add(SaveItem(item, placement));
         }
         return result;
     }
 
     private static List<SavedItem> SaveItems(IEnumerable<LootItemInstance> items)
     {
-        return items.Where(item => item?.Definition != null).Select(item => new SavedItem
+        return items.Where(item => item?.Definition != null).Select(item => SaveItem(item, null)).ToList();
+    }
+
+    private static List<SavedItem> SaveGridItems(IEnumerable<LootItemInstance> items, LootGridModel grid)
+    {
+        var result = new List<SavedItem>();
+        foreach (LootItemInstance item in items)
+        {
+            LootGridPlacement placement = grid?.Find(item?.InstanceId);
+            if (item?.Definition != null && placement != null) result.Add(SaveItem(item, placement));
+        }
+        return result;
+    }
+
+    private static SavedItem SaveItem(LootItemInstance item, LootGridPlacement placement)
+    {
+        var saved = new SavedItem
         {
             item_id = item.Definition.Id,
             instance_id = item.InstanceId,
-            found_in_raid = item.IsFoundInRaid
-        }).ToList();
+            found_in_raid = item.IsFoundInRaid,
+            x = placement?.X ?? 0,
+            y = placement?.Y ?? 0,
+            rotated = placement?.Rotated ?? false
+        };
+        if (item.Definition.Type == LootItemType.Bag && item.BagGrid != null)
+        {
+            foreach (LootGridPlacement child in item.BagGrid.Placements)
+                if (child?.Item?.Definition != null) saved.children.Add(SaveItem(child.Item, child));
+        }
+        return saved;
     }
 
     private static bool Write(SaveData data)
@@ -443,6 +521,7 @@ public static class M5SaveService
         public int save_version = CurrentSaveVersion;
         public string saved_at;
         public List<SavedItem> stash = new List<SavedItem>();
+        public List<SavedItem> temporary_storage = new List<SavedItem>();
         public List<SavedItem> run_bag = new List<SavedItem>();
         public List<SavedItem> equipped = new List<SavedItem>();
         public bool has_basic_loadout;
@@ -464,6 +543,16 @@ public static class M5SaveService
         public int y;
         public bool rotated;
         public bool found_in_raid;
+        public List<SavedItem> children = new List<SavedItem>();
+    }
+
+    private sealed class RestoreContext
+    {
+        public int SaveVersion { get; }
+        public HashSet<string> InstanceIds { get; } = new HashSet<string>(StringComparer.Ordinal);
+        public List<LootItemInstance> Overflow { get; } = new List<LootItemInstance>();
+
+        public RestoreContext(int saveVersion) => SaveVersion = saveVersion;
     }
 
     [Serializable]

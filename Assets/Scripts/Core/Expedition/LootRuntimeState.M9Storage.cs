@@ -81,4 +81,27 @@ public static partial class LootRuntimeState
         if (restored != null) temporaryStorage.AddRange(restored.Where(item => item != null));
         Changed?.Invoke();
     }
+
+    public static void RestoreM9Storage(IEnumerable<LootGridRestoreItem> restoredStash,
+        IEnumerable<LootItemInstance> restoredTemporary)
+    {
+        stash.Clear();
+        temporaryStorage.Clear();
+        stashGrid = new LootGridModel(M9StashConfig.BaseWidth, CurrentStashHeight());
+        if (restoredTemporary != null) temporaryStorage.AddRange(restoredTemporary.Where(item => item != null));
+        if (restoredStash != null)
+        {
+            foreach (LootGridRestoreItem restored in restoredStash)
+            {
+                LootItemInstance item = restored?.Item;
+                bool placed = item != null && (restored.HasPlacement
+                    ? stashGrid.TryPlace(item, restored.X, restored.Y, restored.Rotated)
+                    : stashGrid.TryAutoPlace(item, out _));
+                if (placed) stash.Add(item);
+                else if (item != null) temporaryStorage.Add(item);
+            }
+        }
+        LastFailureReason = null;
+        Changed?.Invoke();
+    }
 }
