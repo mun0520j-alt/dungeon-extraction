@@ -138,7 +138,7 @@ public class InventoryPanel : MonoBehaviour
         activeInstance.EnsureBagBindings();
         activeInstance.lootTransferHandler = transferToLoot;
         activeInstance.bagGridView?.SetItemClickHandler(activeInstance.SelectBagItem);
-        activeInstance.bagGridView?.SetItemDoubleClickHandler(transferToLoot);
+        activeInstance.bagGridView?.SetItemDoubleClickHandler(activeInstance.HandleDungeonItemDoubleClick);
         activeInstance.HideItemActions();
         activeInstance.RefreshBagSlots();
     }
@@ -148,7 +148,7 @@ public class InventoryPanel : MonoBehaviour
         if (activeInstance == null) return;
         activeInstance.lootTransferHandler = null;
         activeInstance.bagGridView?.SetItemClickHandler(activeInstance.SelectBagItem);
-        activeInstance.bagGridView?.SetItemDoubleClickHandler(null);
+        activeInstance.bagGridView?.SetItemDoubleClickHandler(activeInstance.HandleDungeonItemDoubleClick);
     }
 
     // [2026-09-04 신규] 에디터 메뉴(BuildHudInScene)가 "컴포넌트는 이미 붙어있는데(Awake가 다시
@@ -359,7 +359,7 @@ public class InventoryPanel : MonoBehaviour
         bagGridView = grid.GetComponent<LootGridView>() ?? grid.gameObject.AddComponent<LootGridView>();
         bagGridView.Bind(LootRuntimeState.RunBagGrid, LootRuntimeState.MoveRunBagItem);
         bagGridView.SetItemClickHandler(SelectBagItem);
-        bagGridView.SetItemDoubleClickHandler(lootTransferHandler);
+        bagGridView.SetItemDoubleClickHandler(HandleDungeonItemDoubleClick);
         if (dimensionsChanged) ReflowPanelForBagGrid();
     }
 
@@ -435,6 +435,17 @@ public class InventoryPanel : MonoBehaviour
             return success;
         });
         if (spent) SetBagNotice(null);
+    }
+
+    private void HandleDungeonItemDoubleClick(LootItemInstance item)
+    {
+        if (lootTransferHandler != null)
+        {
+            lootTransferHandler(item);
+            return;
+        }
+        if (item?.Definition?.Type == LootItemType.Bag)
+            SetBagNotice("던전에서는 하위 가방을 열 수 없습니다.");
     }
 
     private void SetBagNotice(string message)

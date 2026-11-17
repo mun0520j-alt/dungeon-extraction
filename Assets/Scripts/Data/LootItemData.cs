@@ -59,6 +59,12 @@ public sealed class LootItemInstance
         }
     }
 
+    internal void SetBagGrid(LootGridModel value)
+    {
+        if (Definition?.Type != LootItemType.Bag) return;
+        bagGrid = value;
+    }
+
     public LootItemInstance(LootItemData definition, bool foundInRaid = false)
     {
         InstanceId = Guid.NewGuid().ToString("N");

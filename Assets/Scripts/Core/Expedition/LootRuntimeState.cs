@@ -175,23 +175,29 @@ public static partial class LootRuntimeState
 
     private static bool TryEquipBagFromRunBag(LootItemInstance newBag)
     {
-        int width = newBag.Definition.BagGridWidth;
-        int height = newBag.Definition.BagGridHeight;
-        if (width <= 0 || height <= 0) return Fail("가방 격자 정보가 없습니다.");
-
-        var repackedItems = new List<LootItemInstance>();
-        foreach (LootItemInstance candidate in runBag)
-            if (candidate != null && candidate.InstanceId != newBag.InstanceId) repackedItems.Add(candidate);
         equippedLoot.TryGetValue(LootItemType.Bag, out LootItemInstance previousBag);
-        if (previousBag != null) repackedItems.Add(previousBag);
+        LootGridPlacement original = runBagGrid.Find(newBag.InstanceId);
+        if (original == null) return Fail("가방 배치 정보를 찾을 수 없습니다.");
 
-        if (!TryBuildRepackedGrid(width, height, repackedItems, out LootGridModel candidateGrid))
+        // 새 가방은 현재 가방 안에 있으므로 먼저 꺼낸 뒤, 기존 가방 전체를 새 가방 안에 넣는다.
+        // 성공하기 전에는 장착 상태를 바꾸지 않아 실패 시 Tick과 상태가 모두 유지된다.
+        runBagGrid.Remove(newBag.InstanceId, out _);
+        runBag.Remove(newBag);
+        LootGridModel candidateGrid = CloneGrid(newBag.BagGrid);
+        bool fits = previousBag != null
+            ? candidateGrid.TryAutoPlace(previousBag, out _)
+            : TryPlaceAll(candidateGrid, runBag);
+        if (!fits)
+        {
+            runBag.Add(newBag);
+            runBagGrid.TryPlace(newBag, original.X, original.Y, original.Rotated);
             return Fail("새 가방에 기존 아이템과 가방을 모두 넣을 공간이 없습니다.");
+        }
 
-        runBag.Clear();
-        runBag.AddRange(repackedItems);
-        runBagGrid = candidateGrid;
+        if (previousBag != null) previousBag.SetBagGrid(runBagGrid);
+        newBag.SetBagGrid(candidateGrid);
         equippedLoot[LootItemType.Bag] = newBag;
+        LoadEquippedBagContents(newBag);
         RefreshBagCapacity();
         LastFailureReason = null;
         Changed?.Invoke();
@@ -200,12 +206,13 @@ public static partial class LootRuntimeState
 
     private static bool TryUnequipBagToRunBag(LootItemInstance equippedBag)
     {
-        var repackedItems = new List<LootItemInstance>(runBag) { equippedBag };
-        if (!TryBuildRepackedGrid(BaseBagGridWidth, BaseBagGridHeight, repackedItems, out LootGridModel candidateGrid))
-            return Fail("기본 가방에 기존 아이템과 장착 가방을 모두 넣을 공간이 없습니다.");
+        var candidateGrid = new LootGridModel(BaseBagGridWidth, BaseBagGridHeight);
+        if (!candidateGrid.TryAutoPlace(equippedBag, out _))
+            return Fail("기본 가방에 장착 가방을 넣을 공간이 없습니다.");
 
+        equippedBag.SetBagGrid(runBagGrid);
         runBag.Clear();
-        runBag.AddRange(repackedItems);
+        runBag.Add(equippedBag);
         runBagGrid = candidateGrid;
         equippedLoot.Remove(LootItemType.Bag);
         RefreshBagCapacity();
@@ -214,30 +221,38 @@ public static partial class LootRuntimeState
         return true;
     }
 
-    private static bool TryBuildRepackedGrid(int width, int height, List<LootItemInstance> items,
-        out LootGridModel candidateGrid)
-    {
-        candidateGrid = new LootGridModel(width, height);
-        var placementOrder = new List<LootItemInstance>(items);
-        placementOrder.Sort((left, right) => ItemArea(right).CompareTo(ItemArea(left)));
-        foreach (LootItemInstance item in placementOrder)
-            if (item == null || !candidateGrid.TryAutoPlace(item, out _)) return false;
-        return true;
-    }
-
     private static int ItemArea(LootItemInstance item)
     {
         return item?.Definition == null ? 0 : item.Definition.GridWidth * item.Definition.GridHeight;
     }
 
+    private static LootGridModel CloneGrid(LootGridModel source)
+    {
+        var clone = new LootGridModel(source.Width, source.Height);
+        foreach (LootGridPlacement placement in source.Placements)
+            clone.TryPlace(placement.Item, placement.X, placement.Y, placement.Rotated);
+        return clone;
+    }
+
+    private static bool TryPlaceAll(LootGridModel target, IEnumerable<LootItemInstance> items)
+    {
+        foreach (LootItemInstance item in items)
+            if (item == null || !target.TryAutoPlace(item, out _)) return false;
+        return true;
+    }
+
     public static bool TryUnequipToStash(LootItemType type)
     {
         if (!equippedLoot.TryGetValue(type, out var item) || item == null) return Fail("해제할 장비가 없습니다.");
-        if (type == LootItemType.Bag) MoveAllRunBagItemsToStash();
+        if (type == LootItemType.Bag) item.SetBagGrid(runBagGrid);
         equippedLoot.Remove(type);
         stash.Add(item);
         RefreshBagCapacity();
-        if (type == LootItemType.Bag) CreateRunBagGridForEquippedBag();
+        if (type == LootItemType.Bag)
+        {
+            runBag.Clear();
+            runBagGrid = new LootGridModel(BaseBagGridWidth, BaseBagGridHeight);
+        }
         LastFailureReason = null;
         Changed?.Invoke();
         return true;
@@ -275,13 +290,19 @@ public static partial class LootRuntimeState
         var item = stash.Find(candidate => candidate.InstanceId == instanceId);
         if (item?.Definition == null) return Fail("장착할 아이템을 찾을 수 없습니다.");
         if (item.Definition.Type == LootItemType.Junk || item.Definition.Type == LootItemType.Consumable) return Fail("이 아이템은 장착할 수 없습니다.");
-        if (item.Definition.Type == LootItemType.Bag) MoveAllRunBagItemsToStash();
+        if (item.Definition.Type == LootItemType.Bag)
+        {
+            if (equippedLoot.TryGetValue(LootItemType.Bag, out LootItemInstance currentBag) && currentBag != null)
+                currentBag.SetBagGrid(runBagGrid);
+            else MoveAllRunBagItemsToStash();
+        }
         stash.Remove(item);
+        stashGrid?.Remove(item.InstanceId, out _);
         if (equippedLoot.TryGetValue(item.Definition.Type, out var previous) && previous != null) stash.Add(previous);
         equippedLoot[item.Definition.Type] = item;
         unequippedBasicSlots.Remove(item.Definition.Type);
         RefreshBagCapacity();
-        if (item.Definition.Type == LootItemType.Bag) CreateRunBagGridForEquippedBag();
+        if (item.Definition.Type == LootItemType.Bag) LoadEquippedBagContents(item);
         LastFailureReason = null;
         Changed?.Invoke();
         return true;
@@ -292,14 +313,23 @@ public static partial class LootRuntimeState
         var item = runBag.Find(candidate => candidate.InstanceId == instanceId);
         if (item?.Definition == null) return Fail("장착할 아이템을 찾을 수 없습니다.");
         if (item.Definition.Type == LootItemType.Junk || item.Definition.Type == LootItemType.Consumable) return Fail("이 아이템은 장착할 수 없습니다.");
-        runBagGrid.Remove(instanceId, out _);
-        runBag.Remove(item);
-        if (item.Definition.Type == LootItemType.Bag) MoveAllRunBagItemsToStash();
+        if (item.Definition.Type == LootItemType.Bag)
+        {
+            if (equippedLoot.TryGetValue(LootItemType.Bag, out LootItemInstance currentBag) && currentBag != null)
+                currentBag.SetBagGrid(runBagGrid);
+            runBagGrid.Remove(instanceId, out _);
+            runBag.Remove(item);
+        }
+        else
+        {
+            runBagGrid.Remove(instanceId, out _);
+            runBag.Remove(item);
+        }
         if (equippedLoot.TryGetValue(item.Definition.Type, out var previous) && previous != null) stash.Add(previous);
         equippedLoot[item.Definition.Type] = item;
         unequippedBasicSlots.Remove(item.Definition.Type);
         RefreshBagCapacity();
-        if (item.Definition.Type == LootItemType.Bag) CreateRunBagGridForEquippedBag();
+        if (item.Definition.Type == LootItemType.Bag) LoadEquippedBagContents(item);
         LastFailureReason = null;
         Changed?.Invoke();
         return true;
@@ -310,6 +340,8 @@ public static partial class LootRuntimeState
         var item = stash.Find(candidate => candidate.InstanceId == instanceId)
             ?? runBag.Find(candidate => candidate.InstanceId == instanceId);
         if (item?.Definition == null || item.Definition.Id.StartsWith("basic_", StringComparison.Ordinal)) return false;
+        if (item.Definition.Type == LootItemType.Bag && item.BagGrid.Placements.Count > 0)
+            return Fail("가방을 비워주세요");
         if (!stash.Remove(item))
         {
             runBagGrid.Remove(item.InstanceId, out _);
@@ -318,6 +350,7 @@ public static partial class LootRuntimeState
         Gold += GetSellPrice(item.Definition);
         insuredThisRun.Remove(item.InstanceId);
         insuredItemIds.Remove(item.InstanceId);
+        LastFailureReason = null;
         Changed?.Invoke();
         return true;
     }
@@ -658,15 +691,21 @@ public static partial class LootRuntimeState
 
     private static void CreateRunBagGridForEquippedBag()
     {
-        int width = BaseBagGridWidth;
-        int height = BaseBagGridHeight;
         if (equippedLoot.TryGetValue(LootItemType.Bag, out var bag) && bag?.Definition != null
             && bag.Definition.BagGridWidth > 0 && bag.Definition.BagGridHeight > 0)
         {
-            width = bag.Definition.BagGridWidth;
-            height = bag.Definition.BagGridHeight;
+            LoadEquippedBagContents(bag);
+            return;
         }
-        runBagGrid = new LootGridModel(width, height);
+        runBagGrid = new LootGridModel(BaseBagGridWidth, BaseBagGridHeight);
+    }
+
+    private static void LoadEquippedBagContents(LootItemInstance bag)
+    {
+        runBagGrid = bag.BagGrid;
+        runBag.Clear();
+        foreach (LootGridPlacement placement in runBagGrid.Placements)
+            if (placement?.Item != null) runBag.Add(placement.Item);
     }
 
     private static void MoveAllRunBagItemsToStash()

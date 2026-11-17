@@ -193,7 +193,11 @@ public sealed class BaseCampManagementPanel : MonoBehaviour
         if (GUILayout.Button($"{LootRuntimeState.GetSellPrice(item.Definition)}G", GUILayout.Width(70)))
         {
             if (item.Definition.Rarity >= LootRarity.Unique) pendingUniqueSale = item.InstanceId;
-            else if (LootRuntimeState.TrySell(item.InstanceId)) notice = $"{item.Definition.Name} 판매 완료";
+            else
+            {
+                bool sold = LootRuntimeState.TrySell(item.InstanceId);
+                notice = sold ? $"{item.Definition.Name} 판매 완료" : LootRuntimeState.LastFailureReason;
+            }
         }
         GUILayout.EndHorizontal();
     }
@@ -295,7 +299,8 @@ public sealed class BaseCampManagementPanel : MonoBehaviour
         GUILayout.BeginHorizontal();
         if (GUILayout.Button("판매 확정"))
         {
-            LootRuntimeState.TrySell(pendingUniqueSale);
+            bool sold = LootRuntimeState.TrySell(pendingUniqueSale);
+            notice = sold ? "Unique 장비 판매 완료" : LootRuntimeState.LastFailureReason;
             pendingUniqueSale = null;
         }
         if (GUILayout.Button("취소")) pendingUniqueSale = null;
