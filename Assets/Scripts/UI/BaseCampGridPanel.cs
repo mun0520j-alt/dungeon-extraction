@@ -12,6 +12,8 @@ public sealed class BaseCampGridPanel : MonoBehaviour
     private LootItemInstance selected;
     private LootItemInstance openedBag;
     private Button bagBackButton;
+    private RectTransform loadoutRoot;
+    private RectTransform stashRoot;
     private int filterVersion = -1;
 
     // 던전 인벤토리와 같은 장착 슬롯 표시 (무기·방패·갑옷·가방). 보험 장비는 청록 표시.
@@ -40,6 +42,7 @@ public sealed class BaseCampGridPanel : MonoBehaviour
 
     private void Update()
     {
+        ApplyLayout();
         if (stashGridView == null || filterVersion == BaseCampManagementPanel.StashFilterVersion) return;
         filterVersion = BaseCampManagementPanel.StashFilterVersion;
         stashGridView.SetDimPredicate(BaseCampManagementPanel.ShouldDimStashItem);
@@ -50,12 +53,7 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         Transform hud = ScreenSpaceCanvasProvider.GetOrCreateHudRoot();
         var root = new GameObject("BaseCampRunBagGrid", typeof(RectTransform), typeof(Image));
         root.transform.SetParent(hud, false);
-        RectTransform rect = root.GetComponent<RectTransform>();
-        rect.anchorMin = new Vector2(1f, 0f);
-        rect.anchorMax = new Vector2(1f, 1f);
-        rect.pivot = new Vector2(1f, 0.5f);
-        rect.sizeDelta = new Vector2(620f, -40f);
-        rect.anchoredPosition = new Vector2(-20f, 0f);
+        loadoutRoot = root.GetComponent<RectTransform>();
         root.GetComponent<Image>().color = new Color(0.04f, 0.05f, 0.08f, 0.97f);
 
         CreateText(root.transform, "EquipTitle", "장착 장비", 18, new Vector2(0f, 0.93f), new Vector2(1f, 0.98f));
@@ -74,24 +72,54 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         gridRect.pivot = new Vector2(0.5f, 1f);
         gridView = gridObject.AddComponent<LootGridView>();
 
-        stashTitle = CreateText(root.transform, "StashTitle", "Stash", 18,
-            new Vector2(0f, 0.54f), new Vector2(1f, 0.59f));
+        var stashPanel = new GameObject("BaseCampStashGrid", typeof(RectTransform), typeof(Image));
+        stashPanel.transform.SetParent(hud, false);
+        stashRoot = stashPanel.GetComponent<RectTransform>();
+        stashPanel.GetComponent<Image>().color = new Color(0.04f, 0.05f, 0.08f, 0.97f);
+
+        stashTitle = CreateText(stashPanel.transform, "StashTitle", "Stash", 18,
+            new Vector2(0f, 0.94f), new Vector2(1f, 0.99f));
+        var viewport = new GameObject("StashViewport", typeof(RectTransform), typeof(Image), typeof(RectMask2D), typeof(ScrollRect));
+        viewport.transform.SetParent(stashPanel.transform, false);
+        RectTransform viewportRect = viewport.GetComponent<RectTransform>();
+        viewportRect.anchorMin = new Vector2(0.02f, 0.10f);
+        viewportRect.anchorMax = new Vector2(0.98f, 0.78f);
+        viewportRect.offsetMin = viewportRect.offsetMax = Vector2.zero;
+        viewport.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.18f);
         var stashObject = new GameObject("StashGrid", typeof(RectTransform));
-        stashObject.transform.SetParent(root.transform, false);
+        stashObject.transform.SetParent(viewport.transform, false);
         RectTransform stashRect = stashObject.GetComponent<RectTransform>();
-        stashRect.anchorMin = stashRect.anchorMax = new Vector2(0.5f, 0.53f);
-        stashRect.pivot = new Vector2(0.5f, 1f);
+        stashRect.anchorMin = stashRect.anchorMax = new Vector2(0f, 1f);
+        stashRect.pivot = new Vector2(0f, 1f);
+        stashRect.anchoredPosition = Vector2.zero;
         stashGridView = stashObject.AddComponent<LootGridView>();
+        ScrollRect scroll = viewport.GetComponent<ScrollRect>();
+        scroll.viewport = viewportRect;
+        scroll.content = stashRect;
+        scroll.horizontal = true;
+        scroll.vertical = true;
+        scroll.movementType = ScrollRect.MovementType.Clamped;
 
         notice = CreateText(root.transform, "Notice", "아이템을 선택하세요", 13,
             new Vector2(0.06f, 0.20f), new Vector2(0.94f, 0.30f));
         CreateButton(root.transform, "ToStash", "Stash로 이동", new Vector2(0.08f, 0.10f), MoveToStash);
         CreateButton(root.transform, "Equip", "장착", new Vector2(0.53f, 0.10f), Equip);
-        CreateButton(root.transform, "SortRarity", "등급순 정렬", new Vector2(0.08f, 0.02f),
-            () => LootRuntimeState.SortStashByRarity());
-        CreateButton(root.transform, "SortType", "종류순 정렬", new Vector2(0.53f, 0.02f),
-            () => LootRuntimeState.SortStashByType());
-        bagBackButton = CreateButton(root.transform, "BagBack", "상위 보관함", new Vector2(0.53f, 0.46f), CloseOpenedBag);
+        CreateButton(stashPanel.transform, "SortRarity", "등급순", new Vector2(0.02f, 0.86f),
+            () => LootRuntimeState.SortStashByRarity(), 0.18f);
+        CreateButton(stashPanel.transform, "SortType", "종류순", new Vector2(0.23f, 0.86f),
+            () => LootRuntimeState.SortStashByType(), 0.18f);
+        CreateButton(stashPanel.transform, "FilterType", "부위", new Vector2(0.44f, 0.86f), BaseCampManagementPanel.CycleTypeFilterFromGrid, 0.18f);
+        CreateButton(stashPanel.transform, "FilterRarity", "등급", new Vector2(0.65f, 0.86f), BaseCampManagementPanel.CycleRarityFilterFromGrid, 0.18f);
+        CreateButton(stashPanel.transform, "FilterRaid", "★ 필터", new Vector2(0.80f, 0.86f), BaseCampManagementPanel.CycleRaidFilterFromGrid, 0.18f);
+        bagBackButton = CreateButton(stashPanel.transform, "BagBack", "상위 보관함", new Vector2(0.53f, 0.79f), CloseOpenedBag);
+        ApplyLayout();
+    }
+
+    private void ApplyLayout()
+    {
+        BaseCampLayoutRects layout = BaseCampLayout.Calculate();
+        BaseCampLayout.ApplyTo(loadoutRoot, layout.Loadout);
+        BaseCampLayout.ApplyTo(stashRoot, layout.Stash);
     }
 
     private void Refresh()
@@ -288,17 +316,76 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         return text;
     }
 
-    private static Button CreateButton(Transform parent, string name, string label, Vector2 anchor, UnityEngine.Events.UnityAction action)
+    private static Button CreateButton(Transform parent, string name, string label, Vector2 anchor, UnityEngine.Events.UnityAction action, float width = 0.39f)
     {
         var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
         go.transform.SetParent(parent, false);
         RectTransform rect = go.GetComponent<RectTransform>();
         rect.anchorMin = anchor;
-        rect.anchorMax = anchor + new Vector2(0.39f, 0.07f);
+        rect.anchorMax = anchor + new Vector2(width, 0.06f);
         rect.offsetMin = rect.offsetMax = Vector2.zero;
         go.GetComponent<Image>().color = new Color(0.16f, 0.36f, 0.48f, 0.95f);
         go.GetComponent<Button>().onClick.AddListener(action);
         CreateText(go.transform, "Label", label, 13, Vector2.zero, Vector2.one);
         return go.GetComponent<Button>();
+    }
+}
+
+// BaseCamp 3열 배치의 단일 계산 지점. OnGUI와 uGUI 모두 같은 Rect를 사용한다.
+public readonly struct BaseCampLayoutRects
+{
+    public readonly Rect Merchant;
+    public readonly Rect Stash;
+    public readonly Rect Loadout;
+    public readonly Rect Insurance;
+    public readonly Rect Expedition;
+
+    public BaseCampLayoutRects(Rect merchant, Rect stash, Rect loadout, Rect insurance, Rect expedition)
+    {
+        Merchant = merchant;
+        Stash = stash;
+        Loadout = loadout;
+        Insurance = insurance;
+        Expedition = expedition;
+    }
+}
+
+public static class BaseCampLayout
+{
+    private const float Margin = 16f;
+    private const float Gap = 12f;
+
+    public static BaseCampLayoutRects Calculate()
+    {
+        float totalWidth = Mathf.Max(960f, Screen.width);
+        float totalHeight = Mathf.Max(640f, Screen.height);
+        float contentHeight = totalHeight - Margin * 2f;
+        float usableWidth = totalWidth - Margin * 2f - Gap * 2f;
+        float leftWidth = Mathf.Clamp(usableWidth * 0.25f, 300f, 420f);
+        float rightWidth = Mathf.Clamp(usableWidth * 0.29f, 360f, 520f);
+        float middleWidth = usableWidth - leftWidth - rightWidth;
+
+        float leftX = Margin;
+        float middleX = leftX + leftWidth + Gap;
+        float rightX = middleX + middleWidth + Gap;
+        var merchant = new Rect(leftX, Margin, leftWidth, contentHeight);
+        var stash = new Rect(middleX, Margin, middleWidth, contentHeight);
+
+        float loadoutHeight = contentHeight * 0.56f;
+        float insuranceHeight = contentHeight * 0.20f;
+        float expeditionHeight = contentHeight - loadoutHeight - insuranceHeight - Gap * 2f;
+        var loadout = new Rect(rightX, Margin, rightWidth, loadoutHeight);
+        var insurance = new Rect(rightX, Margin + loadoutHeight + Gap, rightWidth, insuranceHeight);
+        var expedition = new Rect(rightX, insurance.yMax + Gap, rightWidth, expeditionHeight);
+        return new BaseCampLayoutRects(merchant, stash, loadout, insurance, expedition);
+    }
+
+    public static void ApplyTo(RectTransform target, Rect topLeftRect)
+    {
+        if (target == null) return;
+        target.anchorMin = target.anchorMax = Vector2.zero;
+        target.pivot = Vector2.zero;
+        target.anchoredPosition = new Vector2(topLeftRect.x, Screen.height - topLeftRect.yMax);
+        target.sizeDelta = topLeftRect.size;
     }
 }

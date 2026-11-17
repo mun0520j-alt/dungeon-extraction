@@ -29,10 +29,17 @@ public sealed class BaseCampManagementPanel : MonoBehaviour
 
     private void OnGUI()
     {
-        float sideWidth = Mathf.Clamp(Screen.width * 0.24f, 360f, 480f);
-        DrawMerchantPanel(new Rect(20, 20, sideWidth, Screen.height - 40));
-        float gridReserve = Mathf.Clamp(Screen.width * 0.34f, 520f, 650f);
-        DrawStashPanel(new Rect(Screen.width - sideWidth - gridReserve - 40, 20, sideWidth, Screen.height - 40));
+        BaseCampLayoutRects layout = BaseCampLayout.Calculate();
+        DrawMerchantPanel(layout.Merchant);
+        DrawInsuranceArea(layout.Insurance);
+    }
+
+    private void DrawInsuranceArea(Rect area)
+    {
+        GUILayout.BeginArea(area, GUI.skin.box);
+        DrawInsurancePanel();
+        if (!string.IsNullOrEmpty(notice)) GUILayout.Label(notice);
+        GUILayout.EndArea();
     }
 
     private void DrawMerchantPanel(Rect area)
@@ -316,6 +323,27 @@ public sealed class BaseCampManagementPanel : MonoBehaviour
         if (panel.rarityFilter.HasValue && item.Definition.Rarity != panel.rarityFilter.Value) return true;
         if (panel.foundInRaidFilter == FoundInRaidFilter.FoundOnly && !item.IsFoundInRaid) return true;
         return panel.foundInRaidFilter == FoundInRaidFilter.NotFound && item.IsFoundInRaid;
+    }
+
+    public static void CycleTypeFilterFromGrid()
+    {
+        if (activeInstance == null) return;
+        activeInstance.CycleType();
+        StashFilterVersion++;
+    }
+
+    public static void CycleRarityFilterFromGrid()
+    {
+        if (activeInstance == null) return;
+        activeInstance.CycleRarity();
+        StashFilterVersion++;
+    }
+
+    public static void CycleRaidFilterFromGrid()
+    {
+        if (activeInstance == null) return;
+        activeInstance.foundInRaidFilter = (FoundInRaidFilter)(((int)activeInstance.foundInRaidFilter + 1) % 3);
+        StashFilterVersion++;
     }
 
     private void CycleType()
