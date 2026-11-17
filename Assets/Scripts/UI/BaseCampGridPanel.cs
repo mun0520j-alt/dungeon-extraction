@@ -10,6 +10,8 @@ public sealed class BaseCampGridPanel : MonoBehaviour
     private Text stashTitle;
     private Text notice;
     private LootItemInstance selected;
+    private LootItemInstance openedBag;
+    private Button bagBackButton;
     private int filterVersion = -1;
 
     // 던전 인벤토리와 같은 장착 슬롯 표시 (무기·방패·갑옷·가방). 보험 장비는 청록 표시.
@@ -89,6 +91,7 @@ public sealed class BaseCampGridPanel : MonoBehaviour
             () => LootRuntimeState.SortStashByRarity());
         CreateButton(root.transform, "SortType", "종류순 정렬", new Vector2(0.53f, 0.02f),
             () => LootRuntimeState.SortStashByType());
+        bagBackButton = CreateButton(root.transform, "BagBack", "상위 보관함", new Vector2(0.53f, 0.46f), CloseOpenedBag);
     }
 
     private void Refresh()
@@ -99,10 +102,17 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         gridView.SetItemClickHandler(Select);
         gridView.SetItemDoubleClickHandler(MoveToStash);
         title.text = $"출격 가방 {LootRuntimeState.RunBagGrid.Width}×{LootRuntimeState.RunBagGrid.Height}";
-        stashGridView.Bind(LootRuntimeState.StashGrid, LootRuntimeState.MoveStashItem);
+        LootGridModel shownGrid = openedBag?.BagGrid ?? LootRuntimeState.StashGrid;
+        stashGridView.Bind(shownGrid, openedBag == null
+            ? LootRuntimeState.MoveStashItem
+            : (id, x, y, rotated) => LootRuntimeState.MoveNestedBagItem(openedBag.InstanceId, id, x, y, rotated));
         stashGridView.SetDimPredicate(BaseCampManagementPanel.ShouldDimStashItem);
-        stashGridView.SetItemDoubleClickHandler(item => LootRuntimeState.MoveStashItemToBag(item.InstanceId));
-        stashTitle.text = $"Stash {LootRuntimeState.StashGrid.Width}×{LootRuntimeState.StashGrid.Height}";
+        stashGridView.SetItemClickHandler(Select);
+        stashGridView.SetItemDoubleClickHandler(HandleStoredItemDoubleClick);
+        stashTitle.text = openedBag == null
+            ? $"Stash {shownGrid.Width}×{shownGrid.Height}"
+            : $"{openedBag.Definition.Name} {shownGrid.Width}×{shownGrid.Height} · 깊이 {LootRuntimeState.GetStashBagDepth(openedBag.InstanceId)}";
+        if (bagBackButton != null) bagBackButton.gameObject.SetActive(openedBag != null);
         if (selected != null && LootRuntimeState.RunBagGrid.Find(selected.InstanceId) == null) selected = null;
         if (selected == null) gridView.ClearSelection();
         notice.text = selected?.Definition != null ? selected.Definition.Name : "아이템을 선택하세요";
@@ -212,6 +222,54 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         }
     }
 
+    private void HandleStoredItemDoubleClick(LootItemInstance item)
+    {
+        if (item?.Definition?.Type == LootItemType.Bag)
+        {
+            openedBag = item;
+            selected = null;
+            Refresh();
+            return;
+        }
+
+        bool ok = openedBag == null
+            ? LootRuntimeState.MoveStashItemToBag(item.InstanceId)
+            : LootRuntimeState.MoveBagItemToParent(item.InstanceId, openedBag.InstanceId);
+        notice.text = ok ? "아이템을 이동했습니다." : (LootRuntimeState.LastFailureReason ?? "이동 실패");
+    }
+
+    private void CloseOpenedBag()
+    {
+        if (openedBag == null) return;
+        // 현재 가방을 상위에서 찾을 수 없으면 Stash 루트로 돌아간다.
+        string currentId = openedBag.InstanceId;
+        openedBag = FindParentContaining(currentId);
+        selected = null;
+        Refresh();
+    }
+
+    private static LootItemInstance FindParentContaining(string childId)
+    {
+        foreach (LootItemInstance root in LootRuntimeState.Stash)
+        {
+            LootItemInstance found = FindParentContaining(root, childId);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
+    private static LootItemInstance FindParentContaining(LootItemInstance parent, string childId)
+    {
+        if (parent?.BagGrid == null) return null;
+        if (parent.BagGrid.Find(childId) != null) return parent;
+        foreach (LootGridPlacement child in parent.BagGrid.Placements)
+        {
+            LootItemInstance found = FindParentContaining(child.Item, childId);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
     private static Text CreateText(Transform parent, string name, string value, int size, Vector2 min, Vector2 max)
     {
         var go = new GameObject(name, typeof(RectTransform), typeof(Text));
@@ -230,7 +288,7 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         return text;
     }
 
-    private static void CreateButton(Transform parent, string name, string label, Vector2 anchor, UnityEngine.Events.UnityAction action)
+    private static Button CreateButton(Transform parent, string name, string label, Vector2 anchor, UnityEngine.Events.UnityAction action)
     {
         var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
         go.transform.SetParent(parent, false);
@@ -241,5 +299,6 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         go.GetComponent<Image>().color = new Color(0.16f, 0.36f, 0.48f, 0.95f);
         go.GetComponent<Button>().onClick.AddListener(action);
         CreateText(go.transform, "Label", label, 13, Vector2.zero, Vector2.one);
+        return go.GetComponent<Button>();
     }
 }

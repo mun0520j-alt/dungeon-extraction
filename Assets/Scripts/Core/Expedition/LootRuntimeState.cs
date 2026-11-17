@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
-public static class LootRuntimeState
+public static partial class LootRuntimeState
 {
     public const int BaseBagGridWidth = 3;
     public const int BaseBagGridHeight = 2;
