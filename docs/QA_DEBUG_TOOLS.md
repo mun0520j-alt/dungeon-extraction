@@ -48,6 +48,7 @@
 | M6 Grid Model Validation | 격자 인벤토리 모델 |
 | M7 Meta Economy Validation | 잡템·구매·보험 분포 |
 | M8 Quest Data Validation | 퀘스트 9개·선행·우호도 300·인레이드 납품/운반·누적 생환 |
+| M9 Stash Validation | Stash CSV 크기·격자 배치·중첩 4단계·임시 보관함·세이브 v6 계약 |
 
 ## 5. 측정 CSV (`M3MeasurementAutomation`)
 
