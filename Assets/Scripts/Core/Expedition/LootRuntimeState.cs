@@ -63,6 +63,7 @@ public static partial class LootRuntimeState
         droppedInsuredThisRun.Clear();
         insuranceReturns.Clear();
         ResetM9Storage();
+        ResetM9Trade();
     }
 
     public static void BeginNewRun()
@@ -398,12 +399,11 @@ public static partial class LootRuntimeState
     public static bool TryConsumeQuestItems(IEnumerable<string> instanceIds)
     {
         var ids = new HashSet<string>(instanceIds ?? Enumerable.Empty<string>(), StringComparer.Ordinal);
-        var items = stash.Concat(runBag).Where(item => item != null && ids.Contains(item.InstanceId)).ToList();
+        var items = EnumerateStoredItemsRecursive().Where(item => item != null && ids.Contains(item.InstanceId)).ToList();
         if (items.Count != ids.Count) return Fail("납품 아이템 상태가 변경되었습니다.");
         foreach (LootItemInstance item in items)
         {
-            stash.Remove(item);
-            if (runBag.Remove(item)) runBagGrid.Remove(item.InstanceId, out _);
+            if (!RemoveStoredItemRecursive(item.InstanceId)) return Fail("납품 아이템 상태가 변경되었습니다.");
             insuredThisRun.Remove(item.InstanceId);
             insuredItemIds.Remove(item.InstanceId);
             droppedInsuredThisRun.Remove(item.InstanceId);

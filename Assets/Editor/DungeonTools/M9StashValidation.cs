@@ -49,6 +49,9 @@ public static class M9StashValidation
         Check(Contains(root, current.InstanceId, new HashSet<string>(StringComparer.Ordinal)), "하위 가방 탐색", failures);
         Check(!Contains(current, root.InstanceId, new HashSet<string>(StringComparer.Ordinal)), "자기 포함 순환 없음", failures);
         Check(LootRuntimeState.TemporaryStorage != null, "임시 보관함 상태 소유", failures);
+        Check(LootRuntimeState.SaleBasket != null
+            && LootRuntimeState.SaleBasketGrid.Width == M9StashConfig.BaseWidth,
+            "판매 바구니 격자 상태 소유", failures);
     }
 
     private static void ValidateSaveContract(List<string> failures)

@@ -10,6 +10,7 @@ public sealed class BaseCampManagementPanel : MonoBehaviour
     public static string CurrentTypeFilterLabel => activeInstance?.TypeFilterLabel() ?? "전체";
     public static string CurrentRarityFilterLabel => activeInstance?.rarityFilter?.ToString() ?? "전체";
     public static string CurrentRaidFilterLabel => activeInstance?.RaidFilterLabel() ?? "전체";
+    public static bool IsSellMode => activeInstance != null && activeInstance.merchantMode == MerchantMode.Sell;
     private static BaseCampManagementPanel activeInstance;
     private enum SortMode { Acquired, RarityHigh, RarityLow, Type }
     private enum MerchantMode { Sell, Buy, Quest }
@@ -24,11 +25,18 @@ public sealed class BaseCampManagementPanel : MonoBehaviour
     private string notice;
     private string pendingUniqueSale;
     private bool pendingLevelUp;
+    private bool pendingInsuredBasketSale;
     private GUIStyle foundInRaidStarStyle;
     private GUIStyle itemRichTextStyle;
 
     private void OnEnable() => activeInstance = this;
-    private void OnDisable() { if (activeInstance == this) activeInstance = null; }
+    private void OnDisable()
+    {
+        LootRuntimeState.CancelSaleBasket();
+        if (activeInstance == this) activeInstance = null;
+    }
+
+    private void OnApplicationQuit() => LootRuntimeState.CancelSaleBasket();
 
     private void OnGUI()
     {
@@ -49,21 +57,39 @@ public sealed class BaseCampManagementPanel : MonoBehaviour
     {
         GUILayout.BeginArea(area, GUI.skin.box);
         GUILayout.Label($"상인   Gold {LootRuntimeState.Gold}");
+        MerchantMode previousMode = merchantMode;
         GUILayout.BeginHorizontal();
         if (GUILayout.Toggle(merchantMode == MerchantMode.Sell, "판매", GUI.skin.button)) merchantMode = MerchantMode.Sell;
         if (GUILayout.Toggle(merchantMode == MerchantMode.Buy, "구매", GUI.skin.button)) merchantMode = MerchantMode.Buy;
         if (GUILayout.Toggle(merchantMode == MerchantMode.Quest, "퀘스트", GUI.skin.button)) merchantMode = MerchantMode.Quest;
         GUILayout.EndHorizontal();
+        if (previousMode == MerchantMode.Sell && merchantMode != MerchantMode.Sell)
+        {
+            LootRuntimeState.CancelSaleBasket();
+            pendingInsuredBasketSale = false;
+        }
 
         merchantScroll = GUILayout.BeginScrollView(merchantScroll);
         if (merchantMode == MerchantMode.Sell)
         {
             DrawFoundInRaidLegend();
-            GUILayout.Label("Stash");
-            foreach (var item in LootRuntimeState.Stash.ToArray()) DrawSaleItem(item, "Stash");
-            GUILayout.Space(6);
-            GUILayout.Label("출격 가방");
-            foreach (var item in LootRuntimeState.RunBag.ToArray()) DrawSaleItem(item, "가방");
+            GUILayout.Label("Stash 또는 임시 보관함에서 아이템을 판매 바구니로 옮기세요.");
+            GUILayout.Label($"판매 바구니 {LootRuntimeState.SaleBasket.Count}개 · 합계 {LootRuntimeState.SaleBasketTotal}G");
+            foreach (LootItemInstance item in LootRuntimeState.SaleBasket)
+                GUILayout.Label($"- {(LootRuntimeState.IsInsured(item.InstanceId) ? "[보험] " : "")}{item.Definition.Name}");
+            if (LootRuntimeState.SaleBasketHasInsuredItems)
+                GUILayout.Label("경고: 보험 아이템이 포함되어 있습니다. 판매하면 보험이 종료됩니다.");
+            GUILayout.BeginHorizontal();
+            GUI.enabled = LootRuntimeState.SaleBasket.Count > 0;
+            if (GUILayout.Button(pendingInsuredBasketSale ? "보험 포함 판매 재확인" : "판매 확정")) ConfirmSaleBasket();
+            if (GUILayout.Button("전부 되돌리기"))
+            {
+                LootRuntimeState.CancelSaleBasket();
+                pendingInsuredBasketSale = false;
+                notice = "판매 바구니를 원래 위치로 되돌렸습니다.";
+            }
+            GUI.enabled = true;
+            GUILayout.EndHorizontal();
         }
         else if (merchantMode == MerchantMode.Buy)
         {
@@ -75,6 +101,20 @@ public sealed class BaseCampManagementPanel : MonoBehaviour
         DrawUniqueSaleConfirmation();
         if (!string.IsNullOrEmpty(notice)) GUILayout.Label(notice);
         GUILayout.EndArea();
+    }
+
+    private void ConfirmSaleBasket()
+    {
+        if (LootRuntimeState.SaleBasketHasInsuredItems && !pendingInsuredBasketSale)
+        {
+            pendingInsuredBasketSale = true;
+            notice = "보험 아이템이 포함되어 있습니다. 판매 확정을 다시 누르세요.";
+            return;
+        }
+        int total = LootRuntimeState.SaleBasketTotal;
+        bool sold = LootRuntimeState.ConfirmSaleBasket();
+        notice = sold ? $"판매 완료 · {total}G" : LootRuntimeState.LastFailureReason;
+        pendingInsuredBasketSale = false;
     }
 
     private void DrawStashPanel(Rect area)

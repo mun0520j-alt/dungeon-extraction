@@ -7,6 +7,54 @@ public static partial class LootRuntimeState
 {
     public const int MaxBagNestingDepth = 4;
 
+    public static IEnumerable<LootItemInstance> EnumerateStoredItemsRecursive()
+    {
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        foreach (LootItemInstance root in stash.Concat(runBag).Concat(temporaryStorage))
+            foreach (LootItemInstance item in EnumerateRecursive(root, visited)) yield return item;
+    }
+
+    private static IEnumerable<LootItemInstance> EnumerateRecursive(LootItemInstance item, HashSet<string> visited)
+    {
+        if (item == null || !visited.Add(item.InstanceId)) yield break;
+        yield return item;
+        if (item.BagGrid == null) yield break;
+        foreach (LootGridPlacement child in item.BagGrid.Placements)
+            foreach (LootItemInstance nested in EnumerateRecursive(child.Item, visited)) yield return nested;
+    }
+
+    private static bool RemoveStoredItemRecursive(string instanceId)
+    {
+        LootItemInstance direct = stash.Find(item => item?.InstanceId == instanceId);
+        if (direct != null)
+        {
+            stash.Remove(direct);
+            stashGrid?.Remove(instanceId, out _);
+            return true;
+        }
+        direct = runBag.Find(item => item?.InstanceId == instanceId);
+        if (direct != null)
+        {
+            runBag.Remove(direct);
+            runBagGrid.Remove(instanceId, out _);
+            return true;
+        }
+        direct = temporaryStorage.Find(item => item?.InstanceId == instanceId);
+        if (direct != null) return temporaryStorage.Remove(direct);
+        foreach (LootItemInstance root in stash.Concat(runBag).Concat(temporaryStorage))
+            if (RemoveFromBagRecursive(root, instanceId, new HashSet<string>(StringComparer.Ordinal))) return true;
+        return false;
+    }
+
+    private static bool RemoveFromBagRecursive(LootItemInstance bag, string instanceId, HashSet<string> visited)
+    {
+        if (bag?.BagGrid == null || !visited.Add(bag.InstanceId)) return false;
+        if (bag.BagGrid.Remove(instanceId, out _)) return true;
+        foreach (LootGridPlacement child in bag.BagGrid.Placements)
+            if (RemoveFromBagRecursive(child.Item, instanceId, visited)) return true;
+        return false;
+    }
+
     public static LootItemInstance FindStoredItemRecursive(string instanceId)
     {
         if (string.IsNullOrEmpty(instanceId)) return null;

@@ -68,7 +68,7 @@ public static class QuestRuntimeState
     {
         QuestDefinition quest = ActiveQuest;
         if (quest == null || quest.Type != QuestObjectiveType.Delivery) return Enumerable.Empty<LootItemInstance>();
-        return LootRuntimeState.Stash.Concat(LootRuntimeState.RunBag)
+        return LootRuntimeState.EnumerateStoredItemsRecursive()
             .Where(item => item?.Definition != null && (!quest.RequiresFoundInRaid || item.IsFoundInRaid))
             .Where(item => MatchesDeliveryItemSpec(quest.TargetItemId, item));
     }
@@ -132,7 +132,7 @@ public static class QuestRuntimeState
     private static bool MatchesCarryObjective(QuestDefinition quest, List<LootItemInstance> items, ExpeditionRunSnapshot run)
     {
         if (run.ReachedFloor < quest.TargetFloor || quest.RequiresBossKill && !run.BossDefeated) return false;
-        IEnumerable<LootItemInstance> candidates = items;
+        IEnumerable<LootItemInstance> candidates = ExpandItems(items);
         // 운반 퀘스트도 인레이드 아이템만 센다(사용자 결정 2026-11-15). 상점 구매품·보험 반환품·기본 장비로는 완료할 수 없다.
         if (quest.RequiresFoundInRaid) candidates = candidates.Where(item => item.IsFoundInRaid);
         if (quest.TargetCategory == "Equipment") candidates = candidates.Where(item => item.Definition.Type != LootItemType.Junk && item.Definition.Type != LootItemType.Consumable);
@@ -141,6 +141,22 @@ public static class QuestRuntimeState
         if (!string.IsNullOrEmpty(quest.TargetItemId)) candidates = candidates.Where(item => item.Definition.Id == quest.TargetItemId);
         if (quest.TargetValue > 0) return candidates.Where(item => item.Definition.Type == LootItemType.Junk).Sum(item => item.Definition.SellPrice) >= quest.TargetValue;
         return candidates.Count() >= quest.TargetCount;
+    }
+
+    private static IEnumerable<LootItemInstance> ExpandItems(IEnumerable<LootItemInstance> roots)
+    {
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        foreach (LootItemInstance root in roots ?? Enumerable.Empty<LootItemInstance>())
+            foreach (LootItemInstance item in ExpandItem(root, visited)) yield return item;
+    }
+
+    private static IEnumerable<LootItemInstance> ExpandItem(LootItemInstance item, HashSet<string> visited)
+    {
+        if (item == null || !visited.Add(item.InstanceId)) yield break;
+        yield return item;
+        if (item.BagGrid == null) yield break;
+        foreach (LootGridPlacement child in item.BagGrid.Placements)
+            foreach (LootItemInstance nested in ExpandItem(child.Item, visited)) yield return nested;
     }
 
     public static bool TryClaimReward()

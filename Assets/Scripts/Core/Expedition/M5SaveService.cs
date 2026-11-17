@@ -397,8 +397,8 @@ public static class M5SaveService
         {
             save_version = CurrentSaveVersion,
             saved_at = DateTime.UtcNow.ToString("O"),
-            stash = SaveGridItems(LootRuntimeState.Stash, LootRuntimeState.StashGrid),
-            temporary_storage = SaveItems(LootRuntimeState.TemporaryStorage),
+            stash = SaveRestoreItems(LootRuntimeState.PersistentStashRoots()),
+            temporary_storage = SaveItems(LootRuntimeState.PersistentTemporaryItems()),
             run_bag = includeExpeditionItems && !equippedBagOwnsRunBag ? SaveRunBagItems() : new List<SavedItem>(),
             equipped = includeExpeditionItems ? SaveItems(LootRuntimeState.EquippedLoot.Values) : new List<SavedItem>(),
             has_basic_loadout = includeExpeditionItems && LootRuntimeState.HasBasicLoadout,
@@ -447,13 +447,13 @@ public static class M5SaveService
         return items.Where(item => item?.Definition != null).Select(item => SaveItem(item, null)).ToList();
     }
 
-    private static List<SavedItem> SaveGridItems(IEnumerable<LootItemInstance> items, LootGridModel grid)
+    private static List<SavedItem> SaveRestoreItems(IEnumerable<LootGridRestoreItem> items)
     {
         var result = new List<SavedItem>();
-        foreach (LootItemInstance item in items)
+        foreach (LootGridRestoreItem restored in items)
         {
-            LootGridPlacement placement = grid?.Find(item?.InstanceId);
-            if (item?.Definition != null && placement != null) result.Add(SaveItem(item, placement));
+            if (restored?.Item?.Definition == null) continue;
+            result.Add(SaveItem(restored.Item, new LootGridPlacement(restored.Item, restored.X, restored.Y, restored.Rotated)));
         }
         return result;
     }

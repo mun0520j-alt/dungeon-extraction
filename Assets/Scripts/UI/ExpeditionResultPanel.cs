@@ -99,6 +99,7 @@ public sealed class ExpeditionResultPanel : MonoBehaviour
     private static void StartExpedition()
     {
         if (!LootRuntimeState.CanStartExpedition) return;
+        LootRuntimeState.CancelSaleBasket();
         M5SaveService.PrepareForExpedition();
         ExpeditionSession.BeginNewRun();
         SceneManager.LoadScene("InDungeon");

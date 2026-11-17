@@ -6,18 +6,21 @@ public sealed class BaseCampGridPanel : MonoBehaviour
 {
     private LootGridView gridView;
     private LootGridView stashGridView;
+    private LootGridView saleGridView;
     private Text title;
     private Text stashTitle;
     private Text notice;
     private LootItemInstance selected;
     private LootItemInstance openedBag;
     private Button bagBackButton;
+    private Button toSaleButton;
     private Text typeFilterLabel;
     private Text rarityFilterLabel;
     private Text raidFilterLabel;
     private Text temporaryLabel;
     private int temporaryIndex;
     private bool confirmTemporaryDelete;
+    private bool selectedFromSaleBasket;
     private RectTransform loadoutRoot;
     private RectTransform stashRoot;
     private int filterVersion = -1;
@@ -90,7 +93,7 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         viewport.transform.SetParent(stashPanel.transform, false);
         RectTransform viewportRect = viewport.GetComponent<RectTransform>();
         viewportRect.anchorMin = new Vector2(0.02f, 0.18f);
-        viewportRect.anchorMax = new Vector2(0.98f, 0.70f);
+        viewportRect.anchorMax = new Vector2(0.64f, 0.70f);
         viewportRect.offsetMin = viewportRect.offsetMax = Vector2.zero;
         viewport.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.18f);
         var stashObject = new GameObject("StashGrid", typeof(RectTransform));
@@ -107,6 +110,29 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         scroll.vertical = true;
         scroll.movementType = ScrollRect.MovementType.Clamped;
 
+        CreateText(stashPanel.transform, "SaleBasketTitle", "판매 바구니", 16,
+            new Vector2(0.66f, 0.70f), new Vector2(0.98f, 0.76f));
+        var saleViewport = new GameObject("SaleBasketViewport", typeof(RectTransform), typeof(Image), typeof(RectMask2D), typeof(ScrollRect));
+        saleViewport.transform.SetParent(stashPanel.transform, false);
+        RectTransform saleViewportRect = saleViewport.GetComponent<RectTransform>();
+        saleViewportRect.anchorMin = new Vector2(0.66f, 0.18f);
+        saleViewportRect.anchorMax = new Vector2(0.98f, 0.70f);
+        saleViewportRect.offsetMin = saleViewportRect.offsetMax = Vector2.zero;
+        saleViewport.GetComponent<Image>().color = new Color(0.12f, 0.04f, 0.03f, 0.35f);
+        var saleObject = new GameObject("SaleBasketGrid", typeof(RectTransform));
+        saleObject.transform.SetParent(saleViewport.transform, false);
+        RectTransform saleRect = saleObject.GetComponent<RectTransform>();
+        saleRect.anchorMin = saleRect.anchorMax = new Vector2(0f, 1f);
+        saleRect.pivot = new Vector2(0f, 1f);
+        saleRect.anchoredPosition = Vector2.zero;
+        saleGridView = saleObject.AddComponent<LootGridView>();
+        ScrollRect saleScroll = saleViewport.GetComponent<ScrollRect>();
+        saleScroll.viewport = saleViewportRect;
+        saleScroll.content = saleRect;
+        saleScroll.horizontal = true;
+        saleScroll.vertical = true;
+        saleScroll.movementType = ScrollRect.MovementType.Clamped;
+
         notice = CreateText(root.transform, "Notice", "아이템을 선택하세요", 13,
             new Vector2(0.06f, 0.20f), new Vector2(0.94f, 0.30f));
         CreateButton(root.transform, "ToStash", "Stash로 이동", new Vector2(0.08f, 0.10f), MoveToStash);
@@ -116,6 +142,7 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         CreateButton(stashPanel.transform, "SortType", "정렬: 종류별", new Vector2(0.35f, 0.86f),
             () => LootRuntimeState.SortStashByType(), 0.31f);
         bagBackButton = CreateButton(stashPanel.transform, "BagBack", "상위 보관함", new Vector2(0.68f, 0.86f), CloseOpenedBag, 0.30f);
+        toSaleButton = CreateButton(stashPanel.transform, "ToSale", "선택 → 판매", new Vector2(0.68f, 0.86f), MoveSelectedToSale, 0.30f);
 
         typeFilterLabel = CreateButton(stashPanel.transform, "FilterType", "부위: 전체", new Vector2(0.02f, 0.78f),
             BaseCampManagementPanel.CycleTypeFilterFromGrid, 0.22f).GetComponentInChildren<Text>();
@@ -133,6 +160,7 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         CreateButton(stashPanel.transform, "TempToStash", "Stash로", new Vector2(0.21f, 0.03f), MoveTemporaryToStash, 0.20f);
         CreateButton(stashPanel.transform, "TempToBag", "열린 가방으로", new Vector2(0.43f, 0.03f), MoveTemporaryToOpenedBag, 0.27f);
         CreateButton(stashPanel.transform, "TempDelete", "삭제", new Vector2(0.72f, 0.03f), DeleteTemporary, 0.12f);
+        CreateButton(stashPanel.transform, "TempSale", "판매", new Vector2(0.86f, 0.03f), MoveTemporaryToSale, 0.12f);
         RefreshFilterLabels();
         ApplyLayout();
     }
@@ -166,10 +194,14 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         stashGridView.SetDimPredicate(BaseCampManagementPanel.ShouldDimStashItem);
         stashGridView.SetItemClickHandler(Select);
         stashGridView.SetItemDoubleClickHandler(HandleStoredItemDoubleClick);
+        saleGridView.Bind(LootRuntimeState.SaleBasketGrid, LootRuntimeState.MoveSaleBasketItem);
+        saleGridView.SetItemClickHandler(SelectSaleBasketItem);
+        saleGridView.SetItemDoubleClickHandler(item => LootRuntimeState.ReturnSaleBasketItem(item.InstanceId));
         stashTitle.text = openedBag == null
             ? $"Stash {shownGrid.Width}×{shownGrid.Height}"
             : $"{openedBag.Definition.Name} {shownGrid.Width}×{shownGrid.Height} · 깊이 {LootRuntimeState.GetStashBagDepth(openedBag.InstanceId)}";
         if (bagBackButton != null) bagBackButton.gameObject.SetActive(openedBag != null);
+        if (toSaleButton != null) toSaleButton.gameObject.SetActive(openedBag == null && BaseCampManagementPanel.IsSellMode);
         RefreshTemporaryStorage();
         if (selected != null && LootRuntimeState.RunBagGrid.Find(selected.InstanceId) == null) selected = null;
         if (selected == null) gridView.ClearSelection();
@@ -246,6 +278,15 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         confirmTemporaryDelete = false;
     }
 
+    private void MoveTemporaryToSale()
+    {
+        LootItemInstance item = SelectedTemporary();
+        if (item == null) return;
+        bool ok = LootRuntimeState.MoveTemporaryItemToSaleBasket(item.InstanceId);
+        notice.text = ok ? "판매 바구니로 이동했습니다." : LootRuntimeState.LastFailureReason;
+        confirmTemporaryDelete = false;
+    }
+
     private void CreateSlot(Transform parent, LootItemType type, Vector2 min, Vector2 max)
     {
         var go = new GameObject($"Slot_{type}", typeof(RectTransform), typeof(Image));
@@ -317,7 +358,15 @@ public sealed class BaseCampGridPanel : MonoBehaviour
     private void Select(LootItemInstance item)
     {
         selected = item;
+        selectedFromSaleBasket = false;
         notice.text = item?.Definition?.Name ?? "아이템을 선택하세요";
+    }
+
+    private void SelectSaleBasketItem(LootItemInstance item)
+    {
+        selected = item;
+        selectedFromSaleBasket = true;
+        notice.text = item?.Definition != null ? $"판매 대기: {item.Definition.Name}" : "아이템을 선택하세요";
     }
 
     private void MoveToStash()
@@ -360,10 +409,25 @@ public sealed class BaseCampGridPanel : MonoBehaviour
             return;
         }
 
+        if (openedBag == null && BaseCampManagementPanel.IsSellMode)
+        {
+            bool moved = LootRuntimeState.MoveStashItemToSaleBasket(item.InstanceId);
+            notice.text = moved ? "판매 바구니로 이동했습니다." : LootRuntimeState.LastFailureReason;
+            return;
+        }
+
         bool ok = openedBag == null
             ? LootRuntimeState.MoveStashItemToBag(item.InstanceId)
             : LootRuntimeState.MoveBagItemToParent(item.InstanceId, openedBag.InstanceId);
         notice.text = ok ? "아이템을 이동했습니다." : (LootRuntimeState.LastFailureReason ?? "이동 실패");
+    }
+
+    private void MoveSelectedToSale()
+    {
+        if (selected == null || selectedFromSaleBasket) return;
+        bool ok = LootRuntimeState.MoveStashItemToSaleBasket(selected.InstanceId);
+        notice.text = ok ? "판매 바구니로 이동했습니다." : LootRuntimeState.LastFailureReason;
+        if (ok) selected = null;
     }
 
     private void CloseOpenedBag()

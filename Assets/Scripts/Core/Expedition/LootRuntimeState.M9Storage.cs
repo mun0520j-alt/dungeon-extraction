@@ -85,6 +85,7 @@ public static partial class LootRuntimeState
     public static void RestoreM9Storage(IEnumerable<LootGridRestoreItem> restoredStash,
         IEnumerable<LootItemInstance> restoredTemporary)
     {
+        ResetM9Trade();
         stash.Clear();
         temporaryStorage.Clear();
         stashGrid = new LootGridModel(M9StashConfig.BaseWidth, CurrentStashHeight());
