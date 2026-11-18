@@ -23,6 +23,8 @@ public sealed class LootGridView : MonoBehaviour
     private Action<LootItemInstance> itemClickHandler;
     private Action<LootItemInstance> itemDoubleClickHandler;
     private Func<LootItemInstance, bool> dimPredicate;
+    private Func<LootItemInstance, LootItemInstance, bool> bagDropCheck;
+    private Func<LootItemInstance, LootItemInstance, bool> bagDropHandler;
     private RectTransform gridRoot;
     private RectTransform preview;
     private Text tooltip;
@@ -61,6 +63,13 @@ public sealed class LootGridView : MonoBehaviour
     {
         dimPredicate = predicate;
         Refresh();
+    }
+
+    // 이 격자에 놓인 가방 아이콘 위로 다른 아이템을 놓으면 그 가방에 자동으로 넣는다(영지 전용). check는 미리보기 색, handler는 실제 이동.
+    public void SetBagDropHandler(Func<LootItemInstance, LootItemInstance, bool> check, Func<LootItemInstance, LootItemInstance, bool> handler)
+    {
+        bagDropCheck = check;
+        bagDropHandler = handler;
     }
 
     public void ClearExternalDropTargets()
@@ -172,6 +181,8 @@ public sealed class LootGridView : MonoBehaviour
         go.transform.SetParent(gridRoot, false);
         preview = go.GetComponent<RectTransform>();
         go.GetComponent<Image>().color = new Color(0.2f, 0.9f, 0.35f, 0.45f);
+        // 미리보기가 레이캐스트를 가로채면 아래 가방 아이콘·격자 판정이 프레임마다 바뀐다.
+        go.GetComponent<Image>().raycastTarget = false;
         go.SetActive(false);
     }
 
@@ -227,7 +238,9 @@ public sealed class LootGridView : MonoBehaviour
     {
         if (dragged == null) return;
         // 미리보기와 같은 판정 함수를 쓴다. 미리보기가 뜬 격자·칸에만 놓이고, 판정이 없으면 이동 취소(원위치).
-        if (TryResolveDropTarget(screenPosition, out LootGridView target, out ExternalDropBinding binding, out int x, out int y))
+        if (TryResolveBagIconTarget(screenPosition, out LootGridView bagOwner, out LootItemInstance bag))
+            bagOwner.bagDropHandler(dragged.Item, bag);
+        else if (TryResolveDropTarget(screenPosition, out LootGridView target, out ExternalDropBinding binding, out int x, out int y))
         {
             if (binding == null)
             {
@@ -379,6 +392,14 @@ public sealed class LootGridView : MonoBehaviour
             return;
         preview.gameObject.SetActive(false);
         HideExternalPreviews();
+        if (TryResolveBagIconTarget(screenPosition, out LootGridView bagOwner, out LootItemInstance bag))
+        {
+            LootGridPlacement bagPlacement = bagOwner.model.Find(bag.InstanceId);
+            if (bagPlacement != null)
+                bagOwner.ShowPreview(bag, bagPlacement.X, bagPlacement.Y, bagPlacement.Rotated,
+                    bagOwner.bagDropCheck == null || bagOwner.bagDropCheck(dragged.Item, bag));
+            return;
+        }
         if (!TryResolveDropTarget(screenPosition, out LootGridView target, out ExternalDropBinding binding, out int x, out int y))
             return;
         bool valid = binding == null
@@ -427,6 +448,29 @@ public sealed class LootGridView : MonoBehaviour
             return true;
         }
         return false;
+    }
+
+    // 화면 맨 위가 가방 아이콘이고 그 격자가 가방 드롭을 받으면 가방 드롭 모드. 대상 격자가 자기이거나 등록된 외부 격자일 때만.
+    private bool TryResolveBagIconTarget(Vector2 screenPosition, out LootGridView owner, out LootItemInstance bag)
+    {
+        owner = null;
+        bag = null;
+        if (dragged?.Item == null || EventSystem.current == null) return false;
+        var pointer = new PointerEventData(EventSystem.current) { position = screenPosition };
+        RaycastBuffer.Clear();
+        EventSystem.current.RaycastAll(pointer, RaycastBuffer);
+        if (RaycastBuffer.Count == 0 || RaycastBuffer[0].gameObject == null) return false;
+        LootGridItemView itemView = RaycastBuffer[0].gameObject.GetComponentInParent<LootGridItemView>();
+        if (itemView?.Item?.Definition == null || itemView.Item.Definition.Type != LootItemType.Bag) return false;
+        if (itemView.Item.InstanceId == dragged.Item.InstanceId) return false;
+        LootGridView view = itemView.GetComponentInParent<LootGridView>();
+        if (view == null || view.bagDropHandler == null) return false;
+        bool known = view == this;
+        foreach (ExternalDropBinding candidate in externalDropTargets) known |= candidate.Target == view;
+        if (!known) return false;
+        owner = view;
+        bag = itemView.Item;
+        return true;
     }
 
     private static readonly System.Collections.Generic.List<RaycastResult> RaycastBuffer

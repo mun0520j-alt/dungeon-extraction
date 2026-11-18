@@ -232,6 +232,7 @@ public sealed class BaseCampGridPanel : MonoBehaviour
 
         stashGridView.ClearExternalDropTargets();
         saleGridView.ClearExternalDropTargets();
+        stashGridView.SetBagDropHandler(CanDropIntoBagIcon, DropIntoBagIcon);
         if (BaseCampManagementPanel.IsSellMode)
         {
             stashGridView.AddExternalDropTarget(saleGridView,
@@ -254,6 +255,7 @@ public sealed class BaseCampGridPanel : MonoBehaviour
             window.Grid.SetItemClickHandler(item => SelectOpenedBagItem(window, item));
             window.Grid.SetItemDoubleClickHandler(item => HandleOpenedBagItemDoubleClick(window, item));
             window.Grid.ClearExternalDropTargets();
+            window.Grid.SetBagDropHandler(CanDropIntoBagIcon, DropIntoBagIcon);
             window.Title.text = $"{bag.Definition.Name} {bag.BagGrid.Width}×{bag.BagGrid.Height}"
                 + $" · 깊이 {LootRuntimeState.GetStashBagDepth(bag.InstanceId)}";
             stashGridView.AddExternalDropTarget(window.Grid,
@@ -281,6 +283,17 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         if (selected != null && LootRuntimeState.RunBagGrid.Find(selected.InstanceId) == null) selected = null;
         if (selected == null) gridView.ClearSelection();
         notice.text = selected?.Definition != null ? selected.Definition.Name : "아이템을 선택하세요";
+    }
+
+    private static bool CanDropIntoBagIcon(LootItemInstance item, LootItemInstance bag)
+        => LootRuntimeState.CanDropIntoBag(item, bag, out _);
+
+    // 가방 아이콘에 드롭: 빈 공간에 자동 배치(회전 포함). 실패하면 원위치 + 이유.
+    private bool DropIntoBagIcon(LootItemInstance item, LootItemInstance bag)
+    {
+        bool ok = LootRuntimeState.DropIntoBag(item.InstanceId, bag.InstanceId);
+        notice.text = ok ? $"{bag.Definition.Name}에 넣었습니다." : LootRuntimeState.LastFailureReason;
+        return ok;
     }
 
     private LootItemInstance SelectedTemporary()

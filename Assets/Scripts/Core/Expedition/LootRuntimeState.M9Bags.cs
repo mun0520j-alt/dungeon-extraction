@@ -179,6 +179,37 @@ public static partial class LootRuntimeState
         return true;
     }
 
+    // 가방 아이콘에 드롭(타르코프식): 영지 Stash 직속이거나 Stash 쪽 가방 안 아이템을 대상 가방 빈 공간에 자동 배치한다.
+    public static bool CanDropIntoBag(LootItemInstance item, LootItemInstance targetBag, out string reason)
+    {
+        if (!CanInsertIntoBag(item, targetBag, out reason)) return false;
+        if (FindStoredItemRecursive(targetBag.InstanceId) == null) { reason = "영지 Stash의 가방에만 넣을 수 있습니다."; return false; }
+        if (!HasFreeSpace(targetBag.BagGrid, item)) { reason = "가방 공간이 부족합니다."; return false; }
+        if (stash.Find(value => value?.InstanceId == item.InstanceId) == null && FindParentBag(item.InstanceId) == null)
+        { reason = "Stash나 가방 안 아이템만 가방에 넣을 수 있습니다."; return false; }
+        return true;
+    }
+
+    public static bool DropIntoBag(string itemInstanceId, string targetBagInstanceId)
+    {
+        LootItemInstance targetBag = FindStoredItemRecursive(targetBagInstanceId);
+        if (stash.Find(value => value?.InstanceId == itemInstanceId) != null)
+            return MoveStashItemIntoBag(itemInstanceId, targetBagInstanceId);
+        LootItemInstance parent = FindParentBag(itemInstanceId);
+        if (parent == null) return Fail("Stash나 가방 안 아이템만 가방에 넣을 수 있습니다.");
+        if (parent.InstanceId == targetBagInstanceId) return Fail("이미 그 가방 안에 있습니다.");
+        return MoveBagItemToBag(itemInstanceId, parent.InstanceId, targetBagInstanceId);
+    }
+
+    private static bool HasFreeSpace(LootGridModel grid, LootItemInstance item)
+    {
+        if (grid == null || item?.Definition == null) return false;
+        for (int y = 0; y < grid.Height; y++)
+        for (int x = 0; x < grid.Width; x++)
+            if (grid.CanPlace(item, x, y, false) || grid.CanPlace(item, x, y, true)) return true;
+        return false;
+    }
+
     public static bool MoveNestedBagItem(string bagInstanceId, string itemInstanceId, int x, int y, bool rotated)
     {
         LootItemInstance bag = FindStoredItemRecursive(bagInstanceId);
