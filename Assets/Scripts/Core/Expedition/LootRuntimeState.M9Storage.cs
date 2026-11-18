@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using UnityEngine;
 
 // M9 Stash 초과 보관과 영지 출격 게이트. 상태 소유자는 기존 LootRuntimeState를 유지한다.
 public static partial class LootRuntimeState
@@ -86,20 +87,26 @@ public static partial class LootRuntimeState
         IEnumerable<LootItemInstance> restoredTemporary)
     {
         ResetM9Trade();
+        var runBagOverflow = temporaryStorage.Where(item => item != null).ToArray();
         stash.Clear();
         temporaryStorage.Clear();
         stashGrid = new LootGridModel(M9StashConfig.BaseWidth, CurrentStashHeight());
+        temporaryStorage.AddRange(runBagOverflow);
         if (restoredTemporary != null) temporaryStorage.AddRange(restoredTemporary.Where(item => item != null));
         if (restoredStash != null)
         {
             foreach (LootGridRestoreItem restored in restoredStash)
             {
                 LootItemInstance item = restored?.Item;
-                bool placed = item != null && (restored.HasPlacement
-                    ? stashGrid.TryPlace(item, restored.X, restored.Y, restored.Rotated)
-                    : stashGrid.TryAutoPlace(item, out _));
+                bool placed = item != null && ((restored.HasPlacement
+                    && stashGrid.TryPlace(item, restored.X, restored.Y, restored.Rotated))
+                    || stashGrid.TryAutoPlace(item, out _));
                 if (placed) stash.Add(item);
-                else if (item != null) temporaryStorage.Add(item);
+                else if (item != null)
+                {
+                    temporaryStorage.Add(item);
+                    Debug.LogWarning($"[Save] Stash에 재배치할 수 없는 기존 v6 아이템을 임시 보관함으로 이동했습니다: {item.Definition?.Name}");
+                }
             }
         }
         LastFailureReason = null;

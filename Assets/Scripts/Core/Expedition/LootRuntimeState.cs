@@ -206,6 +206,48 @@ public static partial class LootRuntimeState
         return true;
     }
 
+    public static bool TryEquipBagFromLootContainer(LootItemInstance newBag, LootGridModel sourceGrid)
+    {
+        if (newBag?.Definition?.Type != LootItemType.Bag || sourceGrid == null)
+            return Fail("장착할 가방을 찾을 수 없습니다.");
+        LootGridPlacement sourcePlacement = sourceGrid.Find(newBag.InstanceId);
+        if (sourcePlacement == null) return Fail("루팅 보관함의 가방 배치 정보를 찾을 수 없습니다.");
+
+        equippedLoot.TryGetValue(LootItemType.Bag, out LootItemInstance previousBag);
+        LootGridModel candidateBagGrid = CloneGrid(newBag.BagGrid);
+        if (!TryPlaceAll(candidateBagGrid, runBag))
+            return Fail("새 가방에 현재 아이템을 모두 넣을 공간이 없습니다.");
+
+        LootGridModel candidateSource = CloneGridExcept(sourceGrid, newBag.InstanceId);
+        LootGridPlacement previousPlacement = null;
+        if (previousBag != null && !candidateSource.TryAutoPlace(previousBag, out previousPlacement))
+            return Fail("루팅 보관함에 기존 가방을 놓을 공간이 없습니다.");
+
+        // 모든 사전 검사가 끝난 뒤 두 격자를 함께 바꾼다.
+        if (!sourceGrid.Remove(newBag.InstanceId, out _))
+            return Fail("루팅 보관함에서 새 가방을 꺼내지 못했습니다.");
+        if (previousBag != null && !sourceGrid.TryPlace(previousBag,
+                previousPlacement.X, previousPlacement.Y, previousPlacement.Rotated))
+        {
+            sourceGrid.TryPlace(newBag, sourcePlacement.X, sourcePlacement.Y, sourcePlacement.Rotated);
+            return Fail("루팅 보관함에 기존 가방을 놓지 못했습니다.");
+        }
+
+        if (previousBag != null)
+        {
+            previousBag.SetBagGrid(new LootGridModel(previousBag.Definition.BagGridWidth,
+                previousBag.Definition.BagGridHeight));
+            if (insuredThisRun.Contains(previousBag.InstanceId)) droppedInsuredThisRun.Add(previousBag.InstanceId);
+        }
+        newBag.SetBagGrid(candidateBagGrid);
+        equippedLoot[LootItemType.Bag] = newBag;
+        LoadEquippedBagContents(newBag);
+        RefreshBagCapacity();
+        LastFailureReason = null;
+        Changed?.Invoke();
+        return true;
+    }
+
     private static bool TryUnequipBagToRunBag(LootItemInstance equippedBag)
     {
         var candidateGrid = new LootGridModel(BaseBagGridWidth, BaseBagGridHeight);
@@ -233,6 +275,17 @@ public static partial class LootRuntimeState
         var clone = new LootGridModel(source.Width, source.Height);
         foreach (LootGridPlacement placement in source.Placements)
             clone.TryPlace(placement.Item, placement.X, placement.Y, placement.Rotated);
+        return clone;
+    }
+
+    private static LootGridModel CloneGridExcept(LootGridModel source, string excludedInstanceId)
+    {
+        var clone = new LootGridModel(source.Width, source.Height);
+        foreach (LootGridPlacement placement in source.Placements)
+        {
+            if (placement?.Item == null || placement.Item.InstanceId == excludedInstanceId) continue;
+            clone.TryPlace(placement.Item, placement.X, placement.Y, placement.Rotated);
+        }
         return clone;
     }
 
@@ -665,17 +718,17 @@ public static partial class LootRuntimeState
             foreach (var restored in restoredRunBag)
             {
                 LootItemInstance item = restored?.Item;
-                bool placed = item != null && (restored.HasPlacement
-                    ? runBagGrid.TryPlace(item, restored.X, restored.Y, restored.Rotated)
-                    : runBagGrid.TryAutoPlace(item, out _));
+                bool placed = item != null && ((restored.HasPlacement
+                    && runBagGrid.TryPlace(item, restored.X, restored.Y, restored.Rotated))
+                    || runBagGrid.TryAutoPlace(item, out _));
                 if (placed) runBag.Add(item);
                 else if (item != null)
                 {
-                    StoreIncomingItem(item);
+                    temporaryStorage.Add(item);
                     moved++;
                 }
             }
-            if (moved > 0) Debug.LogWarning($"[Loadout] 격자에 들어가지 않는 기존 세이브 아이템 {moved}개를 Stash로 이동했습니다.");
+            if (moved > 0) Debug.LogWarning($"[Save] 출격 가방에 재배치할 수 없는 기존 v6 아이템 {moved}개를 임시 보관함으로 이동했습니다.");
         }
         Changed?.Invoke();
     }

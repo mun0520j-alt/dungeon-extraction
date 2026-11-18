@@ -8,6 +8,8 @@ public sealed class LootingPanel : MonoBehaviour
     private GameObject panelRoot;
     private Text title;
     private Text notice;
+    private Button equipButton;
+    private LootItemInstance selectedItem;
     private LootGridView gridView;
     private ILootContainer container;
     private PlayerTurnActor player;
@@ -33,8 +35,9 @@ public sealed class LootingPanel : MonoBehaviour
         instance.title.text = source.DisplayName;
         instance.notice.text = "첫 클릭: 선택 / 더블클릭: 이동 (1 Tick)";
         instance.gridView.Bind(source.Grid, source.Grid.Move);
-        instance.gridView.SetItemClickHandler(null);
+        instance.gridView.SetItemClickHandler(instance.SelectItem);
         instance.gridView.SetItemDoubleClickHandler(instance.TakeItem);
+        instance.SelectItem(null);
         instance.panelRoot.SetActive(true);
         InventoryPanel.OpenForLoot(instance.PutItem);
     }
@@ -45,6 +48,7 @@ public sealed class LootingPanel : MonoBehaviour
         instance.panelRoot.SetActive(false);
         instance.container = null;
         instance.player = null;
+        instance.selectedItem = null;
         InventoryPanel.ClearLootTransferHandler();
         InventoryPanel.CloseForEscape();
         return true;
@@ -70,6 +74,29 @@ public sealed class LootingPanel : MonoBehaviour
             return true;
         });
         if (spent) RefreshBoth();
+    }
+
+    private void SelectItem(LootItemInstance item)
+    {
+        selectedItem = item;
+        if (equipButton != null)
+            equipButton.gameObject.SetActive(item?.Definition?.Type == LootItemType.Bag);
+    }
+
+    private void EquipSelectedBag()
+    {
+        if (selectedItem?.Definition?.Type != LootItemType.Bag || container == null || player == null) return;
+        bool spent = player.TryPerformTimedAction(TickCost.SwapWeaponInCombat, "Equip", () =>
+        {
+            bool success = LootRuntimeState.TryEquipBagFromLootContainer(selectedItem, container.Grid);
+            if (!success) SetNotice(LootRuntimeState.LastFailureReason);
+            return success;
+        });
+        if (!spent) return;
+        M3MeasurementAutomation.RecordItemAcquired();
+        container.HandleContentsChanged();
+        selectedItem = null;
+        RefreshBoth();
     }
 
     private void PutItem(LootItemInstance item)
@@ -104,8 +131,9 @@ public sealed class LootingPanel : MonoBehaviour
             return;
         }
         gridView.Bind(container.Grid, container.Grid.Move);
-        gridView.SetItemClickHandler(null);
+        gridView.SetItemClickHandler(SelectItem);
         gridView.SetItemDoubleClickHandler(TakeItem);
+        SelectItem(null);
         InventoryPanel.OpenForLoot(PutItem);
     }
 
@@ -151,6 +179,23 @@ public sealed class LootingPanel : MonoBehaviour
         noticeRect.pivot = new Vector2(0.5f, 0f);
         noticeRect.anchoredPosition = new Vector2(0f, 8f);
         noticeRect.sizeDelta = new Vector2(0f, 28f);
+
+        var equipObject = new GameObject("EquipBag", typeof(RectTransform), typeof(Image), typeof(Button));
+        equipObject.transform.SetParent(panelRoot.transform, false);
+        RectTransform equipRect = equipObject.GetComponent<RectTransform>();
+        equipRect.anchorMin = equipRect.anchorMax = new Vector2(1f, 0f);
+        equipRect.pivot = new Vector2(1f, 0f);
+        equipRect.anchoredPosition = new Vector2(-12f, 40f);
+        equipRect.sizeDelta = new Vector2(96f, 34f);
+        equipObject.GetComponent<Image>().color = new Color(0.12f, 0.38f, 0.52f, 1f);
+        equipButton = equipObject.GetComponent<Button>();
+        equipButton.onClick.AddListener(EquipSelectedBag);
+        Text equipText = CreateText("Label", equipObject.transform, 15, TextAnchor.MiddleCenter);
+        equipText.rectTransform.anchorMin = Vector2.zero;
+        equipText.rectTransform.anchorMax = Vector2.one;
+        equipText.rectTransform.sizeDelta = Vector2.zero;
+        equipText.text = $"장착 ({TickCost.SwapWeaponInCombat:0} Tick)";
+        equipObject.SetActive(false);
         panelRoot.SetActive(false);
     }
 
