@@ -22,6 +22,9 @@ public sealed class LootGridView : MonoBehaviour
         = new System.Collections.Generic.List<ExternalDropBinding>();
     private Action<LootItemInstance> itemClickHandler;
     private Action<LootItemInstance> itemDoubleClickHandler;
+    // 결정 42 (타르코프식): 우클릭 = 가방 열기, Ctrl+좌클릭 = 반대편으로 바로 옮기기
+    private Action<LootItemInstance> itemOpenHandler;
+    private Action<LootItemInstance> itemQuickMoveHandler;
     private Func<LootItemInstance, bool> dimPredicate;
     private Func<LootItemInstance, LootItemInstance, bool> bagDropCheck;
     private Func<LootItemInstance, LootItemInstance, bool> bagDropHandler;
@@ -57,6 +60,16 @@ public sealed class LootGridView : MonoBehaviour
     public void SetItemDoubleClickHandler(Action<LootItemInstance> handler)
     {
         itemDoubleClickHandler = handler;
+    }
+
+    public void SetItemOpenHandler(Action<LootItemInstance> handler)
+    {
+        itemOpenHandler = handler;
+    }
+
+    public void SetItemQuickMoveHandler(Action<LootItemInstance> handler)
+    {
+        itemQuickMoveHandler = handler;
     }
 
     public void SetDimPredicate(Func<LootItemInstance, bool> predicate)
@@ -365,6 +378,21 @@ public sealed class LootGridView : MonoBehaviour
         itemClickHandler?.Invoke(item);
     }
 
+    internal void OpenItem(LootItemInstance item)
+    {
+        if (dragged != null || item?.Definition?.Type != LootItemType.Bag || itemOpenHandler == null) return;
+        selectedInstanceId = item.InstanceId;
+        RefreshSelectionHighlight();
+        itemOpenHandler(item);
+    }
+
+    internal bool QuickMoveItem(LootItemInstance item)
+    {
+        if (dragged != null || item == null || itemQuickMoveHandler == null) return false;
+        itemQuickMoveHandler(item);
+        return true;
+    }
+
     internal void DoubleClickItem(LootItemInstance item)
     {
         if (dragged != null || item == null) return;
@@ -645,7 +673,14 @@ public sealed class LootGridItemView : MonoBehaviour, IBeginDragHandler, IDragHa
     public void OnPointerMove(PointerEventData eventData) => owner.MoveTooltip(eventData.position);
     public void OnPointerClick(PointerEventData eventData)
     {
+        if (eventData.button == PointerEventData.InputButton.Right)
+        {
+            owner.OpenItem(Item);
+            return;
+        }
         if (eventData.button != PointerEventData.InputButton.Left) return;
+        bool ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
+        if (ctrl && owner.QuickMoveItem(Item)) return;
         if (eventData.clickCount >= 2) owner.DoubleClickItem(Item);
         else owner.ClickItem(Item);
     }

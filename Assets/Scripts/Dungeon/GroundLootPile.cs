@@ -216,7 +216,7 @@ public sealed class GroundLootPile : MonoBehaviour, ILootContainer
 
     public static bool CloseForModalSwitch()
     {
-        if (LootingPanel.CloseLootOnly()) return true;
+        if (LootingPanel.CloseLootOnly(returnToParent: false)) return true;
         if (!selectionOpen) return false;
         CloseSelection();
         return true;

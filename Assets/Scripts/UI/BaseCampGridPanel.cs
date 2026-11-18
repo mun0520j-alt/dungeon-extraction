@@ -225,6 +225,7 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         stashGridView.SetDimPredicate(BaseCampManagementPanel.ShouldDimStashItem);
         stashGridView.SetItemClickHandler(SelectStashItem);
         stashGridView.SetItemDoubleClickHandler(HandleStoredItemDoubleClick);
+        stashGridView.SetItemOpenHandler(OpenBagWindow); // 결정 42: 우클릭으로도 가방 열기
         saleGridView.Bind(LootRuntimeState.SaleBasketGrid, LootRuntimeState.MoveSaleBasketItem);
         saleGridView.SetItemClickHandler(SelectSaleBasketItem);
         saleGridView.SetItemDoubleClickHandler(item => LootRuntimeState.ReturnSaleBasketItem(item.InstanceId));
@@ -260,6 +261,7 @@ public sealed class BaseCampGridPanel : MonoBehaviour
                 (id, x, y, rotated) => LootRuntimeState.MoveNestedBagItem(bag.InstanceId, id, x, y, rotated));
             window.Grid.SetItemClickHandler(item => SelectOpenedBagItem(window, item));
             window.Grid.SetItemDoubleClickHandler(item => HandleOpenedBagItemDoubleClick(window, item));
+            window.Grid.SetItemOpenHandler(OpenBagWindow);
             window.Grid.ClearExternalDropTargets();
             window.Grid.SetBagDropHandler(CanDropIntoBagIcon, DropIntoBagIcon);
             window.Title.text = $"{bag.Definition.Name} {bag.BagGrid.Width}×{bag.BagGrid.Height}"

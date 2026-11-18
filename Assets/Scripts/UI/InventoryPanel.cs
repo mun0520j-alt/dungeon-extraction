@@ -139,6 +139,8 @@ public class InventoryPanel : MonoBehaviour
         activeInstance.lootTransferHandler = transferToLoot;
         activeInstance.bagGridView?.SetItemClickHandler(activeInstance.SelectBagItem);
         activeInstance.bagGridView?.SetItemDoubleClickHandler(activeInstance.HandleDungeonItemDoubleClick);
+        activeInstance.bagGridView?.SetItemOpenHandler(activeInstance.OpenRunNestedBag);
+        activeInstance.bagGridView?.SetItemQuickMoveHandler(activeInstance.QuickMoveToLoot);
         activeInstance.HideItemActions();
         activeInstance.RefreshBagSlots();
     }
@@ -149,6 +151,8 @@ public class InventoryPanel : MonoBehaviour
         activeInstance.lootTransferHandler = null;
         activeInstance.bagGridView?.SetItemClickHandler(activeInstance.SelectBagItem);
         activeInstance.bagGridView?.SetItemDoubleClickHandler(activeInstance.HandleDungeonItemDoubleClick);
+        activeInstance.bagGridView?.SetItemOpenHandler(activeInstance.OpenRunNestedBag);
+        activeInstance.bagGridView?.SetItemQuickMoveHandler(activeInstance.QuickMoveToLoot);
     }
 
     // [2026-09-04 신규] 에디터 메뉴(BuildHudInScene)가 "컴포넌트는 이미 붙어있는데(Awake가 다시
@@ -368,6 +372,8 @@ public class InventoryPanel : MonoBehaviour
         bagGridView.Bind(LootRuntimeState.RunBagGrid, LootRuntimeState.MoveRunBagItem);
         bagGridView.SetItemClickHandler(SelectBagItem);
         bagGridView.SetItemDoubleClickHandler(HandleDungeonItemDoubleClick);
+        bagGridView.SetItemOpenHandler(OpenRunNestedBag);
+        bagGridView.SetItemQuickMoveHandler(QuickMoveToLoot);
         if (dimensionsChanged) ReflowPanelForBagGrid();
     }
 
@@ -445,16 +451,29 @@ public class InventoryPanel : MonoBehaviour
         if (spent) SetBagNotice(null);
     }
 
+    // 결정 42 (타르코프식): 가방은 더블클릭·우클릭이면 항상 연다(루팅 창이 열려 있어도).
+    // 가방째 보관함으로 옮기려면 Ctrl+좌클릭 또는 드래그. 가방이 아닌 아이템 더블클릭은 기존처럼 보관함으로 옮긴다.
     private void HandleDungeonItemDoubleClick(LootItemInstance item)
     {
-        if (lootTransferHandler != null)
+        if (item?.Definition?.Type == LootItemType.Bag)
         {
-            lootTransferHandler(item);
+            OpenRunNestedBag(item);
             return;
         }
-        // 결정 41: 던전에서도 하위 가방을 루팅 창처럼 연다 (하위 가방 아이템 합계 상한 적용).
-        if (item?.Definition?.Type == LootItemType.Bag && item.BagGrid != null && PlayerTurnActor.Instance != null)
-            LootingPanel.Open(new NestedBagContainer(item), PlayerTurnActor.Instance);
+        lootTransferHandler?.Invoke(item);
+    }
+
+    // 결정 41: 던전에서 하위 가방을 루팅 창처럼 연다 (하위 가방 아이템 합계 상한 적용).
+    private void OpenRunNestedBag(LootItemInstance item)
+    {
+        if (item?.Definition?.Type != LootItemType.Bag || item.BagGrid == null || PlayerTurnActor.Instance == null) return;
+        LootingPanel.Open(new NestedBagContainer(item), PlayerTurnActor.Instance);
+    }
+
+    private void QuickMoveToLoot(LootItemInstance item)
+    {
+        if (lootTransferHandler != null) lootTransferHandler(item);
+        else SelectBagItem(item);
     }
 
     private void SetBagNotice(string message)

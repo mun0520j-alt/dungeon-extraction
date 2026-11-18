@@ -22,7 +22,10 @@ public sealed class LootingPanel : MonoBehaviour
         Build();
     }
 
-    private const string DefaultNotice = "첫 클릭: 선택 / 더블클릭: 빈 부위면 장착(2 Tick), 아니면 가방으로(1 Tick)";
+    private const string DefaultNotice = "더블클릭: 빈 부위면 장착(2 Tick), 아니면 가방으로(1 Tick) / Ctrl+클릭: 바로 옮기기 / 가방: 더블클릭·우클릭으로 열기";
+
+    // 결정 42: 루팅 중 하위 가방을 열면, 닫을 때(Esc) 원래 상자·바닥 더미로 돌아간다.
+    private ILootContainer returnContainer;
 
     private void OnDestroy()
     {
@@ -32,6 +35,9 @@ public sealed class LootingPanel : MonoBehaviour
     public static void Open(ILootContainer source, PlayerTurnActor actor)
     {
         if (instance == null || source == null || actor == null) return;
+        if (!(source is NestedBagContainer)) instance.returnContainer = null;
+        else if (IsOpen && instance.container != null && !(instance.container is NestedBagContainer))
+            instance.returnContainer = instance.container;
         instance.container = source;
         instance.player = actor;
         instance.title.text = source.DisplayName;
@@ -39,14 +45,26 @@ public sealed class LootingPanel : MonoBehaviour
         instance.gridView.Bind(source.Grid, source.Grid.Move);
         instance.gridView.SetItemClickHandler(instance.SelectItem);
         instance.gridView.SetItemDoubleClickHandler(instance.ActivateItem);
+        instance.gridView.SetItemOpenHandler(instance.OpenBagInContainer);
+        instance.gridView.SetItemQuickMoveHandler(instance.TakeItem);
         instance.SelectItem(null);
         instance.panelRoot.SetActive(true);
         InventoryPanel.OpenForLoot(instance.PutItem);
     }
 
-    public static bool CloseLootOnly()
+    public static bool CloseLootOnly() => CloseLootOnly(returnToParent: true);
+
+    public static bool CloseLootOnly(bool returnToParent)
     {
         if (!IsOpen) return false;
+        ILootContainer back = instance.returnContainer;
+        instance.returnContainer = null;
+        bool backAlive = back != null && !(back is UnityEngine.Object unityObject && unityObject == null);
+        if (returnToParent && backAlive && instance.container is NestedBagContainer && instance.player != null)
+        {
+            Open(back, instance.player);
+            return true;
+        }
         instance.panelRoot.SetActive(false);
         instance.container = null;
         instance.player = null;
@@ -88,11 +106,28 @@ public sealed class LootingPanel : MonoBehaviour
     private void ActivateItem(LootItemInstance item)
     {
         if (item?.Definition == null) return;
+        if (container is NestedBagContainer && item.Definition.Type == LootItemType.Bag)
+        {
+            OpenBagInContainer(item);
+            return;
+        }
         LootItemType type = item.Definition.Type;
         bool equippable = type == LootItemType.Weapon || type == LootItemType.Shield
             || type == LootItemType.Armor || type == LootItemType.Bag;
         if (equippable && LootRuntimeState.IsEquipSlotFree(type) && TryEquipFromContainer(item)) return;
         TakeItem(item);
+    }
+
+    // 하위 가방 창 안의 가방은 한 단계 더 연다. 상자·바닥의 가방은 아직 소지품이 아니라 열지 않는다.
+    private void OpenBagInContainer(LootItemInstance item)
+    {
+        if (item?.Definition?.Type != LootItemType.Bag || player == null) return;
+        if (!(container is NestedBagContainer))
+        {
+            SetNotice("상자·바닥의 가방은 출격 가방에 넣거나 장착한 뒤 열 수 있습니다.");
+            return;
+        }
+        Open(new NestedBagContainer(item), player);
     }
 
     private bool TryEquipFromContainer(LootItemInstance item)
