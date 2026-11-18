@@ -241,6 +241,7 @@ public static class M5SaveService
         {
             string json = File.ReadAllText(path, Encoding.UTF8);
             var data = JsonUtility.FromJson<SaveData>(json);
+            if (data != null && json.Contains("\"children\"")) LegacyNestedSave.Flatten(json, data);
             if (data == null || data.save_version <= 0 || data.save_version > CurrentSaveVersion)
             {
                 Debug.LogWarning($"[Save] 지원하지 않는 세이브 버전입니다: {data?.save_version ?? 0} ({path})");
@@ -262,7 +263,7 @@ public static class M5SaveService
         {
             // Stash 높이는 완료 퀘스트(q03/q06)에서 계산하므로 아이템 배치보다 먼저 복원한다.
             QuestRuntimeState.RestorePersistentState(data.quest_state);
-            var context = new RestoreContext(data.save_version);
+            var context = new RestoreContext(data.save_version, data.bag_contents);
             List<LootGridRestoreItem> restoredStash = RestoreGridItems(data.stash, context, bagDepth: 0,
                 placementSupported: data.save_version >= 6);
             List<LootItemInstance> restoredEquipment = RestoreItems(data.equipped, context, bagDepth: 0);
@@ -332,10 +333,10 @@ public static class M5SaveService
             return null;
         }
         var item = new LootItemInstance(definition, instanceId, context.SaveVersion >= 5 && saved.found_in_raid);
-        if (definition.Type != LootItemType.Bag || saved.children == null) return item;
+        if (definition.Type != LootItemType.Bag) return item;
 
         int currentDepth = bagDepth + 1;
-        foreach (SavedItem childSaved in saved.children)
+        foreach (SavedItem childSaved in context.ChildrenOf(saved.instance_id))
         {
             LootItemInstance child = RestoreItem(childSaved, context, currentDepth);
             if (child == null) continue;
@@ -390,7 +391,26 @@ public static class M5SaveService
         };
     }
 
+    // 가방 내용물은 재귀 children 대신 parent_id가 달린 평면 목록(bag_contents)으로 저장한다.
+    // JsonUtility는 재귀 타입을 깊이 10까지만 직렬화하고 매 로드마다 경고를 낸다 (BUG-049).
+    private static List<SavedItem> captureBagContents;
+
     private static SaveData Capture(bool expeditionInProgress, bool includeExpeditionItems)
+    {
+        captureBagContents = new List<SavedItem>();
+        try
+        {
+            SaveData data = CaptureRoots(expeditionInProgress, includeExpeditionItems);
+            data.bag_contents = captureBagContents;
+            return data;
+        }
+        finally
+        {
+            captureBagContents = null;
+        }
+    }
+
+    private static SaveData CaptureRoots(bool expeditionInProgress, bool includeExpeditionItems)
     {
         bool equippedBagOwnsRunBag = LootRuntimeState.GetEquipped(LootItemType.Bag) != null;
         return new SaveData
@@ -472,7 +492,12 @@ public static class M5SaveService
         if (item.Definition.Type == LootItemType.Bag && item.BagGrid != null)
         {
             foreach (LootGridPlacement child in item.BagGrid.Placements)
-                if (child?.Item?.Definition != null) saved.children.Add(SaveItem(child.Item, child));
+            {
+                if (child?.Item?.Definition == null) continue;
+                SavedItem savedChild = SaveItem(child.Item, child);
+                savedChild.parent_id = item.InstanceId;
+                captureBagContents?.Add(savedChild);
+            }
         }
         return saved;
     }
@@ -524,6 +549,7 @@ public static class M5SaveService
         public List<SavedItem> temporary_storage = new List<SavedItem>();
         public List<SavedItem> run_bag = new List<SavedItem>();
         public List<SavedItem> equipped = new List<SavedItem>();
+        public List<SavedItem> bag_contents = new List<SavedItem>();
         public bool has_basic_loadout;
         public List<string> unequipped_basic_slots = new List<string>();
         public SaveSettings settings = new SaveSettings();
@@ -543,7 +569,7 @@ public static class M5SaveService
         public int y;
         public bool rotated;
         public bool found_in_raid;
-        public List<SavedItem> children = new List<SavedItem>();
+        public string parent_id;
     }
 
     private sealed class RestoreContext
@@ -551,8 +577,26 @@ public static class M5SaveService
         public int SaveVersion { get; }
         public HashSet<string> InstanceIds { get; } = new HashSet<string>(StringComparer.Ordinal);
         public List<LootItemInstance> Overflow { get; } = new List<LootItemInstance>();
+        private readonly Dictionary<string, List<SavedItem>> childrenByParent = new Dictionary<string, List<SavedItem>>(StringComparer.Ordinal);
 
-        public RestoreContext(int saveVersion) => SaveVersion = saveVersion;
+        public RestoreContext(int saveVersion, List<SavedItem> bagContents)
+        {
+            SaveVersion = saveVersion;
+            if (bagContents == null) return;
+            foreach (SavedItem saved in bagContents)
+            {
+                if (saved == null || string.IsNullOrEmpty(saved.parent_id)) continue;
+                if (!childrenByParent.TryGetValue(saved.parent_id, out List<SavedItem> list))
+                    childrenByParent[saved.parent_id] = list = new List<SavedItem>();
+                list.Add(saved);
+            }
+        }
+
+        public IEnumerable<SavedItem> ChildrenOf(string parentId)
+        {
+            return !string.IsNullOrEmpty(parentId) && childrenByParent.TryGetValue(parentId, out List<SavedItem> list)
+                ? list : (IEnumerable<SavedItem>)Array.Empty<SavedItem>();
+        }
     }
 
     [Serializable]
@@ -586,6 +630,57 @@ public static class M5SaveService
                 resolution_width = resolution_width,
                 resolution_height = resolution_height
             };
+        }
+    }
+
+    // M9 개발 중 만든 재귀 children 형식 v6 세이브를 평면 bag_contents로 옮긴다.
+    // 재귀 타입 대신 깊이별 고정 클래스로 읽어 JsonUtility 깊이 경고가 나지 않는다. 중첩 4단계 + 내용물 = 5단계면 충분.
+    private static class LegacyNestedSave
+    {
+        [Serializable] private class Item
+        {
+            public string item_id; public string instance_id; public int x; public int y; public bool rotated; public bool found_in_raid;
+            public virtual IEnumerable<Item> Kids() => Array.Empty<Item>();
+        }
+        [Serializable] private class L6 : Item { }
+        [Serializable] private class L5 : Item { public List<L6> children = new List<L6>(); public override IEnumerable<Item> Kids() => children; }
+        [Serializable] private class L4 : Item { public List<L5> children = new List<L5>(); public override IEnumerable<Item> Kids() => children; }
+        [Serializable] private class L3 : Item { public List<L4> children = new List<L4>(); public override IEnumerable<Item> Kids() => children; }
+        [Serializable] private class L2 : Item { public List<L3> children = new List<L3>(); public override IEnumerable<Item> Kids() => children; }
+        [Serializable] private class L1 : Item { public List<L2> children = new List<L2>(); public override IEnumerable<Item> Kids() => children; }
+        [Serializable] private class Root
+        {
+            public List<L1> stash = new List<L1>();
+            public List<L1> temporary_storage = new List<L1>();
+            public List<L1> run_bag = new List<L1>();
+            public List<L1> equipped = new List<L1>();
+        }
+
+        public static void Flatten(string json, SaveData data)
+        {
+            Root root = JsonUtility.FromJson<Root>(json);
+            if (root == null) return;
+            data.bag_contents ??= new List<SavedItem>();
+            foreach (List<L1> list in new[] { root.stash, root.temporary_storage, root.run_bag, root.equipped })
+            {
+                if (list == null) continue;
+                foreach (L1 item in list) AddChildren(item, data.bag_contents);
+            }
+        }
+
+        private static void AddChildren(Item parent, List<SavedItem> sink)
+        {
+            if (parent == null || string.IsNullOrEmpty(parent.instance_id)) return;
+            foreach (Item child in parent.Kids())
+            {
+                if (child == null) continue;
+                sink.Add(new SavedItem
+                {
+                    item_id = child.item_id, instance_id = child.instance_id, x = child.x, y = child.y,
+                    rotated = child.rotated, found_in_raid = child.found_in_raid, parent_id = parent.instance_id
+                });
+                AddChildren(child, sink);
+            }
         }
     }
 }

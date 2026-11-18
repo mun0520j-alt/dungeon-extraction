@@ -1273,3 +1273,12 @@ DungeonRunManager.CreateRuntimeEnemy () (at Assets/Scripts/MapGen/DungeonRunMana
 - 원인: `PlayerEquipment.ApplyLootSlot`이 루트 장비가 없을 때 기본 아이템으로만 덮어쓴다. 무기·방패·갑옷은 기본 아이템이 있지만 가방 슬롯은 없어서 이전 어댑터가 남았다
 - 수정: 기본 아이템이 없는 슬롯은 비운다
 - 상태: 수정 (Play 재확인 대기)
+
+## BUG-049 세이브 로드 시 JsonUtility 직렬화 깊이 경고
+
+- 발견: 2026-11-18 사용자 Play 콘솔
+- 재현: 가방 안에 아이템이 있는 Stash로 저장 → 재실행
+- 실제: `Serialization depth limit 10 exceeded at 'SavedItem.children'` 경고가 로드마다 2회
+- 원인: v6 `SavedItem`이 자기 자신 목록(`children`)을 가지는 재귀 타입. JsonUtility는 재귀 타입을 깊이 10에서 자르고 경고한다 (데이터는 4단계라 손실 없음)
+- 수정: 가방 내용물을 `bag_contents` 평면 목록 + `parent_id`로 저장. 기존 `children` 형식 v6 세이브는 깊이별 고정 클래스로 읽어 자동 변환 (세이브 버전 6 유지)
+- 상태: 수정 (Play 재확인 대기 — 경고 0, 가방 내용물 유지)
