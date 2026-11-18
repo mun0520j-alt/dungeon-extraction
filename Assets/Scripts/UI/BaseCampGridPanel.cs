@@ -4,6 +4,7 @@ using UnityEngine.UI;
 // 영지에서도 던전과 동일한 LootGridView를 사용한다. 데이터 변경은 LootRuntimeState에 위임한다.
 public sealed class BaseCampGridPanel : MonoBehaviour
 {
+    private const float GridScrollSensitivity = 36f;
     private LootGridView gridView;
     private LootGridView stashGridView;
     private LootGridView saleGridView;
@@ -108,6 +109,7 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         scroll.content = stashRect;
         scroll.horizontal = false;
         scroll.vertical = true;
+        scroll.scrollSensitivity = GridScrollSensitivity;
         scroll.movementType = ScrollRect.MovementType.Clamped;
 
         CreateText(stashPanel.transform, "SaleBasketTitle", "판매 바구니", 16,
@@ -131,6 +133,7 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         saleScroll.content = saleRect;
         saleScroll.horizontal = false;
         saleScroll.vertical = true;
+        saleScroll.scrollSensitivity = GridScrollSensitivity;
         saleScroll.movementType = ScrollRect.MovementType.Clamped;
 
         notice = CreateText(root.transform, "Notice", "아이템을 선택하세요", 13,

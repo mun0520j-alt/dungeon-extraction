@@ -8,6 +8,8 @@ public sealed class LootGridView : MonoBehaviour
 {
     public const float MinimumCellSize = 48f;
     private const float CellGap = 2f;
+    private const float DragAutoScrollEdge = 72f;
+    private const float DragAutoScrollSpeed = 360f;
 
     private LootGridModel model;
     private Func<string, int, int, bool, bool> moveHandler;
@@ -19,6 +21,7 @@ public sealed class LootGridView : MonoBehaviour
     private Text tooltip;
     private LootGridItemView dragged;
     private bool dragRotated;
+    private Vector2 dragScreenPosition;
     private string selectedInstanceId;
     private readonly System.Collections.Generic.Dictionary<string, Outline> selectionOutlines
         = new System.Collections.Generic.Dictionary<string, Outline>();
@@ -54,9 +57,11 @@ public sealed class LootGridView : MonoBehaviour
 
     private void Update()
     {
-        if (dragged == null || !Input.GetKeyDown(KeyCode.R)) return;
+        if (dragged == null) return;
+        AutoScrollWhileDragging();
+        if (!Input.GetKeyDown(KeyCode.R)) return;
         dragRotated = !dragRotated;
-        UpdateDragPreview(Input.mousePosition);
+        UpdateDragPreview(dragScreenPosition);
     }
 
     private void Build()
@@ -179,6 +184,7 @@ public sealed class LootGridView : MonoBehaviour
     {
         dragged = item;
         dragRotated = item.Rotated;
+        dragScreenPosition = screenPosition;
         item.GetComponent<CanvasGroup>().alpha = 0.35f;
         item.GetComponent<CanvasGroup>().blocksRaycasts = false;
         HideTooltip();
@@ -187,6 +193,7 @@ public sealed class LootGridView : MonoBehaviour
 
     internal void Drag(Vector2 screenPosition)
     {
+        dragScreenPosition = screenPosition;
         UpdateDragPreview(screenPosition);
     }
 
@@ -201,6 +208,29 @@ public sealed class LootGridView : MonoBehaviour
         dragged = null;
         if (preview != null) preview.gameObject.SetActive(false);
         Refresh();
+    }
+
+    private void AutoScrollWhileDragging()
+    {
+        ScrollRect scroll = GetComponentInParent<ScrollRect>();
+        if (scroll == null || !scroll.vertical || scroll.viewport == null || scroll.content == null) return;
+
+        Camera eventCamera = null;
+        Canvas canvas = scroll.GetComponentInParent<Canvas>();
+        if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay) eventCamera = canvas.worldCamera;
+        if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(scroll.viewport, dragScreenPosition, eventCamera, out Vector2 local)) return;
+
+        Rect rect = scroll.viewport.rect;
+        if (local.x < rect.xMin || local.x > rect.xMax) return;
+        float direction = 0f;
+        if (local.y >= rect.yMax - DragAutoScrollEdge) direction = 1f;
+        else if (local.y <= rect.yMin + DragAutoScrollEdge) direction = -1f;
+        if (Mathf.Approximately(direction, 0f)) return;
+
+        float overflow = Mathf.Max(1f, scroll.content.rect.height - scroll.viewport.rect.height);
+        scroll.verticalNormalizedPosition = Mathf.Clamp01(
+            scroll.verticalNormalizedPosition + direction * DragAutoScrollSpeed * Time.unscaledDeltaTime / overflow);
+        UpdateDragPreview(dragScreenPosition);
     }
 
     // 보험에 든 장비는 청록 테두리로 표시한다 (선택 표시의 노랑과 구분).
