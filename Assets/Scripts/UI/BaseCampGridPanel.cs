@@ -10,6 +10,7 @@ public sealed class BaseCampGridPanel : MonoBehaviour
     private LootGridView saleGridView;
     private Text title;
     private Text stashTitle;
+    private Text secondaryGridTitle;
     private Text notice;
     private LootItemInstance selected;
     private LootItemInstance openedBag;
@@ -112,7 +113,7 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         scroll.scrollSensitivity = GridScrollSensitivity;
         scroll.movementType = ScrollRect.MovementType.Clamped;
 
-        CreateText(stashPanel.transform, "SaleBasketTitle", "판매 바구니", 16,
+        secondaryGridTitle = CreateText(stashPanel.transform, "SaleBasketTitle", "판매 바구니", 16,
             new Vector2(0.67f, 0.70f), new Vector2(0.99f, 0.76f));
         var saleViewport = new GameObject("SaleBasketViewport", typeof(RectTransform), typeof(Image), typeof(RectMask2D), typeof(ScrollRect));
         saleViewport.transform.SetParent(stashPanel.transform, false);
@@ -156,14 +157,18 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         CreateButton(stashPanel.transform, "FilterReset", "필터 초기화", new Vector2(0.76f, 0.78f),
             BaseCampManagementPanel.ResetFiltersFromGrid, 0.22f);
         temporaryLabel = CreateText(stashPanel.transform, "TemporaryStorage", "임시 보관함 비어 있음", 12,
-            new Vector2(0.02f, 0.11f), new Vector2(0.98f, 0.17f));
+            new Vector2(0.02f, 0.125f), new Vector2(0.98f, 0.17f));
         temporaryLabel.color = new Color(1f, 0.72f, 0.32f, 1f);
-        CreateButton(stashPanel.transform, "TempPrev", "◀", new Vector2(0.02f, 0.03f), PreviousTemporary, 0.08f);
-        CreateButton(stashPanel.transform, "TempNext", "▶", new Vector2(0.11f, 0.03f), NextTemporary, 0.08f);
-        CreateButton(stashPanel.transform, "TempToStash", "Stash로", new Vector2(0.21f, 0.03f), MoveTemporaryToStash, 0.20f);
-        CreateButton(stashPanel.transform, "TempToBag", "열린 가방으로", new Vector2(0.43f, 0.03f), MoveTemporaryToOpenedBag, 0.27f);
-        CreateButton(stashPanel.transform, "TempDelete", "삭제", new Vector2(0.72f, 0.03f), DeleteTemporary, 0.12f);
-        CreateButton(stashPanel.transform, "TempSale", "판매", new Vector2(0.86f, 0.03f), MoveTemporaryToSale, 0.12f);
+        Text temporaryHelp = CreateText(stashPanel.transform, "TemporaryHelp",
+            "◀ ▶ 항목 선택 · Stash/열린 가방으로 이동 · 삭제는 두 번 확인 · 판매는 바구니로 이동",
+            10, new Vector2(0.02f, 0.085f), new Vector2(0.98f, 0.125f));
+        temporaryHelp.color = new Color(0.75f, 0.82f, 0.9f, 1f);
+        CreateButton(stashPanel.transform, "TempPrev", "◀ 이전", new Vector2(0.02f, 0.02f), PreviousTemporary, 0.09f);
+        CreateButton(stashPanel.transform, "TempNext", "다음 ▶", new Vector2(0.12f, 0.02f), NextTemporary, 0.09f);
+        CreateButton(stashPanel.transform, "TempToStash", "선택 → Stash", new Vector2(0.22f, 0.02f), MoveTemporaryToStash, 0.19f);
+        CreateButton(stashPanel.transform, "TempToBag", "선택 → 열린 가방", new Vector2(0.42f, 0.02f), MoveTemporaryToOpenedBag, 0.27f);
+        CreateButton(stashPanel.transform, "TempDelete", "선택 삭제", new Vector2(0.70f, 0.02f), DeleteTemporary, 0.13f);
+        CreateButton(stashPanel.transform, "TempSale", "선택 판매", new Vector2(0.84f, 0.02f), MoveTemporaryToSale, 0.14f);
         RefreshFilterLabels();
         ApplyLayout();
     }
@@ -190,19 +195,28 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         gridView.SetItemClickHandler(Select);
         gridView.SetItemDoubleClickHandler(MoveToStash);
         title.text = $"출격 가방 {LootRuntimeState.RunBagGrid.Width}×{LootRuntimeState.RunBagGrid.Height}";
-        LootGridModel shownGrid = openedBag?.BagGrid ?? LootRuntimeState.StashGrid;
-        stashGridView.Bind(shownGrid, openedBag == null
-            ? LootRuntimeState.MoveStashItem
-            : (id, x, y, rotated) => LootRuntimeState.MoveNestedBagItem(openedBag.InstanceId, id, x, y, rotated));
+        LootGridModel stashGrid = LootRuntimeState.StashGrid;
+        stashGridView.Bind(stashGrid, LootRuntimeState.MoveStashItem);
         stashGridView.SetDimPredicate(BaseCampManagementPanel.ShouldDimStashItem);
         stashGridView.SetItemClickHandler(Select);
         stashGridView.SetItemDoubleClickHandler(HandleStoredItemDoubleClick);
-        saleGridView.Bind(LootRuntimeState.SaleBasketGrid, LootRuntimeState.MoveSaleBasketItem);
-        saleGridView.SetItemClickHandler(SelectSaleBasketItem);
-        saleGridView.SetItemDoubleClickHandler(item => LootRuntimeState.ReturnSaleBasketItem(item.InstanceId));
-        stashTitle.text = openedBag == null
-            ? $"Stash {shownGrid.Width}×{shownGrid.Height}"
-            : $"{openedBag.Definition.Name} {shownGrid.Width}×{shownGrid.Height} · 깊이 {LootRuntimeState.GetStashBagDepth(openedBag.InstanceId)}";
+        if (openedBag == null)
+        {
+            saleGridView.Bind(LootRuntimeState.SaleBasketGrid, LootRuntimeState.MoveSaleBasketItem);
+            saleGridView.SetItemClickHandler(SelectSaleBasketItem);
+            saleGridView.SetItemDoubleClickHandler(item => LootRuntimeState.ReturnSaleBasketItem(item.InstanceId));
+            secondaryGridTitle.text = "판매 바구니";
+        }
+        else
+        {
+            saleGridView.Bind(openedBag.BagGrid,
+                (id, x, y, rotated) => LootRuntimeState.MoveNestedBagItem(openedBag.InstanceId, id, x, y, rotated));
+            saleGridView.SetItemClickHandler(SelectOpenedBagItem);
+            saleGridView.SetItemDoubleClickHandler(HandleOpenedBagItemDoubleClick);
+            secondaryGridTitle.text = $"{openedBag.Definition.Name} {openedBag.BagGrid.Width}×{openedBag.BagGrid.Height}"
+                + $" · 깊이 {LootRuntimeState.GetStashBagDepth(openedBag.InstanceId)}";
+        }
+        stashTitle.text = $"Stash {stashGrid.Width}×{stashGrid.Height}";
         if (bagBackButton != null) bagBackButton.gameObject.SetActive(openedBag != null);
         if (toSaleButton != null) toSaleButton.gameObject.SetActive(openedBag == null && BaseCampManagementPanel.IsSellMode);
         RefreshTemporaryStorage();
@@ -372,6 +386,13 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         notice.text = item?.Definition != null ? $"판매 대기: {item.Definition.Name}" : "아이템을 선택하세요";
     }
 
+    private void SelectOpenedBagItem(LootItemInstance item)
+    {
+        selected = item;
+        selectedFromSaleBasket = false;
+        notice.text = item?.Definition != null ? $"열린 가방: {item.Definition.Name}" : "아이템을 선택하세요";
+    }
+
     private void MoveToStash()
     {
         MoveToStash(selected);
@@ -412,17 +433,36 @@ public sealed class BaseCampGridPanel : MonoBehaviour
             return;
         }
 
-        if (openedBag == null && BaseCampManagementPanel.IsSellMode)
+        if (openedBag != null)
+        {
+            bool inserted = LootRuntimeState.MoveStashItemIntoBag(item.InstanceId, openedBag.InstanceId);
+            notice.text = inserted ? $"{openedBag.Definition.Name}에 넣었습니다." : LootRuntimeState.LastFailureReason;
+            return;
+        }
+
+        if (BaseCampManagementPanel.IsSellMode)
         {
             bool moved = LootRuntimeState.MoveStashItemToSaleBasket(item.InstanceId);
             notice.text = moved ? "판매 바구니로 이동했습니다." : LootRuntimeState.LastFailureReason;
             return;
         }
 
-        bool ok = openedBag == null
-            ? LootRuntimeState.MoveStashItemToBag(item.InstanceId)
-            : LootRuntimeState.MoveBagItemToParent(item.InstanceId, openedBag.InstanceId);
+        bool ok = LootRuntimeState.MoveStashItemToBag(item.InstanceId);
         notice.text = ok ? "아이템을 이동했습니다." : (LootRuntimeState.LastFailureReason ?? "이동 실패");
+    }
+
+    private void HandleOpenedBagItemDoubleClick(LootItemInstance item)
+    {
+        if (item?.Definition?.Type == LootItemType.Bag)
+        {
+            openedBag = item;
+            selected = null;
+            Refresh();
+            return;
+        }
+
+        bool ok = LootRuntimeState.MoveBagItemToParent(item.InstanceId, openedBag.InstanceId);
+        notice.text = ok ? "상위 보관함으로 이동했습니다." : (LootRuntimeState.LastFailureReason ?? "이동 실패");
     }
 
     private void MoveSelectedToSale()
