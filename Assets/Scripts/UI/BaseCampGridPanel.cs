@@ -43,12 +43,14 @@ public sealed class BaseCampGridPanel : MonoBehaviour
     {
         Build();
         LootRuntimeState.Changed += Refresh;
+        QuestRuntimeState.Changed += Refresh;
         Refresh();
     }
 
     private void OnDestroy()
     {
         LootRuntimeState.Changed -= Refresh;
+        QuestRuntimeState.Changed -= Refresh;
     }
 
     private void Update()
