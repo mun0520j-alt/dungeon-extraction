@@ -185,8 +185,9 @@ public static partial class LootRuntimeState
         if (!CanInsertIntoBag(item, targetBag, out reason)) return false;
         if (FindStoredItemRecursive(targetBag.InstanceId) == null) { reason = "영지 Stash의 가방에만 넣을 수 있습니다."; return false; }
         if (!HasFreeSpace(targetBag.BagGrid, item)) { reason = "가방 공간이 부족합니다."; return false; }
-        if (stash.Find(value => value?.InstanceId == item.InstanceId) == null && FindParentBag(item.InstanceId) == null)
-        { reason = "Stash나 가방 안 아이템만 가방에 넣을 수 있습니다."; return false; }
+        if (stash.Find(value => value?.InstanceId == item.InstanceId) == null && FindParentBag(item.InstanceId) == null
+            && runBag.Find(value => value?.InstanceId == item.InstanceId) == null)
+        { reason = "Stash·출격 가방·가방 안 아이템만 가방에 넣을 수 있습니다."; return false; }
         return true;
     }
 
@@ -195,10 +196,80 @@ public static partial class LootRuntimeState
         LootItemInstance targetBag = FindStoredItemRecursive(targetBagInstanceId);
         if (stash.Find(value => value?.InstanceId == itemInstanceId) != null)
             return MoveStashItemIntoBag(itemInstanceId, targetBagInstanceId);
+        LootItemInstance fromRunBag = runBag.Find(value => value?.InstanceId == itemInstanceId);
+        if (fromRunBag != null)
+        {
+            if (!CanInsertIntoBag(fromRunBag, targetBag, out string runBagReason)) return Fail(runBagReason);
+            if (!targetBag.BagGrid.TryAutoPlace(fromRunBag, out _)) return Fail("가방 공간이 부족합니다.");
+            RemoveFromRunBag(fromRunBag);
+            LastFailureReason = null;
+            Changed?.Invoke();
+            return true;
+        }
         LootItemInstance parent = FindParentBag(itemInstanceId);
         if (parent == null) return Fail("Stash나 가방 안 아이템만 가방에 넣을 수 있습니다.");
         if (parent.InstanceId == targetBagInstanceId) return Fail("이미 그 가방 안에 있습니다.");
         return MoveBagItemToBag(itemInstanceId, parent.InstanceId, targetBagInstanceId);
+    }
+
+    // 영지 출격 가방 ↔ Stash·열린 가방 드래그 (지정 칸·회전). 실패하면 상태 불변.
+    public static bool MoveStashItemToRunBagAt(string itemInstanceId, int x, int y, bool rotated)
+    {
+        EnsureStashGrid();
+        LootItemInstance item = stash.Find(value => value?.InstanceId == itemInstanceId);
+        if (item == null) return Fail("Stash 아이템을 찾을 수 없습니다.");
+        if (!runBagGrid.TryPlace(item, x, y, rotated)) return Fail("출격 가방의 해당 위치에 놓을 수 없습니다.");
+        stashGrid.Remove(item.InstanceId, out _);
+        stash.Remove(item);
+        runBag.Add(item);
+        LastFailureReason = null;
+        Changed?.Invoke();
+        return true;
+    }
+
+    public static bool MoveRunBagItemToStashAt(string itemInstanceId, int x, int y, bool rotated)
+    {
+        EnsureStashGrid();
+        LootItemInstance item = runBag.Find(value => value?.InstanceId == itemInstanceId);
+        if (item == null) return Fail("출격 가방 아이템을 찾을 수 없습니다.");
+        if (!stashGrid.TryPlace(item, x, y, rotated)) return Fail("Stash의 해당 위치에 놓을 수 없습니다.");
+        RemoveFromRunBag(item);
+        stash.Add(item);
+        LastFailureReason = null;
+        Changed?.Invoke();
+        return true;
+    }
+
+    public static bool MoveBagItemToRunBagAt(string itemInstanceId, string sourceBagInstanceId, int x, int y, bool rotated)
+    {
+        LootItemInstance sourceBag = FindStoredItemRecursive(sourceBagInstanceId);
+        LootGridPlacement placement = sourceBag?.BagGrid?.Find(itemInstanceId);
+        if (placement == null) return Fail("가방 안 아이템을 찾을 수 없습니다.");
+        if (!runBagGrid.TryPlace(placement.Item, x, y, rotated)) return Fail("출격 가방의 해당 위치에 놓을 수 없습니다.");
+        sourceBag.BagGrid.Remove(itemInstanceId, out _);
+        runBag.Add(placement.Item);
+        LastFailureReason = null;
+        Changed?.Invoke();
+        return true;
+    }
+
+    public static bool MoveRunBagItemIntoBagAt(string itemInstanceId, string targetBagInstanceId, int x, int y, bool rotated)
+    {
+        LootItemInstance item = runBag.Find(value => value?.InstanceId == itemInstanceId);
+        LootItemInstance targetBag = FindStoredItemRecursive(targetBagInstanceId);
+        if (item == null) return Fail("출격 가방 아이템을 찾을 수 없습니다.");
+        if (!CanInsertIntoBag(item, targetBag, out string reason)) return Fail(reason);
+        if (!targetBag.BagGrid.TryPlace(item, x, y, rotated)) return Fail("가방의 해당 위치에 놓을 수 없습니다.");
+        RemoveFromRunBag(item);
+        LastFailureReason = null;
+        Changed?.Invoke();
+        return true;
+    }
+
+    private static void RemoveFromRunBag(LootItemInstance item)
+    {
+        runBagGrid.Remove(item.InstanceId, out _);
+        runBag.Remove(item);
     }
 
     private static bool HasFreeSpace(LootGridModel grid, LootItemInstance item)

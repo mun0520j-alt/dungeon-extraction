@@ -233,6 +233,12 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         stashGridView.ClearExternalDropTargets();
         saleGridView.ClearExternalDropTargets();
         stashGridView.SetBagDropHandler(CanDropIntoBagIcon, DropIntoBagIcon);
+        // 출격 가방 ↔ Stash 드래그 (영지)
+        gridView.ClearExternalDropTargets();
+        stashGridView.AddExternalDropTarget(gridView,
+            (item, x, y, rotated) => LootRuntimeState.MoveStashItemToRunBagAt(item.InstanceId, x, y, rotated));
+        gridView.AddExternalDropTarget(stashGridView,
+            (item, x, y, rotated) => LootRuntimeState.MoveRunBagItemToStashAt(item.InstanceId, x, y, rotated));
         if (BaseCampManagementPanel.IsSellMode)
         {
             stashGridView.AddExternalDropTarget(saleGridView,
@@ -263,6 +269,13 @@ public sealed class BaseCampGridPanel : MonoBehaviour
                     item.InstanceId, bag.InstanceId, x, y, rotated));
             window.Grid.AddExternalDropTarget(stashGridView,
                 (item, x, y, rotated) => LootRuntimeState.MoveBagItemToStashAt(
+                    item.InstanceId, bag.InstanceId, x, y, rotated));
+            // 열린 가방 ↔ 출격 가방
+            window.Grid.AddExternalDropTarget(gridView,
+                (item, x, y, rotated) => LootRuntimeState.MoveBagItemToRunBagAt(
+                    item.InstanceId, bag.InstanceId, x, y, rotated));
+            gridView.AddExternalDropTarget(window.Grid,
+                (item, x, y, rotated) => LootRuntimeState.MoveRunBagItemIntoBagAt(
                     item.InstanceId, bag.InstanceId, x, y, rotated));
         }
         for (int i = 0; i < bagWindows.Count; i++)
