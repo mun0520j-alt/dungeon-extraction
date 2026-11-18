@@ -200,7 +200,7 @@ public sealed class LootGridView : MonoBehaviour
     internal void EndDrag(Vector2 screenPosition)
     {
         if (dragged == null) return;
-        if (TryScreenToCell(screenPosition, out int x, out int y)
+        if (TryScreenToPlacementCell(screenPosition, out int x, out int y)
             && model.CanMove(dragged.Item.InstanceId, x, y, dragRotated))
             moveHandler?.Invoke(dragged.Item.InstanceId, x, y, dragRotated);
         dragged.GetComponent<CanvasGroup>().alpha = 1f;
@@ -330,7 +330,7 @@ public sealed class LootGridView : MonoBehaviour
 
     private void UpdateDragPreview(Vector2 screenPosition)
     {
-        if (dragged == null || preview == null || !TryScreenToCell(screenPosition, out int x, out int y))
+        if (dragged == null || preview == null || !TryScreenToPlacementCell(screenPosition, out int x, out int y))
         {
             if (preview != null) preview.gameObject.SetActive(false);
             return;
@@ -351,6 +351,19 @@ public sealed class LootGridView : MonoBehaviour
         x = Mathf.FloorToInt(local.x / MinimumCellSize);
         y = Mathf.FloorToInt(-local.y / MinimumCellSize);
         return x >= 0 && y >= 0 && x < model.Width && y < model.Height;
+    }
+
+    private bool TryScreenToPlacementCell(Vector2 screenPosition, out int x, out int y)
+    {
+        if (!TryScreenToCell(screenPosition, out x, out y) || dragged?.Item?.Definition == null) return false;
+        int width = dragRotated ? dragged.Item.Definition.GridHeight : dragged.Item.Definition.GridWidth;
+        int height = dragRotated ? dragged.Item.Definition.GridWidth : dragged.Item.Definition.GridHeight;
+        if (width > model.Width || height > model.Height) return false;
+
+        // 포인터가 마지막 행·열을 가리켜도 다칸 아이템 전체가 격자 밖으로 삐져나가지 않게 한다.
+        x = Mathf.Min(x, model.Width - width);
+        y = Mathf.Min(y, model.Height - height);
+        return true;
     }
 
     private void PositionTooltip(Vector2 screenPosition)
