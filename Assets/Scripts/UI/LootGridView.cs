@@ -13,6 +13,8 @@ public sealed class LootGridView : MonoBehaviour
 
     private LootGridModel model;
     private Func<string, int, int, bool, bool> moveHandler;
+    private LootGridView externalDropTarget;
+    private Func<LootItemInstance, int, int, bool, bool> externalDropHandler;
     private Action<LootItemInstance> itemClickHandler;
     private Action<LootItemInstance> itemDoubleClickHandler;
     private Func<LootItemInstance, bool> dimPredicate;
@@ -22,6 +24,7 @@ public sealed class LootGridView : MonoBehaviour
     private LootGridItemView dragged;
     private bool dragRotated;
     private Vector2 dragScreenPosition;
+    private RectTransform dragGhost;
     private string selectedInstanceId;
     private readonly System.Collections.Generic.Dictionary<string, Outline> selectionOutlines
         = new System.Collections.Generic.Dictionary<string, Outline>();
@@ -55,12 +58,22 @@ public sealed class LootGridView : MonoBehaviour
         Refresh();
     }
 
+    public void SetExternalDropTarget(LootGridView target, Func<LootItemInstance, int, int, bool, bool> handler)
+    {
+        externalDropTarget = target;
+        externalDropHandler = handler;
+    }
+
     private void Update()
     {
         if (dragged == null) return;
         AutoScrollWhileDragging();
+        if (externalDropTarget != null) externalDropTarget.AutoScrollAt(dragScreenPosition);
+        UpdateDragGhost(dragScreenPosition);
+        UpdateDragPreview(dragScreenPosition);
         if (!Input.GetKeyDown(KeyCode.R)) return;
         dragRotated = !dragRotated;
+        ResizeDragGhost(dragged.Item, dragRotated);
         UpdateDragPreview(dragScreenPosition);
     }
 
@@ -188,12 +201,14 @@ public sealed class LootGridView : MonoBehaviour
         item.GetComponent<CanvasGroup>().alpha = 0.35f;
         item.GetComponent<CanvasGroup>().blocksRaycasts = false;
         HideTooltip();
+        CreateDragGhost(item.Item, dragRotated, screenPosition);
         UpdateDragPreview(screenPosition);
     }
 
     internal void Drag(Vector2 screenPosition)
     {
         dragScreenPosition = screenPosition;
+        UpdateDragGhost(screenPosition);
         UpdateDragPreview(screenPosition);
     }
 
@@ -203,22 +218,38 @@ public sealed class LootGridView : MonoBehaviour
         if (TryScreenToPlacementCell(screenPosition, out int x, out int y)
             && model.CanMove(dragged.Item.InstanceId, x, y, dragRotated))
             moveHandler?.Invoke(dragged.Item.InstanceId, x, y, dragRotated);
+        else if (externalDropTarget != null && externalDropHandler != null
+            && externalDropTarget.TryScreenToPlacementCell(screenPosition, dragged.Item, dragRotated, out x, out y))
+            externalDropHandler(dragged.Item, x, y, dragRotated);
         dragged.GetComponent<CanvasGroup>().alpha = 1f;
         dragged.GetComponent<CanvasGroup>().blocksRaycasts = true;
         dragged = null;
+        if (dragGhost != null) DestroyImmediateSafe(dragGhost.gameObject);
+        dragGhost = null;
         if (preview != null) preview.gameObject.SetActive(false);
+        externalDropTarget?.HideExternalPreview();
         Refresh();
     }
 
     private void AutoScrollWhileDragging()
     {
         ScrollRect scroll = GetComponentInParent<ScrollRect>();
+        AutoScrollAt(dragScreenPosition, scroll);
+    }
+
+    private void AutoScrollAt(Vector2 screenPosition)
+    {
+        AutoScrollAt(screenPosition, GetComponentInParent<ScrollRect>());
+    }
+
+    private static void AutoScrollAt(Vector2 screenPosition, ScrollRect scroll)
+    {
         if (scroll == null || !scroll.vertical || scroll.viewport == null || scroll.content == null) return;
 
         Camera eventCamera = null;
         Canvas canvas = scroll.GetComponentInParent<Canvas>();
         if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay) eventCamera = canvas.worldCamera;
-        if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(scroll.viewport, dragScreenPosition, eventCamera, out Vector2 local)) return;
+        if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(scroll.viewport, screenPosition, eventCamera, out Vector2 local)) return;
 
         Rect rect = scroll.viewport.rect;
         if (local.x < rect.xMin || local.x > rect.xMax) return;
@@ -230,7 +261,6 @@ public sealed class LootGridView : MonoBehaviour
         float overflow = Mathf.Max(1f, scroll.content.rect.height - scroll.viewport.rect.height);
         scroll.verticalNormalizedPosition = Mathf.Clamp01(
             scroll.verticalNormalizedPosition + direction * DragAutoScrollSpeed * Time.unscaledDeltaTime / overflow);
-        UpdateDragPreview(dragScreenPosition);
     }
 
     // 보험에 든 장비는 청록 테두리로 표시한다 (선택 표시의 노랑과 구분).
@@ -330,23 +360,45 @@ public sealed class LootGridView : MonoBehaviour
 
     private void UpdateDragPreview(Vector2 screenPosition)
     {
-        if (dragged == null || preview == null || !TryScreenToPlacementCell(screenPosition, out int x, out int y))
+        if (dragged == null || preview == null)
+            return;
+        if (TryScreenToPlacementCell(screenPosition, out int x, out int y))
         {
-            if (preview != null) preview.gameObject.SetActive(false);
+            externalDropTarget?.HideExternalPreview();
+            ShowPreview(dragged.Item, x, y, dragRotated,
+                model.CanMove(dragged.Item.InstanceId, x, y, dragRotated));
             return;
         }
-        int width = dragRotated ? dragged.Item.Definition.GridHeight : dragged.Item.Definition.GridWidth;
-        int height = dragRotated ? dragged.Item.Definition.GridWidth : dragged.Item.Definition.GridHeight;
+        preview.gameObject.SetActive(false);
+        if (externalDropTarget != null
+            && externalDropTarget.TryScreenToPlacementCell(screenPosition, dragged.Item, dragRotated, out x, out y))
+            externalDropTarget.ShowPreview(dragged.Item, x, y, dragRotated,
+                externalDropTarget.model.CanPlace(dragged.Item, x, y, dragRotated));
+        else externalDropTarget?.HideExternalPreview();
+    }
+
+    private void ShowPreview(LootItemInstance item, int x, int y, bool rotated, bool valid)
+    {
+        int width = rotated ? item.Definition.GridHeight : item.Definition.GridWidth;
+        int height = rotated ? item.Definition.GridWidth : item.Definition.GridHeight;
         SetItemRect(preview, x, y, width, height);
-        preview.GetComponent<Image>().color = model.CanMove(dragged.Item.InstanceId, x, y, dragRotated)
+        preview.GetComponent<Image>().color = valid
             ? new Color(0.2f, 0.9f, 0.35f, 0.45f) : new Color(0.95f, 0.15f, 0.12f, 0.55f);
         preview.gameObject.SetActive(true);
         preview.SetAsLastSibling();
     }
 
+    private void HideExternalPreview()
+    {
+        if (preview != null) preview.gameObject.SetActive(false);
+    }
+
     private bool TryScreenToCell(Vector2 screenPosition, out int x, out int y)
     {
         x = y = -1;
+        ScrollRect scroll = GetComponentInParent<ScrollRect>();
+        if (scroll?.viewport != null && !RectTransformUtility.RectangleContainsScreenPoint(scroll.viewport, screenPosition, null))
+            return false;
         if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(gridRoot, screenPosition, null, out Vector2 local)) return false;
         x = Mathf.FloorToInt(local.x / MinimumCellSize);
         y = Mathf.FloorToInt(-local.y / MinimumCellSize);
@@ -355,15 +407,48 @@ public sealed class LootGridView : MonoBehaviour
 
     private bool TryScreenToPlacementCell(Vector2 screenPosition, out int x, out int y)
     {
-        if (!TryScreenToCell(screenPosition, out x, out y) || dragged?.Item?.Definition == null) return false;
-        int width = dragRotated ? dragged.Item.Definition.GridHeight : dragged.Item.Definition.GridWidth;
-        int height = dragRotated ? dragged.Item.Definition.GridWidth : dragged.Item.Definition.GridHeight;
+        return TryScreenToPlacementCell(screenPosition, dragged?.Item, dragRotated, out x, out y);
+    }
+
+    private bool TryScreenToPlacementCell(Vector2 screenPosition, LootItemInstance item, bool rotated, out int x, out int y)
+    {
+        if (!TryScreenToCell(screenPosition, out x, out y) || item?.Definition == null) return false;
+        int width = rotated ? item.Definition.GridHeight : item.Definition.GridWidth;
+        int height = rotated ? item.Definition.GridWidth : item.Definition.GridHeight;
         if (width > model.Width || height > model.Height) return false;
 
         // 포인터가 마지막 행·열을 가리켜도 다칸 아이템 전체가 격자 밖으로 삐져나가지 않게 한다.
         x = Mathf.Min(x, model.Width - width);
         y = Mathf.Min(y, model.Height - height);
         return true;
+    }
+
+    private void CreateDragGhost(LootItemInstance item, bool rotated, Vector2 screenPosition)
+    {
+        Canvas canvas = GetComponentInParent<Canvas>();
+        if (canvas == null || item?.Definition == null) return;
+        var ghost = new GameObject("DragGhost", typeof(RectTransform), typeof(Image), typeof(CanvasGroup));
+        ghost.transform.SetParent(canvas.transform, false);
+        dragGhost = ghost.GetComponent<RectTransform>();
+        dragGhost.pivot = new Vector2(0.5f, 0.5f);
+        ResizeDragGhost(item, rotated);
+        ghost.GetComponent<Image>().color = RarityColor(item.Definition.Rarity) * new Color(1f, 1f, 1f, 0.72f);
+        ghost.GetComponent<CanvasGroup>().blocksRaycasts = false;
+        UpdateDragGhost(screenPosition);
+        dragGhost.SetAsLastSibling();
+    }
+
+    private void UpdateDragGhost(Vector2 screenPosition)
+    {
+        if (dragGhost != null) dragGhost.position = screenPosition;
+    }
+
+    private void ResizeDragGhost(LootItemInstance item, bool rotated)
+    {
+        if (dragGhost == null || item?.Definition == null) return;
+        int width = rotated ? item.Definition.GridHeight : item.Definition.GridWidth;
+        int height = rotated ? item.Definition.GridWidth : item.Definition.GridHeight;
+        dragGhost.sizeDelta = new Vector2(width * MinimumCellSize - CellGap, height * MinimumCellSize - CellGap);
     }
 
     private void PositionTooltip(Vector2 screenPosition)

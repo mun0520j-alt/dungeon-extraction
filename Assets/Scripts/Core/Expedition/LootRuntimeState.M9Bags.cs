@@ -91,6 +91,21 @@ public static partial class LootRuntimeState
         return true;
     }
 
+    public static bool MoveStashItemIntoBagAt(string itemInstanceId, string bagInstanceId, int x, int y, bool rotated)
+    {
+        EnsureStashGrid();
+        LootItemInstance item = stash.Find(value => value?.InstanceId == itemInstanceId);
+        LootItemInstance bag = FindStoredItemRecursive(bagInstanceId);
+        if (item == null) return Fail("Stash 직속 아이템만 가방에 넣을 수 있습니다.");
+        if (!CanInsertIntoBag(item, bag, out string reason)) return Fail(reason);
+        if (!bag.BagGrid.TryPlace(item, x, y, rotated)) return Fail("가방의 해당 위치에 놓을 수 없습니다.");
+        stashGrid.Remove(item.InstanceId, out _);
+        stash.Remove(item);
+        LastFailureReason = null;
+        Changed?.Invoke();
+        return true;
+    }
+
     public static bool MoveBagItemToParent(string itemInstanceId, string sourceBagInstanceId)
     {
         LootItemInstance sourceBag = FindStoredItemRecursive(sourceBagInstanceId);
@@ -109,6 +124,20 @@ public static partial class LootRuntimeState
             stash.Add(placement.Item);
         }
         sourceBag.BagGrid.Remove(itemInstanceId, out _);
+        LastFailureReason = null;
+        Changed?.Invoke();
+        return true;
+    }
+
+    public static bool MoveBagItemToStashAt(string itemInstanceId, string sourceBagInstanceId, int x, int y, bool rotated)
+    {
+        LootItemInstance sourceBag = FindStoredItemRecursive(sourceBagInstanceId);
+        LootGridPlacement placement = sourceBag?.BagGrid?.Find(itemInstanceId);
+        if (placement == null) return Fail("가방 안 아이템을 찾을 수 없습니다.");
+        EnsureStashGrid();
+        if (!stashGrid.TryPlace(placement.Item, x, y, rotated)) return Fail("Stash의 해당 위치에 놓을 수 없습니다.");
+        sourceBag.BagGrid.Remove(itemInstanceId, out _);
+        stash.Add(placement.Item);
         LastFailureReason = null;
         Changed?.Invoke();
         return true;

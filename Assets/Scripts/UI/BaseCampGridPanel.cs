@@ -204,15 +204,23 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         stashGridView.SetItemDoubleClickHandler(HandleStoredItemDoubleClick);
         if (openedBag == null)
         {
+            stashGridView.SetExternalDropTarget(null, null);
             saleGridView.Bind(LootRuntimeState.SaleBasketGrid, LootRuntimeState.MoveSaleBasketItem);
+            saleGridView.SetExternalDropTarget(null, null);
             saleGridView.SetItemClickHandler(SelectSaleBasketItem);
             saleGridView.SetItemDoubleClickHandler(item => LootRuntimeState.ReturnSaleBasketItem(item.InstanceId));
             secondaryGridTitle.text = "판매 바구니";
         }
         else
         {
+            stashGridView.SetExternalDropTarget(saleGridView,
+                (item, x, y, rotated) => LootRuntimeState.MoveStashItemIntoBagAt(
+                    item.InstanceId, openedBag.InstanceId, x, y, rotated));
             saleGridView.Bind(openedBag.BagGrid,
                 (id, x, y, rotated) => LootRuntimeState.MoveNestedBagItem(openedBag.InstanceId, id, x, y, rotated));
+            saleGridView.SetExternalDropTarget(stashGridView,
+                (item, x, y, rotated) => LootRuntimeState.MoveBagItemToStashAt(
+                    item.InstanceId, openedBag.InstanceId, x, y, rotated));
             saleGridView.SetItemClickHandler(SelectOpenedBagItem);
             saleGridView.SetItemDoubleClickHandler(HandleOpenedBagItemDoubleClick);
             secondaryGridTitle.text = $"{openedBag.Definition.Name} {openedBag.BagGrid.Width}×{openedBag.BagGrid.Height}"
