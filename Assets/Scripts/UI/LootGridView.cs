@@ -421,18 +421,6 @@ public sealed class LootGridView : MonoBehaviour
         foreach (ExternalDropBinding binding in externalDropTargets) binding.Target?.HideExternalPreview();
     }
 
-    private bool TryScreenToCell(Vector2 screenPosition, out int x, out int y)
-    {
-        x = y = -1;
-        ScrollRect scroll = GetComponentInParent<ScrollRect>();
-        if (scroll?.viewport != null && !RectTransformUtility.RectangleContainsScreenPoint(scroll.viewport, screenPosition, null))
-            return false;
-        if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(gridRoot, screenPosition, null, out Vector2 local)) return false;
-        x = Mathf.FloorToInt(local.x / MinimumCellSize);
-        y = Mathf.FloorToInt(-local.y / MinimumCellSize);
-        return x >= 0 && y >= 0 && x < model.Width && y < model.Height;
-    }
-
     private bool TryScreenToPlacementCell(Vector2 screenPosition, out int x, out int y)
     {
         return TryScreenToPlacementCell(screenPosition, dragged?.Item, dragRotated, out x, out y);
@@ -440,14 +428,21 @@ public sealed class LootGridView : MonoBehaviour
 
     private bool TryScreenToPlacementCell(Vector2 screenPosition, LootItemInstance item, bool rotated, out int x, out int y)
     {
-        if (!TryScreenToCell(screenPosition, out x, out y) || item?.Definition == null) return false;
+        x = y = -1;
+        if (item?.Definition == null) return false;
+        ScrollRect scroll = GetComponentInParent<ScrollRect>();
+        if (scroll?.viewport != null && !RectTransformUtility.RectangleContainsScreenPoint(scroll.viewport, screenPosition, null))
+            return false;
+        if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(gridRoot, screenPosition, null, out Vector2 local))
+            return false;
         int width = rotated ? item.Definition.GridHeight : item.Definition.GridWidth;
         int height = rotated ? item.Definition.GridWidth : item.Definition.GridHeight;
         if (width > model.Width || height > model.Height) return false;
 
-        // 포인터가 마지막 행·열을 가리켜도 다칸 아이템 전체가 격자 밖으로 삐져나가지 않게 한다.
-        x = Mathf.Min(x, model.Width - width);
-        y = Mathf.Min(y, model.Height - height);
+        // 격자 창 안에만 놓으면 가장 가까운 유효 시작 칸으로 스냅한다.
+        // 작은 가방에서 정확히 셀 안을 조준해야 했던 불편과 가장자리 돌출을 함께 막는다.
+        x = Mathf.Clamp(Mathf.FloorToInt(local.x / MinimumCellSize), 0, model.Width - width);
+        y = Mathf.Clamp(Mathf.FloorToInt(-local.y / MinimumCellSize), 0, model.Height - height);
         return true;
     }
 
