@@ -33,6 +33,7 @@ public sealed class BaseCampGridPanel : MonoBehaviour
     private int temporaryIndex;
     private bool confirmTemporaryDelete;
     private bool selectedFromSaleBasket;
+    private bool selectedFromStash;
     private RectTransform loadoutRoot;
     private RectTransform stashRoot;
     private Transform hudRoot;
@@ -216,13 +217,13 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         if (gridView == null) return;
         RefreshSlots();
         gridView.Bind(LootRuntimeState.RunBagGrid, LootRuntimeState.MoveRunBagItem);
-        gridView.SetItemClickHandler(Select);
+        gridView.SetItemClickHandler(SelectRunBagItem);
         gridView.SetItemDoubleClickHandler(MoveToStash);
         title.text = $"출격 가방 {LootRuntimeState.RunBagGrid.Width}×{LootRuntimeState.RunBagGrid.Height}";
         LootGridModel stashGrid = LootRuntimeState.StashGrid;
         stashGridView.Bind(stashGrid, LootRuntimeState.MoveStashItem);
         stashGridView.SetDimPredicate(BaseCampManagementPanel.ShouldDimStashItem);
-        stashGridView.SetItemClickHandler(Select);
+        stashGridView.SetItemClickHandler(SelectStashItem);
         stashGridView.SetItemDoubleClickHandler(HandleStoredItemDoubleClick);
         saleGridView.Bind(LootRuntimeState.SaleBasketGrid, LootRuntimeState.MoveSaleBasketItem);
         saleGridView.SetItemClickHandler(SelectSaleBasketItem);
@@ -465,11 +466,21 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         }
     }
 
-    private void Select(LootItemInstance item)
+    private void SelectRunBagItem(LootItemInstance item)
     {
         selected = item;
         selectedSourceBagId = null;
         selectedFromSaleBasket = false;
+        selectedFromStash = false;
+        notice.text = item?.Definition?.Name ?? "아이템을 선택하세요";
+    }
+
+    private void SelectStashItem(LootItemInstance item)
+    {
+        selected = item;
+        selectedSourceBagId = null;
+        selectedFromSaleBasket = false;
+        selectedFromStash = true;
         notice.text = item?.Definition?.Name ?? "아이템을 선택하세요";
     }
 
@@ -478,6 +489,7 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         selected = item;
         selectedSourceBagId = null;
         selectedFromSaleBasket = true;
+        selectedFromStash = false;
         notice.text = item?.Definition != null ? $"판매 대기: {item.Definition.Name}" : "아이템을 선택하세요";
     }
 
@@ -487,6 +499,7 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         selected = item;
         selectedSourceBagId = window?.Bag?.InstanceId;
         selectedFromSaleBasket = false;
+        selectedFromStash = false;
         notice.text = item?.Definition != null ? $"열린 가방: {item.Definition.Name}" : "아이템을 선택하세요";
     }
 
@@ -512,13 +525,17 @@ public sealed class BaseCampGridPanel : MonoBehaviour
     private void Equip()
     {
         if (selected == null) return;
-        bool ok = LootRuntimeState.TryEquipFromBaseCampBag(selected.InstanceId);
+        bool ok = selectedFromStash
+            ? LootRuntimeState.TryEquipFromStash(selected.InstanceId)
+            : LootRuntimeState.TryEquipFromBaseCampBag(selected.InstanceId);
         notice.text = ok ? "장착했습니다." : LootRuntimeState.LastFailureReason;
         if (ok)
         {
             selected = null;
             selectedSourceBagId = null;
+            selectedFromStash = false;
             gridView.ClearSelection();
+            stashGridView.ClearSelection();
         }
     }
 
