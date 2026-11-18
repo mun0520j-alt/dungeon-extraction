@@ -5,6 +5,7 @@ using UnityEngine.UI;
 // 영지에서도 던전과 동일한 LootGridView를 사용한다. 데이터 변경은 LootRuntimeState에 위임한다.
 public sealed class BaseCampGridPanel : MonoBehaviour
 {
+    private static BaseCampGridPanel instance;
     private const int MaxOpenBagWindows = 5;
     private const float GridScrollSensitivity = 36f;
     private sealed class BagWindowState
@@ -52,6 +53,7 @@ public sealed class BaseCampGridPanel : MonoBehaviour
 
     private void Start()
     {
+        instance = this;
         Build();
         LootRuntimeState.Changed += Refresh;
         QuestRuntimeState.Changed += Refresh;
@@ -62,6 +64,14 @@ public sealed class BaseCampGridPanel : MonoBehaviour
     {
         LootRuntimeState.Changed -= Refresh;
         QuestRuntimeState.Changed -= Refresh;
+        if (instance == this) instance = null;
+    }
+
+    public static bool CloseNewestBagWindowForEscape()
+    {
+        if (instance == null || instance.bagWindows.Count == 0) return false;
+        instance.CloseBagWindow(instance.bagWindows[instance.bagWindows.Count - 1]);
+        return true;
     }
 
     private void Update()
