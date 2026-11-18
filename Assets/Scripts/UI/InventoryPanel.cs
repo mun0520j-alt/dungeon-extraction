@@ -338,8 +338,16 @@ public class InventoryPanel : MonoBehaviour
     {
         var player = PlayerTurnActor.Instance;
         if (player == null || player.Equipment == null) return;
-        bool spent = player.TryPerformTimedAction(TickCost.SwapWeaponInCombat, "Unequip", () => player.Equipment.TryUnequip(slot));
-        SetBagNotice(spent ? null : LootRuntimeState.LastFailureReason);
+        // 던전에서 큰 가방은 기본 3×2에 안 들어가므로 내용물째 발밑 바닥 더미로 내려놓는다 (결정 40).
+        bool dropBagToGround = slot == EquipmentSlotType.Bag && ExpeditionSession.IsActive
+            && LootRuntimeState.GetEquipped(LootItemType.Bag) != null && !LootRuntimeState.CanUnequipBagIntoBaseBag();
+        bool spent = player.TryPerformTimedAction(TickCost.SwapWeaponInCombat, "Unequip", () => dropBagToGround
+            ? LootRuntimeState.TryUnequipBagOntoGround(bag => player.FloorTilemap != null
+                && GroundLootPile.TryAddOrCreate(player.FloorTilemap, player.CurrentCell, bag, out _))
+            : player.Equipment.TryUnequip(slot));
+        SetBagNotice(spent
+            ? (dropBagToGround ? "가방을 내용물째 발밑에 내려놓았습니다. 바닥 더미에서 더블클릭하면 다시 장착합니다." : null)
+            : LootRuntimeState.LastFailureReason);
     }
 
     private void EnsureBagBindings()

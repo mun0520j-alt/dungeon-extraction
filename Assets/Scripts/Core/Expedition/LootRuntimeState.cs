@@ -240,6 +240,7 @@ public static partial class LootRuntimeState
             if (insuredThisRun.Contains(previousBag.InstanceId)) droppedInsuredThisRun.Add(previousBag.InstanceId);
         }
         newBag.SetBagGrid(candidateBagGrid);
+        droppedInsuredThisRun.Remove(newBag.InstanceId); // 버렸던 보험 가방을 다시 장착하면 버림 판정에서 뺀다
         equippedLoot[LootItemType.Bag] = newBag;
         LoadEquippedBagContents(newBag);
         RefreshBagCapacity();
@@ -308,6 +309,36 @@ public static partial class LootRuntimeState
         runBag.Add(equippedBag);
         runBagGrid = candidateGrid;
         equippedLoot.Remove(LootItemType.Bag);
+        RefreshBagCapacity();
+        LastFailureReason = null;
+        Changed?.Invoke();
+        return true;
+    }
+
+    // 던전 가방 해제 (결정 40): 기본 3×2에 장착 가방이 안 들어가면 내용물을 담은 채 발밑 바닥 더미로 내려놓는다.
+    // dropToGround가 실패하면(더미 공간 없음) 아무것도 바꾸지 않는다. 다시 장착은 바닥 더미에서 더블클릭(빈 부위 → 장착).
+    public static bool CanUnequipBagIntoBaseBag()
+    {
+        if (!equippedLoot.TryGetValue(LootItemType.Bag, out LootItemInstance bag) || bag == null) return false;
+        return new LootGridModel(BaseBagGridWidth, BaseBagGridHeight).TryAutoPlace(bag, out _);
+    }
+
+    public static bool TryUnequipBagOntoGround(Func<LootItemInstance, bool> dropToGround)
+    {
+        if (!equippedLoot.TryGetValue(LootItemType.Bag, out LootItemInstance bag) || bag == null)
+            return Fail("해제할 가방이 없습니다.");
+        if (dropToGround == null) return Fail("가방을 내려놓을 곳이 없습니다.");
+        LootGridModel previousGrid = bag.BagGrid;
+        bag.SetBagGrid(runBagGrid);
+        if (!dropToGround(bag))
+        {
+            bag.SetBagGrid(previousGrid);
+            return Fail("발밑에 가방을 내려놓을 공간이 없습니다.");
+        }
+        runBag.Clear();
+        runBagGrid = new LootGridModel(BaseBagGridWidth, BaseBagGridHeight);
+        equippedLoot.Remove(LootItemType.Bag);
+        if (insuredThisRun.Contains(bag.InstanceId)) droppedInsuredThisRun.Add(bag.InstanceId);
         RefreshBagCapacity();
         LastFailureReason = null;
         Changed?.Invoke();
