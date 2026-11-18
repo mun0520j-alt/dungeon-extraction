@@ -248,6 +248,49 @@ public static partial class LootRuntimeState
         return true;
     }
 
+    public static bool TryEquipFromLootContainer(LootItemInstance item, LootGridModel sourceGrid)
+    {
+        if (item?.Definition == null || sourceGrid == null)
+            return Fail("장착할 아이템을 찾을 수 없습니다.");
+        LootItemType type = item.Definition.Type;
+        if (type == LootItemType.Bag) return TryEquipBagFromLootContainer(item, sourceGrid);
+        if (type == LootItemType.Junk || type == LootItemType.Consumable)
+            return Fail("이 아이템은 장착할 수 없습니다.");
+
+        LootGridPlacement sourcePlacement = sourceGrid.Find(item.InstanceId);
+        if (sourcePlacement == null) return Fail("루팅 보관함의 아이템 배치 정보를 찾을 수 없습니다.");
+        equippedLoot.TryGetValue(type, out LootItemInstance previous);
+        bool replacingBasic = previous == null && !unequippedBasicSlots.Contains(type);
+        LootItemInstance previousForContainer = previous;
+        if (replacingBasic)
+        {
+            LootItemData basic = LootItemDatabase.FindById($"basic_{type.ToString().ToLowerInvariant()}");
+            if (basic != null) previousForContainer = new LootItemInstance(basic);
+        }
+
+        LootGridModel candidateSource = CloneGridExcept(sourceGrid, item.InstanceId);
+        LootGridPlacement previousPlacement = null;
+        if (previousForContainer != null && !candidateSource.TryAutoPlace(previousForContainer, out previousPlacement))
+            return Fail("루팅 보관함에 기존 장비를 놓을 공간이 없습니다.");
+
+        if (!sourceGrid.Remove(item.InstanceId, out _))
+            return Fail("루팅 보관함에서 장비를 꺼내지 못했습니다.");
+        if (previousForContainer != null && !sourceGrid.TryPlace(previousForContainer,
+                previousPlacement.X, previousPlacement.Y, previousPlacement.Rotated))
+        {
+            sourceGrid.TryPlace(item, sourcePlacement.X, sourcePlacement.Y, sourcePlacement.Rotated);
+            return Fail("루팅 보관함에 기존 장비를 놓지 못했습니다.");
+        }
+
+        if (previous != null && insuredThisRun.Contains(previous.InstanceId))
+            droppedInsuredThisRun.Add(previous.InstanceId);
+        if (replacingBasic && previousForContainer != null) unequippedBasicSlots.Add(type);
+        equippedLoot[type] = item;
+        LastFailureReason = null;
+        Changed?.Invoke();
+        return true;
+    }
+
     private static bool TryUnequipBagToRunBag(LootItemInstance equippedBag)
     {
         var candidateGrid = new LootGridModel(BaseBagGridWidth, BaseBagGridHeight);

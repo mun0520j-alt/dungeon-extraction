@@ -36,7 +36,7 @@ public sealed class LootingPanel : MonoBehaviour
         instance.notice.text = "첫 클릭: 선택 / 더블클릭: 이동 (1 Tick)";
         instance.gridView.Bind(source.Grid, source.Grid.Move);
         instance.gridView.SetItemClickHandler(instance.SelectItem);
-        instance.gridView.SetItemDoubleClickHandler(instance.TakeItem);
+        instance.gridView.SetItemDoubleClickHandler(instance.ActivateItem);
         instance.SelectItem(null);
         instance.panelRoot.SetActive(true);
         InventoryPanel.OpenForLoot(instance.PutItem);
@@ -74,6 +74,28 @@ public sealed class LootingPanel : MonoBehaviour
             return true;
         });
         if (spent) RefreshBoth();
+    }
+
+    private void ActivateItem(LootItemInstance item)
+    {
+        if (item?.Definition == null) return;
+        if (item.Definition.Type == LootItemType.Junk || item.Definition.Type == LootItemType.Consumable)
+        {
+            TakeItem(item);
+            return;
+        }
+
+        bool spent = player != null && player.TryPerformTimedAction(TickCost.SwapWeaponInCombat, "Equip", () =>
+        {
+            bool success = LootRuntimeState.TryEquipFromLootContainer(item, container?.Grid);
+            if (!success) SetNotice(LootRuntimeState.LastFailureReason);
+            return success;
+        });
+        if (!spent) return;
+        M3MeasurementAutomation.RecordItemAcquired();
+        container?.HandleContentsChanged();
+        selectedItem = null;
+        RefreshBoth();
     }
 
     private void SelectItem(LootItemInstance item)
@@ -132,7 +154,7 @@ public sealed class LootingPanel : MonoBehaviour
         }
         gridView.Bind(container.Grid, container.Grid.Move);
         gridView.SetItemClickHandler(SelectItem);
-        gridView.SetItemDoubleClickHandler(TakeItem);
+        gridView.SetItemDoubleClickHandler(ActivateItem);
         SelectItem(null);
         InventoryPanel.OpenForLoot(PutItem);
     }

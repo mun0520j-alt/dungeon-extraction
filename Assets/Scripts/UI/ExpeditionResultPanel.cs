@@ -15,6 +15,9 @@ public sealed class ExpeditionResultPanel : MonoBehaviour
         LootRuntimeState.Changed += RefreshStartButton;
         if (GetComponent<BaseCampManagementPanel>() == null) gameObject.AddComponent<BaseCampManagementPanel>();
         if (GetComponent<BaseCampGridPanel>() == null) gameObject.AddComponent<BaseCampGridPanel>();
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        if (GetComponent<ExpeditionDebugCommands>() == null) gameObject.AddComponent<ExpeditionDebugCommands>();
+#endif
     }
 
     private void OnDestroy() => LootRuntimeState.Changed -= RefreshStartButton;

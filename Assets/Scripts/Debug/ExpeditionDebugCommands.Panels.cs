@@ -9,8 +9,13 @@ public sealed partial class ExpeditionDebugCommands
         float height = Mathf.Min(620f, Screen.height - 32f);
         GUILayout.BeginArea(new Rect(Screen.width * 0.5f - 210f, 16f, 420f, height),
             "M6 아이템 지급 (F9)", GUI.skin.window);
-        GUILayout.Label("버튼 클릭: 현재 출격 가방에 즉시 지급 · 측정 원정 제외");
-        GUILayout.Label($"가방: {LootRuntimeState.RunBagGrid.Width}×{LootRuntimeState.RunBagGrid.Height} / 아이템 {LootRuntimeState.RunBag.Count}개");
+        bool inDungeon = ExpeditionSession.IsActive && PlayerTurnActor.Instance != null;
+        GUILayout.Label(inDungeon
+            ? "버튼 클릭: 플레이어 발밑 바닥 더미에 생성 · 측정 원정 제외"
+            : "버튼 클릭: Stash에 생성 (공간 부족 시 임시 보관함)");
+        GUILayout.Label(inDungeon
+            ? $"출격 가방: {LootRuntimeState.RunBagGrid.Width}×{LootRuntimeState.RunBagGrid.Height} / 아이템 {LootRuntimeState.RunBag.Count}개"
+            : $"Stash: {LootRuntimeState.StashGrid.Width}×{LootRuntimeState.StashGrid.Height} / 아이템 {LootRuntimeState.Stash.Count}개");
         if (GUILayout.Button($"보험 대기 {insuranceAdvanceTicks:0} Tick 진행", GUILayout.Height(30f)))
         {
             M3MeasurementAutomation.MarkDebugRun();
@@ -37,12 +42,22 @@ public sealed partial class ExpeditionDebugCommands
     {
         if (definition == null) return;
         M3MeasurementAutomation.MarkDebugRun();
-        if (!LootRuntimeState.TryAddToRunBag(new LootItemInstance(definition)))
+        var item = new LootItemInstance(definition);
+        PlayerTurnActor player = PlayerTurnActor.Instance;
+        if (ExpeditionSession.IsActive && player != null && player.FloorTilemap != null)
         {
-            Debug.LogWarning($"[QA] {definition.Name} 지급 실패 — {LootRuntimeState.LastFailureReason ?? "가방 공간 부족"}");
+            if (!GroundLootPile.TryAddOrCreate(player.FloorTilemap, player.CurrentCell, item, out _, "QA 아이템 더미"))
+            {
+                Debug.LogWarning($"[QA] {definition.Name} 생성 실패 — 플레이어 발밑 바닥 더미 공간 부족");
+                return;
+            }
+            Debug.Log($"[QA] {definition.Name} 생성 완료 — 플레이어 발밑 바닥 더미");
             return;
         }
-        Debug.Log($"[QA] {definition.Name} 지급 완료 — 출격 가방 {LootRuntimeState.RunBag.Count}개");
+
+        LootRuntimeState.AddRewardToStash(item);
+        M5SaveService.SaveNow();
+        Debug.Log($"[QA] {definition.Name} 생성 완료 — Stash (공간 부족 시 임시 보관함)");
     }
 
     private void DrawM3Panel()
