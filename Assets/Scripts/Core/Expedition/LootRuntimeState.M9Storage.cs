@@ -9,8 +9,11 @@ public static partial class LootRuntimeState
 
     public static IReadOnlyList<LootItemInstance> TemporaryStorage => temporaryStorage;
     public static bool HasTemporaryStorageItems => temporaryStorage.Count > 0;
-    public static bool CanStartExpedition => temporaryStorage.Count == 0;
-    public static string ExpeditionBlockedReason => CanStartExpedition ? null : "임시 보관함을 정리하세요";
+    public static bool CanStartExpedition => temporaryStorage.Count == 0 && RunNestedItemCount <= M9StashConfig.RunNestedItemLimit;
+    public static string ExpeditionBlockedReason => temporaryStorage.Count > 0 ? "임시 보관함을 정리하세요"
+        : RunNestedItemCount > M9StashConfig.RunNestedItemLimit
+            ? $"출격 가방 하위 가방 아이템이 {RunNestedItemCount}개입니다. 최대 {M9StashConfig.RunNestedItemLimit}개로 줄이세요"
+            : null;
 
     private static void ResetM9Storage() => temporaryStorage.Clear();
 

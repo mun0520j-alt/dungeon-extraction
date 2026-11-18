@@ -63,7 +63,9 @@ public sealed class LootingPanel : MonoBehaviour
         {
             if (!LootRuntimeState.TryAddToRunBag(item))
             {
-                SetNotice("출격 가방 공간이 부족합니다. 바꿔 끼우려면 선택 후 '장착'을 누르세요.");
+                SetNotice(LootRuntimeState.LastFailureReason != null && LootRuntimeState.LastFailureReason.Contains("하위 가방")
+                    ? LootRuntimeState.LastFailureReason
+                    : "출격 가방 공간이 부족합니다. 바꿔 끼우려면 선택 후 '장착'을 누르세요.");
                 return false;
             }
             if (!container.TryRemove(item.InstanceId, out _))
@@ -145,10 +147,17 @@ public sealed class LootingPanel : MonoBehaviour
         {
             if (!container.TryAdd(item))
             {
-                SetNotice("보관함 공간 부족");
+                SetNotice(container is NestedBagContainer ? NestedBagContainer.LastFailureReason ?? "하위 가방 공간 부족" : "보관함 공간 부족");
                 return false;
             }
             LootItemInstance removed = LootRuntimeState.DropBagItem(item.InstanceId);
+            if (removed != null && container is NestedBagContainer)
+            {
+                // 내 하위 가방에 넣은 것은 버린 것이 아니다 (보험 버림 판정 제외).
+                LootRuntimeState.MarkKeptInRun(item.InstanceId);
+                container.HandleContentsChanged();
+                return true;
+            }
             if (removed != null)
             {
                 M3MeasurementAutomation.RecordItemDroppedToContainer();
@@ -170,6 +179,7 @@ public sealed class LootingPanel : MonoBehaviour
             return;
         }
         gridView.Bind(container.Grid, container.Grid.Move);
+        title.text = container.DisplayName;
         gridView.SetItemClickHandler(SelectItem);
         gridView.SetItemDoubleClickHandler(ActivateItem);
         SelectItem(null);

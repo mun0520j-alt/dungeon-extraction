@@ -452,8 +452,9 @@ public class InventoryPanel : MonoBehaviour
             lootTransferHandler(item);
             return;
         }
-        if (item?.Definition?.Type == LootItemType.Bag)
-            SetBagNotice("던전에서는 하위 가방을 열 수 없습니다.");
+        // 결정 41: 던전에서도 하위 가방을 루팅 창처럼 연다 (하위 가방 아이템 합계 상한 적용).
+        if (item?.Definition?.Type == LootItemType.Bag && item.BagGrid != null && PlayerTurnActor.Instance != null)
+            LootingPanel.Open(new NestedBagContainer(item), PlayerTurnActor.Instance);
     }
 
     private void SetBagNotice(string message)

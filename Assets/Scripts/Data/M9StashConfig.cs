@@ -13,6 +13,8 @@ public static class M9StashConfig
     public static int RowsAfterQ06 => Mathf.Max(0, Get("rows_after_q06", 2));
     public static int SaleBasketWidth => Mathf.Max(1, Get("sale_basket_width", 5));
     public static int SaleBasketHeight => Mathf.Max(1, Get("sale_basket_height", 20));
+    // 원정 중 출격 가방 안 하위 가방들에 든 아이템 합계 상한 (결정 41). 하위 가방 공간 꼼수 방지.
+    public static int RunNestedItemLimit => Mathf.Max(0, Get("run_nested_item_limit", 10));
 
     private static int Get(string key, int fallback)
     {

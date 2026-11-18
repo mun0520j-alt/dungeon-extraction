@@ -75,7 +75,10 @@ public static partial class LootRuntimeState
 
     public static bool TryAddToRunBag(LootItemInstance item)
     {
-        if (item == null || !runBagGrid.TryAutoPlace(item, out _)) return Fail("공간 부족");
+        if (item == null) return Fail("공간 부족");
+        if (ExpeditionSession.IsActive && RunNestedCountAfterTakingToRunBag(item) > M9StashConfig.RunNestedItemLimit)
+            return Fail("이 가방의 내용물이 많아 들 수 없습니다. " + RunNestedLimitReason);
+        if (!runBagGrid.TryAutoPlace(item, out _)) return Fail("공간 부족");
         runBag.Add(item);
         droppedInsuredThisRun.Remove(item.InstanceId);
         LastFailureReason = null;
@@ -217,6 +220,10 @@ public static partial class LootRuntimeState
         LootGridModel candidateBagGrid = CloneGrid(newBag.BagGrid);
         if (!TryPlaceAll(candidateBagGrid, runBag))
             return Fail("새 가방에 현재 아이템을 모두 넣을 공간이 없습니다.");
+        var candidateRoots = new List<LootItemInstance>();
+        foreach (LootGridPlacement placed in candidateBagGrid.Placements) candidateRoots.Add(placed.Item);
+        if (CountNestedItems(candidateRoots) > M9StashConfig.RunNestedItemLimit)
+            return Fail("새 가방의 하위 가방 내용물이 많아 장착할 수 없습니다. " + RunNestedLimitReason);
 
         LootGridModel candidateSource = CloneGridExcept(sourceGrid, newBag.InstanceId);
         LootGridPlacement previousPlacement = null;
@@ -678,7 +685,7 @@ public static partial class LootRuntimeState
     private static void ResolveCurrentInsurance(ExpeditionResult result, int reachedFloor)
     {
         var carried = new HashSet<string>(equippedLoot.Values.Where(item => item != null).Select(item => item.InstanceId)
-            .Concat(runBag.Where(item => item != null).Select(item => item.InstanceId)));
+            .Concat(EnumerateCarriedIdsRecursive())); // 하위 가방 안 장비도 가지고 있던 것으로 본다 (결정 41)
         bool eligibleResult = result != ExpeditionResult.MIA && reachedFloor < 8;
         foreach (string instanceId in insuredThisRun.ToArray())
         {
