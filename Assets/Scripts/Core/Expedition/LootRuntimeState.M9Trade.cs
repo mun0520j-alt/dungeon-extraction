@@ -58,6 +58,24 @@ public static partial class LootRuntimeState
         return true;
     }
 
+    public static bool MoveStashItemToSaleBasketAt(string instanceId, int x, int y, bool rotated)
+    {
+        EnsureStashGrid();
+        LootItemInstance item = stash.Find(value => value?.InstanceId == instanceId);
+        LootGridPlacement original = stashGrid.Find(instanceId);
+        if (item == null || original == null) return Fail("Stash 아이템을 찾을 수 없습니다.");
+        if (!CanEnterSaleBasket(item)) return false;
+        if (!SaleBasketGrid.TryPlace(item, x, y, rotated)) return Fail("판매 바구니의 해당 위치에 놓을 수 없습니다.");
+        saleOrigins[item.InstanceId] = new SaleOrigin
+            { Source = SaleSource.Stash, X = original.X, Y = original.Y, Rotated = original.Rotated };
+        stashGrid.Remove(item.InstanceId, out _);
+        stash.Remove(item);
+        saleBasket.Add(item);
+        LastFailureReason = null;
+        Changed?.Invoke();
+        return true;
+    }
+
     public static bool MoveTemporaryItemToSaleBasket(string instanceId)
     {
         LootItemInstance item = temporaryStorage.Find(value => value?.InstanceId == instanceId);
@@ -101,6 +119,22 @@ public static partial class LootRuntimeState
         saleBasketGrid?.Remove(instanceId, out _);
         saleBasket.Remove(item);
         saleOrigins.Remove(instanceId);
+        LastFailureReason = null;
+        Changed?.Invoke();
+        return true;
+    }
+
+    public static bool ReturnSaleBasketItemToStashAt(string instanceId, int x, int y, bool rotated)
+    {
+        LootItemInstance item = saleBasket.Find(value => value?.InstanceId == instanceId);
+        if (item == null || !saleOrigins.ContainsKey(instanceId))
+            return Fail("판매 바구니 아이템을 찾을 수 없습니다.");
+        EnsureStashGrid();
+        if (!stashGrid.TryPlace(item, x, y, rotated)) return Fail("Stash의 해당 위치에 놓을 수 없습니다.");
+        saleBasketGrid?.Remove(instanceId, out _);
+        saleBasket.Remove(item);
+        saleOrigins.Remove(instanceId);
+        stash.Add(item);
         LastFailureReason = null;
         Changed?.Invoke();
         return true;

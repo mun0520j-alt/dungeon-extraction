@@ -8,13 +8,14 @@ public sealed class BaseCampGridPanel : MonoBehaviour
     private LootGridView gridView;
     private LootGridView stashGridView;
     private LootGridView saleGridView;
+    private LootGridView bagGridView;
     private Text title;
     private Text stashTitle;
     private Text secondaryGridTitle;
+    private Text bagWindowTitle;
     private Text notice;
     private LootItemInstance selected;
     private LootItemInstance openedBag;
-    private Button bagBackButton;
     private Button toSaleButton;
     private Text typeFilterLabel;
     private Text rarityFilterLabel;
@@ -25,6 +26,7 @@ public sealed class BaseCampGridPanel : MonoBehaviour
     private bool selectedFromSaleBasket;
     private RectTransform loadoutRoot;
     private RectTransform stashRoot;
+    private RectTransform bagWindowRoot;
     private int filterVersion = -1;
 
     // 던전 인벤토리와 같은 장착 슬롯 표시 (무기·방패·갑옷·가방). 보험 장비는 청록 표시.
@@ -139,6 +141,40 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         saleScroll.scrollSensitivity = GridScrollSensitivity;
         saleScroll.movementType = ScrollRect.MovementType.Clamped;
 
+        var bagWindow = new GameObject("OpenedBagWindow", typeof(RectTransform), typeof(Image), typeof(Outline));
+        bagWindow.transform.SetParent(hud, false);
+        bagWindowRoot = bagWindow.GetComponent<RectTransform>();
+        bagWindow.GetComponent<Image>().color = new Color(0.035f, 0.045f, 0.065f, 0.99f);
+        Outline bagOutline = bagWindow.GetComponent<Outline>();
+        bagOutline.effectColor = new Color(0.85f, 0.52f, 0.16f, 1f);
+        bagOutline.effectDistance = new Vector2(3f, -3f);
+        bagWindowTitle = CreateText(bagWindow.transform, "Title", "열린 가방", 16,
+            new Vector2(0.05f, 0.86f), new Vector2(0.70f, 0.98f));
+        CreateButton(bagWindow.transform, "BagBack", "상위", new Vector2(0.71f, 0.89f), CloseOpenedBag, 0.13f);
+        CreateButton(bagWindow.transform, "BagClose", "닫기", new Vector2(0.85f, 0.89f), CloseBagWindow, 0.12f);
+        var bagViewport = new GameObject("BagViewport", typeof(RectTransform), typeof(Image), typeof(RectMask2D), typeof(ScrollRect));
+        bagViewport.transform.SetParent(bagWindow.transform, false);
+        RectTransform bagViewportRect = bagViewport.GetComponent<RectTransform>();
+        bagViewportRect.anchorMin = new Vector2(0.05f, 0.08f);
+        bagViewportRect.anchorMax = new Vector2(0.95f, 0.84f);
+        bagViewportRect.offsetMin = bagViewportRect.offsetMax = Vector2.zero;
+        bagViewport.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.3f);
+        var bagGridObject = new GameObject("BagGrid", typeof(RectTransform));
+        bagGridObject.transform.SetParent(bagViewport.transform, false);
+        RectTransform bagGridRect = bagGridObject.GetComponent<RectTransform>();
+        bagGridRect.anchorMin = bagGridRect.anchorMax = new Vector2(0f, 1f);
+        bagGridRect.pivot = new Vector2(0f, 1f);
+        bagGridRect.anchoredPosition = Vector2.zero;
+        bagGridView = bagGridObject.AddComponent<LootGridView>();
+        ScrollRect bagScroll = bagViewport.GetComponent<ScrollRect>();
+        bagScroll.viewport = bagViewportRect;
+        bagScroll.content = bagGridRect;
+        bagScroll.horizontal = false;
+        bagScroll.vertical = true;
+        bagScroll.scrollSensitivity = GridScrollSensitivity;
+        bagScroll.movementType = ScrollRect.MovementType.Clamped;
+        bagWindow.SetActive(false);
+
         notice = CreateText(root.transform, "Notice", "아이템을 선택하세요", 13,
             new Vector2(0.06f, 0.20f), new Vector2(0.94f, 0.30f));
         CreateButton(root.transform, "ToStash", "Stash로 이동", new Vector2(0.08f, 0.10f), MoveToStash);
@@ -147,7 +183,6 @@ public sealed class BaseCampGridPanel : MonoBehaviour
             () => LootRuntimeState.SortStashByRarity(), 0.31f);
         CreateButton(stashPanel.transform, "SortType", "정렬: 종류별", new Vector2(0.35f, 0.86f),
             () => LootRuntimeState.SortStashByType(), 0.31f);
-        bagBackButton = CreateButton(stashPanel.transform, "BagBack", "상위 보관함", new Vector2(0.68f, 0.86f), CloseOpenedBag, 0.30f);
         toSaleButton = CreateButton(stashPanel.transform, "ToSale", "선택 → 판매", new Vector2(0.68f, 0.86f), MoveSelectedToSale, 0.30f);
 
         typeFilterLabel = CreateButton(stashPanel.transform, "FilterType", "부위: 전체", new Vector2(0.02f, 0.78f),
@@ -180,6 +215,15 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         BaseCampLayoutRects layout = BaseCampLayout.Calculate();
         BaseCampLayout.ApplyTo(loadoutRoot, layout.Loadout);
         BaseCampLayout.ApplyTo(stashRoot, layout.Stash);
+        if (bagWindowRoot != null && openedBag != null)
+        {
+            float width = Mathf.Clamp(openedBag.BagGrid.Width * LootGridView.MinimumCellSize + 44f, 260f, layout.Loadout.width - 24f);
+            float height = Mathf.Clamp(openedBag.BagGrid.Height * LootGridView.MinimumCellSize + 92f, 210f, layout.Loadout.height - 24f);
+            var bagRect = new Rect(layout.Loadout.center.x - width * 0.5f,
+                layout.Loadout.y + 12f, width, height);
+            BaseCampLayout.ApplyTo(bagWindowRoot, bagRect);
+            bagWindowRoot.SetAsLastSibling();
+        }
     }
 
     private void RefreshFilterLabels()
@@ -202,33 +246,40 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         stashGridView.SetDimPredicate(BaseCampManagementPanel.ShouldDimStashItem);
         stashGridView.SetItemClickHandler(Select);
         stashGridView.SetItemDoubleClickHandler(HandleStoredItemDoubleClick);
-        if (openedBag == null)
+        saleGridView.Bind(LootRuntimeState.SaleBasketGrid, LootRuntimeState.MoveSaleBasketItem);
+        saleGridView.SetItemClickHandler(SelectSaleBasketItem);
+        saleGridView.SetItemDoubleClickHandler(item => LootRuntimeState.ReturnSaleBasketItem(item.InstanceId));
+        secondaryGridTitle.text = "판매 바구니";
+
+        stashGridView.ClearExternalDropTargets();
+        saleGridView.ClearExternalDropTargets();
+        bagGridView.ClearExternalDropTargets();
+        if (BaseCampManagementPanel.IsSellMode)
         {
-            stashGridView.SetExternalDropTarget(null, null);
-            saleGridView.Bind(LootRuntimeState.SaleBasketGrid, LootRuntimeState.MoveSaleBasketItem);
-            saleGridView.SetExternalDropTarget(null, null);
-            saleGridView.SetItemClickHandler(SelectSaleBasketItem);
-            saleGridView.SetItemDoubleClickHandler(item => LootRuntimeState.ReturnSaleBasketItem(item.InstanceId));
-            secondaryGridTitle.text = "판매 바구니";
+            stashGridView.AddExternalDropTarget(saleGridView,
+                (item, x, y, rotated) => LootRuntimeState.MoveStashItemToSaleBasketAt(item.InstanceId, x, y, rotated));
+            saleGridView.AddExternalDropTarget(stashGridView,
+                (item, x, y, rotated) => LootRuntimeState.ReturnSaleBasketItemToStashAt(item.InstanceId, x, y, rotated));
         }
-        else
+        if (openedBag != null)
         {
-            stashGridView.SetExternalDropTarget(saleGridView,
+            bagWindowRoot.gameObject.SetActive(true);
+            bagGridView.Bind(openedBag.BagGrid,
+                (id, x, y, rotated) => LootRuntimeState.MoveNestedBagItem(openedBag.InstanceId, id, x, y, rotated));
+            bagGridView.SetItemClickHandler(SelectOpenedBagItem);
+            bagGridView.SetItemDoubleClickHandler(HandleOpenedBagItemDoubleClick);
+            bagWindowTitle.text = $"{openedBag.Definition.Name} {openedBag.BagGrid.Width}×{openedBag.BagGrid.Height}"
+                + $" · 깊이 {LootRuntimeState.GetStashBagDepth(openedBag.InstanceId)}";
+            stashGridView.AddExternalDropTarget(bagGridView,
                 (item, x, y, rotated) => LootRuntimeState.MoveStashItemIntoBagAt(
                     item.InstanceId, openedBag.InstanceId, x, y, rotated));
-            saleGridView.Bind(openedBag.BagGrid,
-                (id, x, y, rotated) => LootRuntimeState.MoveNestedBagItem(openedBag.InstanceId, id, x, y, rotated));
-            saleGridView.SetExternalDropTarget(stashGridView,
+            bagGridView.AddExternalDropTarget(stashGridView,
                 (item, x, y, rotated) => LootRuntimeState.MoveBagItemToStashAt(
                     item.InstanceId, openedBag.InstanceId, x, y, rotated));
-            saleGridView.SetItemClickHandler(SelectOpenedBagItem);
-            saleGridView.SetItemDoubleClickHandler(HandleOpenedBagItemDoubleClick);
-            secondaryGridTitle.text = $"{openedBag.Definition.Name} {openedBag.BagGrid.Width}×{openedBag.BagGrid.Height}"
-                + $" · 깊이 {LootRuntimeState.GetStashBagDepth(openedBag.InstanceId)}";
         }
+        else bagWindowRoot.gameObject.SetActive(false);
         stashTitle.text = $"Stash {stashGrid.Width}×{stashGrid.Height}";
-        if (bagBackButton != null) bagBackButton.gameObject.SetActive(openedBag != null);
-        if (toSaleButton != null) toSaleButton.gameObject.SetActive(openedBag == null && BaseCampManagementPanel.IsSellMode);
+        if (toSaleButton != null) toSaleButton.gameObject.SetActive(BaseCampManagementPanel.IsSellMode);
         RefreshTemporaryStorage();
         if (selected != null && LootRuntimeState.RunBagGrid.Find(selected.InstanceId) == null) selected = null;
         if (selected == null) gridView.ClearSelection();
@@ -489,6 +540,13 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         // 현재 가방을 상위에서 찾을 수 없으면 Stash 루트로 돌아간다.
         string currentId = openedBag.InstanceId;
         openedBag = FindParentContaining(currentId);
+        selected = null;
+        Refresh();
+    }
+
+    private void CloseBagWindow()
+    {
+        openedBag = null;
         selected = null;
         Refresh();
     }

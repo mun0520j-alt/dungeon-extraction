@@ -13,8 +13,13 @@ public sealed class LootGridView : MonoBehaviour
 
     private LootGridModel model;
     private Func<string, int, int, bool, bool> moveHandler;
-    private LootGridView externalDropTarget;
-    private Func<LootItemInstance, int, int, bool, bool> externalDropHandler;
+    private sealed class ExternalDropBinding
+    {
+        public LootGridView Target;
+        public Func<LootItemInstance, int, int, bool, bool> Handler;
+    }
+    private readonly System.Collections.Generic.List<ExternalDropBinding> externalDropTargets
+        = new System.Collections.Generic.List<ExternalDropBinding>();
     private Action<LootItemInstance> itemClickHandler;
     private Action<LootItemInstance> itemDoubleClickHandler;
     private Func<LootItemInstance, bool> dimPredicate;
@@ -58,17 +63,23 @@ public sealed class LootGridView : MonoBehaviour
         Refresh();
     }
 
-    public void SetExternalDropTarget(LootGridView target, Func<LootItemInstance, int, int, bool, bool> handler)
+    public void ClearExternalDropTargets()
     {
-        externalDropTarget = target;
-        externalDropHandler = handler;
+        HideExternalPreviews();
+        externalDropTargets.Clear();
+    }
+
+    public void AddExternalDropTarget(LootGridView target, Func<LootItemInstance, int, int, bool, bool> handler)
+    {
+        if (target == null || handler == null) return;
+        externalDropTargets.Add(new ExternalDropBinding { Target = target, Handler = handler });
     }
 
     private void Update()
     {
         if (dragged == null) return;
         AutoScrollWhileDragging();
-        if (externalDropTarget != null) externalDropTarget.AutoScrollAt(dragScreenPosition);
+        foreach (ExternalDropBinding binding in externalDropTargets) binding.Target.AutoScrollAt(dragScreenPosition);
         UpdateDragGhost(dragScreenPosition);
         UpdateDragPreview(dragScreenPosition);
         if (!Input.GetKeyDown(KeyCode.R)) return;
@@ -218,16 +229,22 @@ public sealed class LootGridView : MonoBehaviour
         if (TryScreenToPlacementCell(screenPosition, out int x, out int y)
             && model.CanMove(dragged.Item.InstanceId, x, y, dragRotated))
             moveHandler?.Invoke(dragged.Item.InstanceId, x, y, dragRotated);
-        else if (externalDropTarget != null && externalDropHandler != null
-            && externalDropTarget.TryScreenToPlacementCell(screenPosition, dragged.Item, dragRotated, out x, out y))
-            externalDropHandler(dragged.Item, x, y, dragRotated);
+        else
+        {
+            foreach (ExternalDropBinding binding in externalDropTargets)
+            {
+                if (!binding.Target.TryScreenToPlacementCell(screenPosition, dragged.Item, dragRotated, out x, out y)) continue;
+                binding.Handler(dragged.Item, x, y, dragRotated);
+                break;
+            }
+        }
         dragged.GetComponent<CanvasGroup>().alpha = 1f;
         dragged.GetComponent<CanvasGroup>().blocksRaycasts = true;
         dragged = null;
         if (dragGhost != null) DestroyImmediateSafe(dragGhost.gameObject);
         dragGhost = null;
         if (preview != null) preview.gameObject.SetActive(false);
-        externalDropTarget?.HideExternalPreview();
+        HideExternalPreviews();
         Refresh();
     }
 
@@ -364,17 +381,23 @@ public sealed class LootGridView : MonoBehaviour
             return;
         if (TryScreenToPlacementCell(screenPosition, out int x, out int y))
         {
-            externalDropTarget?.HideExternalPreview();
+            HideExternalPreviews();
             ShowPreview(dragged.Item, x, y, dragRotated,
                 model.CanMove(dragged.Item.InstanceId, x, y, dragRotated));
             return;
         }
         preview.gameObject.SetActive(false);
-        if (externalDropTarget != null
-            && externalDropTarget.TryScreenToPlacementCell(screenPosition, dragged.Item, dragRotated, out x, out y))
-            externalDropTarget.ShowPreview(dragged.Item, x, y, dragRotated,
-                externalDropTarget.model.CanPlace(dragged.Item, x, y, dragRotated));
-        else externalDropTarget?.HideExternalPreview();
+        bool shown = false;
+        foreach (ExternalDropBinding binding in externalDropTargets)
+        {
+            if (!shown && binding.Target.TryScreenToPlacementCell(screenPosition, dragged.Item, dragRotated, out x, out y))
+            {
+                binding.Target.ShowPreview(dragged.Item, x, y, dragRotated,
+                    binding.Target.model.CanPlace(dragged.Item, x, y, dragRotated));
+                shown = true;
+            }
+            else binding.Target.HideExternalPreview();
+        }
     }
 
     private void ShowPreview(LootItemInstance item, int x, int y, bool rotated, bool valid)
@@ -391,6 +414,11 @@ public sealed class LootGridView : MonoBehaviour
     private void HideExternalPreview()
     {
         if (preview != null) preview.gameObject.SetActive(false);
+    }
+
+    private void HideExternalPreviews()
+    {
+        foreach (ExternalDropBinding binding in externalDropTargets) binding.Target?.HideExternalPreview();
     }
 
     private bool TryScreenToCell(Vector2 screenPosition, out int x, out int y)
