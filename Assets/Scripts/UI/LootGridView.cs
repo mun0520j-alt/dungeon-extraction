@@ -226,17 +226,15 @@ public sealed class LootGridView : MonoBehaviour
     internal void EndDrag(Vector2 screenPosition)
     {
         if (dragged == null) return;
-        if (TryScreenToPlacementCell(screenPosition, out int x, out int y)
-            && model.CanMove(dragged.Item.InstanceId, x, y, dragRotated))
-            moveHandler?.Invoke(dragged.Item.InstanceId, x, y, dragRotated);
-        else
+        // 미리보기와 같은 판정 함수를 쓴다. 미리보기가 뜬 격자·칸에만 놓이고, 판정이 없으면 이동 취소(원위치).
+        if (TryResolveDropTarget(screenPosition, out LootGridView target, out ExternalDropBinding binding, out int x, out int y))
         {
-            foreach (ExternalDropBinding binding in externalDropTargets)
+            if (binding == null)
             {
-                if (!binding.Target.TryScreenToPlacementCell(screenPosition, dragged.Item, dragRotated, out x, out y)) continue;
-                binding.Handler(dragged.Item, x, y, dragRotated);
-                break;
+                if (model.CanMove(dragged.Item.InstanceId, x, y, dragRotated))
+                    moveHandler?.Invoke(dragged.Item.InstanceId, x, y, dragRotated);
             }
+            else binding.Handler(dragged.Item, x, y, dragRotated);
         }
         dragged.GetComponent<CanvasGroup>().alpha = 1f;
         dragged.GetComponent<CanvasGroup>().blocksRaycasts = true;
@@ -379,25 +377,78 @@ public sealed class LootGridView : MonoBehaviour
     {
         if (dragged == null || preview == null)
             return;
-        if (TryScreenToPlacementCell(screenPosition, out int x, out int y))
-        {
-            HideExternalPreviews();
-            ShowPreview(dragged.Item, x, y, dragRotated,
-                model.CanMove(dragged.Item.InstanceId, x, y, dragRotated));
-            return;
-        }
         preview.gameObject.SetActive(false);
-        bool shown = false;
-        foreach (ExternalDropBinding binding in externalDropTargets)
+        HideExternalPreviews();
+        if (!TryResolveDropTarget(screenPosition, out LootGridView target, out ExternalDropBinding binding, out int x, out int y))
+            return;
+        bool valid = binding == null
+            ? model.CanMove(dragged.Item.InstanceId, x, y, dragRotated)
+            : target.model.CanPlace(dragged.Item, x, y, dragRotated);
+        target.ShowPreview(dragged.Item, x, y, dragRotated, valid);
+    }
+
+    // [BUG-045] 드롭 대상 = 화면에서 맨 위에 보이는 격자. 미리보기·드롭이 이 함수 하나만 쓴다.
+    // 이전에는 자기 격자(Stash)를 먼저 확인해, Stash 위에 떠 있는 가방 창에 놓아도 아래 Stash가 가로챘다.
+    // EventSystem 레이캐스트의 첫 결과(가장 위 UI)가 자기 격자나 등록된 외부 격자가 아니면(창 제목줄·다른 패널 등) 취소한다.
+    private bool TryResolveDropTarget(Vector2 screenPosition, out LootGridView target, out ExternalDropBinding binding, out int x, out int y)
+    {
+        target = null;
+        binding = null;
+        x = y = -1;
+        if (dragged?.Item == null) return false;
+
+        LootGridView topmost = FindTopmostGridView(screenPosition, out bool raycastAvailable);
+        if (!raycastAvailable)
         {
-            if (!shown && binding.Target.TryScreenToPlacementCell(screenPosition, dragged.Item, dragRotated, out x, out y))
+            // EventSystem이 없을 때만 예전 순서(자기 → 외부)로 판정한다.
+            if (TryScreenToPlacementCell(screenPosition, dragged.Item, dragRotated, out x, out y)) { target = this; return true; }
+            foreach (ExternalDropBinding candidate in externalDropTargets)
             {
-                binding.Target.ShowPreview(dragged.Item, x, y, dragRotated,
-                    binding.Target.model.CanPlace(dragged.Item, x, y, dragRotated));
-                shown = true;
+                if (!candidate.Target.TryScreenToPlacementCell(screenPosition, dragged.Item, dragRotated, out x, out y)) continue;
+                target = candidate.Target;
+                binding = candidate;
+                return true;
             }
-            else binding.Target.HideExternalPreview();
+            return false;
         }
+        if (topmost == null) return false;
+        if (topmost == this)
+        {
+            if (!TryScreenToPlacementCell(screenPosition, dragged.Item, dragRotated, out x, out y)) return false;
+            target = this;
+            return true;
+        }
+        foreach (ExternalDropBinding candidate in externalDropTargets)
+        {
+            if (candidate.Target != topmost) continue;
+            if (!candidate.Target.TryScreenToPlacementCell(screenPosition, dragged.Item, dragRotated, out x, out y)) return false;
+            target = candidate.Target;
+            binding = candidate;
+            return true;
+        }
+        return false;
+    }
+
+    private static readonly System.Collections.Generic.List<RaycastResult> RaycastBuffer
+        = new System.Collections.Generic.List<RaycastResult>();
+
+    private static LootGridView FindTopmostGridView(Vector2 screenPosition, out bool raycastAvailable)
+    {
+        raycastAvailable = EventSystem.current != null;
+        if (!raycastAvailable) return null;
+        var pointer = new PointerEventData(EventSystem.current) { position = screenPosition };
+        RaycastBuffer.Clear();
+        EventSystem.current.RaycastAll(pointer, RaycastBuffer);
+        if (RaycastBuffer.Count == 0) return null;
+        // 결과는 위에서 아래 순. 첫 결과가 속한 격자만 인정한다(아래에 깔린 격자로 넘어가지 않음).
+        GameObject hit = RaycastBuffer[0].gameObject;
+        if (hit == null) return null;
+        LootGridView owner = hit.GetComponentInParent<LootGridView>();
+        if (owner != null) return owner;
+        // 가방 창 여백·스크롤 영역 빈 곳처럼 격자를 하나만 품은 틀이면 그 격자로 본다(정확히 칸을 조준하지 않아도 됨).
+        // 격자를 여러 개 품은 큰 패널이면 어느 격자인지 모호하므로 취소한다.
+        LootGridView[] inside = hit.GetComponentsInChildren<LootGridView>(false);
+        return inside.Length == 1 ? inside[0] : null;
     }
 
     private void ShowPreview(LootItemInstance item, int x, int y, bool rotated, bool valid)
@@ -435,6 +486,14 @@ public sealed class LootGridView : MonoBehaviour
             return false;
         if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(gridRoot, screenPosition, null, out Vector2 local))
             return false;
+        // 스크롤 영역이 없는 격자(출격 가방·가방 창)는 격자 크기 + 한 칸 여백 밖이면 대상이 아니다. (BUG-045: 화면 어디든 Clamp로 끌어오던 문제)
+        if (scroll?.viewport == null)
+        {
+            float margin = MinimumCellSize;
+            if (local.x < -margin || local.x > model.Width * MinimumCellSize + margin
+                || -local.y < -margin || -local.y > model.Height * MinimumCellSize + margin)
+                return false;
+        }
         int width = rotated ? item.Definition.GridHeight : item.Definition.GridWidth;
         int height = rotated ? item.Definition.GridWidth : item.Definition.GridHeight;
         if (width > model.Width || height > model.Height) return false;
