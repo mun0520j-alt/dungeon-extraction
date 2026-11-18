@@ -1,18 +1,25 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 // 영지에서도 던전과 동일한 LootGridView를 사용한다. 데이터 변경은 LootRuntimeState에 위임한다.
 public sealed class BaseCampGridPanel : MonoBehaviour
 {
+    private const int MaxOpenBagWindows = 5;
     private const float GridScrollSensitivity = 36f;
+    private sealed class BagWindowState
+    {
+        public LootItemInstance Bag;
+        public RectTransform Root;
+        public LootGridView Grid;
+        public Text Title;
+    }
     private LootGridView gridView;
     private LootGridView stashGridView;
     private LootGridView saleGridView;
-    private LootGridView bagGridView;
     private Text title;
     private Text stashTitle;
     private Text secondaryGridTitle;
-    private Text bagWindowTitle;
     private Text notice;
     private LootItemInstance selected;
     private LootItemInstance openedBag;
@@ -26,7 +33,9 @@ public sealed class BaseCampGridPanel : MonoBehaviour
     private bool selectedFromSaleBasket;
     private RectTransform loadoutRoot;
     private RectTransform stashRoot;
-    private RectTransform bagWindowRoot;
+    private Transform hudRoot;
+    private readonly System.Collections.Generic.List<BagWindowState> bagWindows
+        = new System.Collections.Generic.List<BagWindowState>();
     private int filterVersion = -1;
 
     // 던전 인벤토리와 같은 장착 슬롯 표시 (무기·방패·갑옷·가방). 보험 장비는 청록 표시.
@@ -67,6 +76,7 @@ public sealed class BaseCampGridPanel : MonoBehaviour
     private void Build()
     {
         Transform hud = ScreenSpaceCanvasProvider.GetOrCreateHudRoot();
+        hudRoot = hud;
         var root = new GameObject("BaseCampRunBagGrid", typeof(RectTransform), typeof(Image));
         root.transform.SetParent(hud, false);
         loadoutRoot = root.GetComponent<RectTransform>();
@@ -141,40 +151,6 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         saleScroll.scrollSensitivity = GridScrollSensitivity;
         saleScroll.movementType = ScrollRect.MovementType.Clamped;
 
-        var bagWindow = new GameObject("OpenedBagWindow", typeof(RectTransform), typeof(Image), typeof(Outline));
-        bagWindow.transform.SetParent(hud, false);
-        bagWindowRoot = bagWindow.GetComponent<RectTransform>();
-        bagWindow.GetComponent<Image>().color = new Color(0.035f, 0.045f, 0.065f, 0.99f);
-        Outline bagOutline = bagWindow.GetComponent<Outline>();
-        bagOutline.effectColor = new Color(0.85f, 0.52f, 0.16f, 1f);
-        bagOutline.effectDistance = new Vector2(3f, -3f);
-        bagWindowTitle = CreateText(bagWindow.transform, "Title", "열린 가방", 16,
-            new Vector2(0.05f, 0.86f), new Vector2(0.70f, 0.98f));
-        CreateButton(bagWindow.transform, "BagBack", "상위", new Vector2(0.71f, 0.89f), CloseOpenedBag, 0.13f);
-        CreateButton(bagWindow.transform, "BagClose", "닫기", new Vector2(0.85f, 0.89f), CloseBagWindow, 0.12f);
-        var bagViewport = new GameObject("BagViewport", typeof(RectTransform), typeof(Image), typeof(RectMask2D), typeof(ScrollRect));
-        bagViewport.transform.SetParent(bagWindow.transform, false);
-        RectTransform bagViewportRect = bagViewport.GetComponent<RectTransform>();
-        bagViewportRect.anchorMin = new Vector2(0.05f, 0.08f);
-        bagViewportRect.anchorMax = new Vector2(0.95f, 0.84f);
-        bagViewportRect.offsetMin = bagViewportRect.offsetMax = Vector2.zero;
-        bagViewport.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.3f);
-        var bagGridObject = new GameObject("BagGrid", typeof(RectTransform));
-        bagGridObject.transform.SetParent(bagViewport.transform, false);
-        RectTransform bagGridRect = bagGridObject.GetComponent<RectTransform>();
-        bagGridRect.anchorMin = bagGridRect.anchorMax = new Vector2(0f, 1f);
-        bagGridRect.pivot = new Vector2(0f, 1f);
-        bagGridRect.anchoredPosition = Vector2.zero;
-        bagGridView = bagGridObject.AddComponent<LootGridView>();
-        ScrollRect bagScroll = bagViewport.GetComponent<ScrollRect>();
-        bagScroll.viewport = bagViewportRect;
-        bagScroll.content = bagGridRect;
-        bagScroll.horizontal = false;
-        bagScroll.vertical = true;
-        bagScroll.scrollSensitivity = GridScrollSensitivity;
-        bagScroll.movementType = ScrollRect.MovementType.Clamped;
-        bagWindow.SetActive(false);
-
         notice = CreateText(root.transform, "Notice", "아이템을 선택하세요", 13,
             new Vector2(0.06f, 0.20f), new Vector2(0.94f, 0.30f));
         CreateButton(root.transform, "ToStash", "Stash로 이동", new Vector2(0.08f, 0.10f), MoveToStash);
@@ -215,15 +191,6 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         BaseCampLayoutRects layout = BaseCampLayout.Calculate();
         BaseCampLayout.ApplyTo(loadoutRoot, layout.Loadout);
         BaseCampLayout.ApplyTo(stashRoot, layout.Stash);
-        if (bagWindowRoot != null && openedBag != null)
-        {
-            float width = Mathf.Clamp(openedBag.BagGrid.Width * LootGridView.MinimumCellSize + 44f, 260f, layout.Loadout.width - 24f);
-            float height = Mathf.Clamp(openedBag.BagGrid.Height * LootGridView.MinimumCellSize + 92f, 210f, layout.Loadout.height - 24f);
-            var bagRect = new Rect(layout.Loadout.center.x - width * 0.5f,
-                layout.Loadout.y + 12f, width, height);
-            BaseCampLayout.ApplyTo(bagWindowRoot, bagRect);
-            bagWindowRoot.SetAsLastSibling();
-        }
     }
 
     private void RefreshFilterLabels()
@@ -253,7 +220,6 @@ public sealed class BaseCampGridPanel : MonoBehaviour
 
         stashGridView.ClearExternalDropTargets();
         saleGridView.ClearExternalDropTargets();
-        bagGridView.ClearExternalDropTargets();
         if (BaseCampManagementPanel.IsSellMode)
         {
             stashGridView.AddExternalDropTarget(saleGridView,
@@ -261,23 +227,42 @@ public sealed class BaseCampGridPanel : MonoBehaviour
             saleGridView.AddExternalDropTarget(stashGridView,
                 (item, x, y, rotated) => LootRuntimeState.ReturnSaleBasketItemToStashAt(item.InstanceId, x, y, rotated));
         }
-        if (openedBag != null)
+
+        for (int i = bagWindows.Count - 1; i >= 0; i--)
         {
-            bagWindowRoot.gameObject.SetActive(true);
-            bagGridView.Bind(openedBag.BagGrid,
-                (id, x, y, rotated) => LootRuntimeState.MoveNestedBagItem(openedBag.InstanceId, id, x, y, rotated));
-            bagGridView.SetItemClickHandler(SelectOpenedBagItem);
-            bagGridView.SetItemDoubleClickHandler(HandleOpenedBagItemDoubleClick);
-            bagWindowTitle.text = $"{openedBag.Definition.Name} {openedBag.BagGrid.Width}×{openedBag.BagGrid.Height}"
-                + $" · 깊이 {LootRuntimeState.GetStashBagDepth(openedBag.InstanceId)}";
-            stashGridView.AddExternalDropTarget(bagGridView,
-                (item, x, y, rotated) => LootRuntimeState.MoveStashItemIntoBagAt(
-                    item.InstanceId, openedBag.InstanceId, x, y, rotated));
-            bagGridView.AddExternalDropTarget(stashGridView,
-                (item, x, y, rotated) => LootRuntimeState.MoveBagItemToStashAt(
-                    item.InstanceId, openedBag.InstanceId, x, y, rotated));
+            if (LootRuntimeState.FindStoredItemRecursive(bagWindows[i].Bag.InstanceId) != null) continue;
+            Destroy(bagWindows[i].Root.gameObject);
+            bagWindows.RemoveAt(i);
         }
-        else bagWindowRoot.gameObject.SetActive(false);
+        foreach (BagWindowState window in bagWindows)
+        {
+            LootItemInstance bag = window.Bag;
+            window.Grid.Bind(bag.BagGrid,
+                (id, x, y, rotated) => LootRuntimeState.MoveNestedBagItem(bag.InstanceId, id, x, y, rotated));
+            window.Grid.SetItemClickHandler(item => SelectOpenedBagItem(window, item));
+            window.Grid.SetItemDoubleClickHandler(item => HandleOpenedBagItemDoubleClick(window, item));
+            window.Grid.ClearExternalDropTargets();
+            window.Title.text = $"{bag.Definition.Name} {bag.BagGrid.Width}×{bag.BagGrid.Height}"
+                + $" · 깊이 {LootRuntimeState.GetStashBagDepth(bag.InstanceId)}";
+            stashGridView.AddExternalDropTarget(window.Grid,
+                (item, x, y, rotated) => LootRuntimeState.MoveStashItemIntoBagAt(
+                    item.InstanceId, bag.InstanceId, x, y, rotated));
+            window.Grid.AddExternalDropTarget(stashGridView,
+                (item, x, y, rotated) => LootRuntimeState.MoveBagItemToStashAt(
+                    item.InstanceId, bag.InstanceId, x, y, rotated));
+        }
+        for (int i = 0; i < bagWindows.Count; i++)
+        for (int j = 0; j < bagWindows.Count; j++)
+        {
+            if (i == j) continue;
+            BagWindowState source = bagWindows[i];
+            BagWindowState target = bagWindows[j];
+            source.Grid.AddExternalDropTarget(target.Grid,
+                (item, x, y, rotated) => LootRuntimeState.MoveBagItemToBagAt(
+                    item.InstanceId, source.Bag.InstanceId, target.Bag.InstanceId, x, y, rotated));
+        }
+        if (openedBag != null && LootRuntimeState.FindStoredItemRecursive(openedBag.InstanceId) == null)
+            openedBag = bagWindows.Count > 0 ? bagWindows[bagWindows.Count - 1].Bag : null;
         stashTitle.text = $"Stash {stashGrid.Width}×{stashGrid.Height}";
         if (toSaleButton != null) toSaleButton.gameObject.SetActive(BaseCampManagementPanel.IsSellMode);
         RefreshTemporaryStorage();
@@ -447,8 +432,9 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         notice.text = item?.Definition != null ? $"판매 대기: {item.Definition.Name}" : "아이템을 선택하세요";
     }
 
-    private void SelectOpenedBagItem(LootItemInstance item)
+    private void SelectOpenedBagItem(BagWindowState window, LootItemInstance item)
     {
+        FocusBagWindow(window);
         selected = item;
         selectedFromSaleBasket = false;
         notice.text = item?.Definition != null ? $"열린 가방: {item.Definition.Name}" : "아이템을 선택하세요";
@@ -488,9 +474,8 @@ public sealed class BaseCampGridPanel : MonoBehaviour
     {
         if (item?.Definition?.Type == LootItemType.Bag)
         {
-            openedBag = item;
+            OpenBagWindow(item);
             selected = null;
-            Refresh();
             return;
         }
 
@@ -512,17 +497,17 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         notice.text = ok ? "아이템을 이동했습니다." : (LootRuntimeState.LastFailureReason ?? "이동 실패");
     }
 
-    private void HandleOpenedBagItemDoubleClick(LootItemInstance item)
+    private void HandleOpenedBagItemDoubleClick(BagWindowState window, LootItemInstance item)
     {
+        FocusBagWindow(window);
         if (item?.Definition?.Type == LootItemType.Bag)
         {
-            openedBag = item;
+            OpenBagWindow(item);
             selected = null;
-            Refresh();
             return;
         }
 
-        bool ok = LootRuntimeState.MoveBagItemToParent(item.InstanceId, openedBag.InstanceId);
+        bool ok = LootRuntimeState.MoveBagItemToParent(item.InstanceId, window.Bag.InstanceId);
         notice.text = ok ? "상위 보관함으로 이동했습니다." : (LootRuntimeState.LastFailureReason ?? "이동 실패");
     }
 
@@ -534,19 +519,97 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         if (ok) selected = null;
     }
 
-    private void CloseOpenedBag()
+    private void OpenBagWindow(LootItemInstance bag)
     {
-        if (openedBag == null) return;
-        // 현재 가방을 상위에서 찾을 수 없으면 Stash 루트로 돌아간다.
-        string currentId = openedBag.InstanceId;
-        openedBag = FindParentContaining(currentId);
-        selected = null;
+        if (bag?.Definition?.Type != LootItemType.Bag || hudRoot == null) return;
+        BagWindowState existing = bagWindows.Find(value => value.Bag.InstanceId == bag.InstanceId);
+        if (existing != null)
+        {
+            FocusBagWindow(existing);
+            return;
+        }
+        if (bagWindows.Count >= MaxOpenBagWindows)
+        {
+            BagWindowState oldest = bagWindows[0];
+            bagWindows.RemoveAt(0);
+            if (oldest.Root != null) Destroy(oldest.Root.gameObject);
+        }
+
+        var state = new BagWindowState { Bag = bag };
+        var window = new GameObject($"BagWindow_{bag.InstanceId}", typeof(RectTransform), typeof(Image), typeof(Outline));
+        window.transform.SetParent(hudRoot, false);
+        state.Root = window.GetComponent<RectTransform>();
+        state.Root.anchorMin = state.Root.anchorMax = new Vector2(0.5f, 0.5f);
+        state.Root.pivot = new Vector2(0.5f, 0.5f);
+        float width = Mathf.Max(270f, bag.BagGrid.Width * LootGridView.MinimumCellSize + 44f);
+        float height = Mathf.Max(220f, bag.BagGrid.Height * LootGridView.MinimumCellSize + 94f);
+        state.Root.sizeDelta = new Vector2(width, height);
+        state.Root.anchoredPosition = new Vector2(190f + bagWindows.Count * 26f, 70f - bagWindows.Count * 26f);
+        window.GetComponent<Image>().color = new Color(0.035f, 0.045f, 0.065f, 0.99f);
+        Outline outline = window.GetComponent<Outline>();
+        outline.effectColor = new Color(0.85f, 0.52f, 0.16f, 1f);
+        outline.effectDistance = new Vector2(3f, -3f);
+
+        var header = new GameObject("DragHeader", typeof(RectTransform), typeof(Image), typeof(BagWindowDragHandle));
+        header.transform.SetParent(window.transform, false);
+        RectTransform headerRect = header.GetComponent<RectTransform>();
+        headerRect.anchorMin = new Vector2(0f, 0.84f);
+        headerRect.anchorMax = Vector2.one;
+        headerRect.offsetMin = headerRect.offsetMax = Vector2.zero;
+        header.GetComponent<Image>().color = new Color(0.12f, 0.16f, 0.23f, 1f);
+        state.Title = CreateText(header.transform, "Title", "열린 가방", 15,
+            new Vector2(0.03f, 0f), new Vector2(0.67f, 1f));
+        header.GetComponent<BagWindowDragHandle>().Initialize(state.Root, () => FocusBagWindow(state));
+        CreateButton(window.transform, "OpenParent", "상위 열기", new Vector2(0.68f, 0.88f), () => OpenParentBag(state), 0.17f);
+        CreateButton(window.transform, "Close", "닫기", new Vector2(0.86f, 0.88f), () => CloseBagWindow(state), 0.12f);
+
+        var viewport = new GameObject("BagViewport", typeof(RectTransform), typeof(Image), typeof(RectMask2D), typeof(ScrollRect));
+        viewport.transform.SetParent(window.transform, false);
+        RectTransform viewportRect = viewport.GetComponent<RectTransform>();
+        viewportRect.anchorMin = new Vector2(0.05f, 0.06f);
+        viewportRect.anchorMax = new Vector2(0.95f, 0.82f);
+        viewportRect.offsetMin = viewportRect.offsetMax = Vector2.zero;
+        viewport.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.3f);
+        var gridObject = new GameObject("BagGrid", typeof(RectTransform));
+        gridObject.transform.SetParent(viewport.transform, false);
+        RectTransform gridRect = gridObject.GetComponent<RectTransform>();
+        gridRect.anchorMin = gridRect.anchorMax = new Vector2(0f, 1f);
+        gridRect.pivot = new Vector2(0f, 1f);
+        gridRect.anchoredPosition = Vector2.zero;
+        state.Grid = gridObject.AddComponent<LootGridView>();
+        ScrollRect scroll = viewport.GetComponent<ScrollRect>();
+        scroll.viewport = viewportRect;
+        scroll.content = gridRect;
+        scroll.horizontal = false;
+        scroll.vertical = true;
+        scroll.scrollSensitivity = GridScrollSensitivity;
+        scroll.movementType = ScrollRect.MovementType.Clamped;
+
+        bagWindows.Add(state);
+        FocusBagWindow(state);
         Refresh();
     }
 
-    private void CloseBagWindow()
+    private void FocusBagWindow(BagWindowState window)
     {
-        openedBag = null;
+        if (window == null) return;
+        openedBag = window.Bag;
+        window.Root?.SetAsLastSibling();
+    }
+
+    private void OpenParentBag(BagWindowState window)
+    {
+        LootItemInstance parent = FindParentContaining(window.Bag.InstanceId);
+        if (parent != null) OpenBagWindow(parent);
+        else notice.text = "이 가방은 Stash 최상위에 있습니다.";
+    }
+
+    private void CloseBagWindow(BagWindowState window)
+    {
+        if (window == null) return;
+        bagWindows.Remove(window);
+        if (window.Root != null) Destroy(window.Root.gameObject);
+        openedBag = bagWindows.Count > 0 ? bagWindows[bagWindows.Count - 1].Bag : null;
         selected = null;
         Refresh();
     }
@@ -606,6 +669,37 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         buttonLabel.resizeTextMinSize = 9;
         buttonLabel.resizeTextMaxSize = 13;
         return go.GetComponent<Button>();
+    }
+}
+
+public sealed class BagWindowDragHandle : MonoBehaviour, IPointerDownHandler, IBeginDragHandler, IDragHandler
+{
+    private RectTransform target;
+    private System.Action focus;
+    private Canvas canvas;
+
+    public void Initialize(RectTransform window, System.Action onFocus)
+    {
+        target = window;
+        focus = onFocus;
+        canvas = GetComponentInParent<Canvas>();
+    }
+
+    public void OnPointerDown(PointerEventData eventData) => focus?.Invoke();
+    public void OnBeginDrag(PointerEventData eventData) => focus?.Invoke();
+
+    public void OnDrag(PointerEventData eventData)
+    {
+        if (target == null) return;
+        float scale = canvas != null ? Mathf.Max(0.01f, canvas.scaleFactor) : 1f;
+        target.anchoredPosition += eventData.delta / scale;
+        RectTransform parent = target.parent as RectTransform;
+        if (parent == null) return;
+        Rect bounds = parent.rect;
+        Vector2 half = target.rect.size * 0.5f;
+        target.anchoredPosition = new Vector2(
+            Mathf.Clamp(target.anchoredPosition.x, bounds.xMin + half.x, bounds.xMax - half.x),
+            Mathf.Clamp(target.anchoredPosition.y, bounds.yMin + half.y, bounds.yMax - half.y));
     }
 }
 
