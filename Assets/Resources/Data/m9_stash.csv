@@ -1,5 +1,7 @@
 key,value
 base_width,10
-base_height,8
+base_height,20
 rows_after_q03,2
 rows_after_q06,2
+sale_basket_width,5
+sale_basket_height,20

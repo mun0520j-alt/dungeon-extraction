@@ -8,9 +8,11 @@ public static class M9StashConfig
     private const string ResourcePath = "Data/m9_stash";
     private static Dictionary<string, int> values;
     public static int BaseWidth => Mathf.Max(1, Get("base_width", 10));
-    public static int BaseHeight => Mathf.Max(1, Get("base_height", 8));
+    public static int BaseHeight => Mathf.Max(1, Get("base_height", 20));
     public static int RowsAfterQ03 => Mathf.Max(0, Get("rows_after_q03", 2));
     public static int RowsAfterQ06 => Mathf.Max(0, Get("rows_after_q06", 2));
+    public static int SaleBasketWidth => Mathf.Max(1, Get("sale_basket_width", 5));
+    public static int SaleBasketHeight => Mathf.Max(1, Get("sale_basket_height", 20));
 
     private static int Get(string key, int fallback)
     {

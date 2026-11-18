@@ -24,8 +24,8 @@ public static partial class LootRuntimeState
     {
         get
         {
-            int width = M9StashConfig.BaseWidth;
-            int height = CurrentStashHeight();
+            int width = M9StashConfig.SaleBasketWidth;
+            int height = M9StashConfig.SaleBasketHeight;
             if (saleBasketGrid == null || saleBasketGrid.Width != width || saleBasketGrid.Height != height)
                 RebuildSaleBasketGrid(width, height);
             return saleBasketGrid;

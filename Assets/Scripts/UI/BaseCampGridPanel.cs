@@ -93,7 +93,7 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         viewport.transform.SetParent(stashPanel.transform, false);
         RectTransform viewportRect = viewport.GetComponent<RectTransform>();
         viewportRect.anchorMin = new Vector2(0.02f, 0.18f);
-        viewportRect.anchorMax = new Vector2(0.64f, 0.70f);
+        viewportRect.anchorMax = new Vector2(0.65f, 0.70f);
         viewportRect.offsetMin = viewportRect.offsetMax = Vector2.zero;
         viewport.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.18f);
         var stashObject = new GameObject("StashGrid", typeof(RectTransform));
@@ -106,17 +106,17 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         ScrollRect scroll = viewport.GetComponent<ScrollRect>();
         scroll.viewport = viewportRect;
         scroll.content = stashRect;
-        scroll.horizontal = true;
+        scroll.horizontal = false;
         scroll.vertical = true;
         scroll.movementType = ScrollRect.MovementType.Clamped;
 
         CreateText(stashPanel.transform, "SaleBasketTitle", "판매 바구니", 16,
-            new Vector2(0.66f, 0.70f), new Vector2(0.98f, 0.76f));
+            new Vector2(0.67f, 0.70f), new Vector2(0.99f, 0.76f));
         var saleViewport = new GameObject("SaleBasketViewport", typeof(RectTransform), typeof(Image), typeof(RectMask2D), typeof(ScrollRect));
         saleViewport.transform.SetParent(stashPanel.transform, false);
         RectTransform saleViewportRect = saleViewport.GetComponent<RectTransform>();
-        saleViewportRect.anchorMin = new Vector2(0.66f, 0.18f);
-        saleViewportRect.anchorMax = new Vector2(0.98f, 0.70f);
+        saleViewportRect.anchorMin = new Vector2(0.67f, 0.18f);
+        saleViewportRect.anchorMax = new Vector2(0.99f, 0.70f);
         saleViewportRect.offsetMin = saleViewportRect.offsetMax = Vector2.zero;
         saleViewport.GetComponent<Image>().color = new Color(0.12f, 0.04f, 0.03f, 0.35f);
         var saleObject = new GameObject("SaleBasketGrid", typeof(RectTransform));
@@ -129,7 +129,7 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         ScrollRect saleScroll = saleViewport.GetComponent<ScrollRect>();
         saleScroll.viewport = saleViewportRect;
         saleScroll.content = saleRect;
-        saleScroll.horizontal = true;
+        saleScroll.horizontal = false;
         saleScroll.vertical = true;
         saleScroll.movementType = ScrollRect.MovementType.Clamped;
 

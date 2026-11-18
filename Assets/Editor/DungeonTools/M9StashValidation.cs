@@ -10,7 +10,9 @@ public static class M9StashValidation
     public static void Run()
     {
         var failures = new List<string>();
-        Check(M9StashConfig.BaseWidth == 10 && M9StashConfig.BaseHeight == 8, "기본 Stash 10x8", failures);
+        Check(M9StashConfig.BaseWidth == 10 && M9StashConfig.BaseHeight == 20, "기본 Stash 10x20", failures);
+        Check(M9StashConfig.SaleBasketWidth == 5 && M9StashConfig.SaleBasketHeight == 20,
+            "판매 바구니 5x20", failures);
         Check(M9StashConfig.RowsAfterQ03 == 2 && M9StashConfig.RowsAfterQ06 == 2, "퀘스트 확장 +2/+2", failures);
         Check(LootRuntimeState.MaxBagNestingDepth == 4, "가방 최대 중첩 4", failures);
         ValidateGrid(failures);
