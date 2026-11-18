@@ -23,6 +23,7 @@ public sealed class BaseCampGridPanel : MonoBehaviour
     private Text secondaryGridTitle;
     private Text notice;
     private LootItemInstance selected;
+    private string selectedSourceBagId;
     private LootItemInstance openedBag;
     private Button toSaleButton;
     private Text typeFilterLabel;
@@ -183,13 +184,13 @@ public sealed class BaseCampGridPanel : MonoBehaviour
             new Vector2(0.02f, 0.125f), new Vector2(0.98f, 0.17f));
         temporaryLabel.color = new Color(1f, 0.72f, 0.32f, 1f);
         Text temporaryHelp = CreateText(stashPanel.transform, "TemporaryHelp",
-            "◀ ▶ 항목 선택 · Stash/열린 가방으로 이동 · 삭제는 두 번 확인 · 판매는 바구니로 이동",
+            "아이템 선택 후 열린 가방으로 이동 · 임시 보관함은 ◀ ▶ 선택 · 삭제는 두 번 확인",
             10, new Vector2(0.02f, 0.085f), new Vector2(0.98f, 0.125f));
         temporaryHelp.color = new Color(0.75f, 0.82f, 0.9f, 1f);
         CreateButton(stashPanel.transform, "TempPrev", "◀ 이전", new Vector2(0.02f, 0.02f), PreviousTemporary, 0.09f);
         CreateButton(stashPanel.transform, "TempNext", "다음 ▶", new Vector2(0.12f, 0.02f), NextTemporary, 0.09f);
         CreateButton(stashPanel.transform, "TempToStash", "선택 → Stash", new Vector2(0.22f, 0.02f), MoveTemporaryToStash, 0.19f);
-        CreateButton(stashPanel.transform, "TempToBag", "선택 → 열린 가방", new Vector2(0.42f, 0.02f), MoveTemporaryToOpenedBag, 0.27f);
+        CreateButton(stashPanel.transform, "TempToBag", "선택 → 열린 가방", new Vector2(0.42f, 0.02f), MoveSelectedToOpenedBag, 0.27f);
         CreateButton(stashPanel.transform, "TempDelete", "선택 삭제", new Vector2(0.70f, 0.02f), DeleteTemporary, 0.13f);
         CreateButton(stashPanel.transform, "TempSale", "선택 판매", new Vector2(0.84f, 0.02f), MoveTemporaryToSale, 0.14f);
         RefreshFilterLabels();
@@ -335,6 +336,42 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         confirmTemporaryDelete = false;
     }
 
+    private void MoveSelectedToOpenedBag()
+    {
+        if (openedBag == null)
+        {
+            notice.text = "먼저 대상 가방을 여세요.";
+            return;
+        }
+
+        LootItemInstance moving = selected;
+        bool ok;
+        if (moving != null && !selectedFromSaleBasket)
+        {
+            ok = string.IsNullOrEmpty(selectedSourceBagId)
+                ? LootRuntimeState.MoveStashItemIntoBag(moving.InstanceId, openedBag.InstanceId)
+                : LootRuntimeState.MoveBagItemToBag(moving.InstanceId, selectedSourceBagId, openedBag.InstanceId);
+        }
+        else
+        {
+            moving = SelectedTemporary();
+            ok = moving != null && LootRuntimeState.MoveTemporaryItemIntoBag(moving.InstanceId, openedBag.InstanceId);
+        }
+
+        if (!ok)
+        {
+            notice.text = moving == null ? "이동할 아이템을 선택하세요." : LootRuntimeState.LastFailureReason;
+            return;
+        }
+
+        notice.text = $"{openedBag.Definition.Name}에 넣었습니다.";
+        selected = null;
+        selectedSourceBagId = null;
+        confirmTemporaryDelete = false;
+        // 가방을 넣었다면 그 가방을 다음 수납 대상으로 바로 열어 연속 중첩을 쉽게 만든다.
+        if (moving.Definition?.Type == LootItemType.Bag) OpenBagWindow(moving);
+    }
+
     private void DeleteTemporary()
     {
         LootItemInstance item = SelectedTemporary();
@@ -431,6 +468,7 @@ public sealed class BaseCampGridPanel : MonoBehaviour
     private void Select(LootItemInstance item)
     {
         selected = item;
+        selectedSourceBagId = null;
         selectedFromSaleBasket = false;
         notice.text = item?.Definition?.Name ?? "아이템을 선택하세요";
     }
@@ -438,6 +476,7 @@ public sealed class BaseCampGridPanel : MonoBehaviour
     private void SelectSaleBasketItem(LootItemInstance item)
     {
         selected = item;
+        selectedSourceBagId = null;
         selectedFromSaleBasket = true;
         notice.text = item?.Definition != null ? $"판매 대기: {item.Definition.Name}" : "아이템을 선택하세요";
     }
@@ -446,6 +485,7 @@ public sealed class BaseCampGridPanel : MonoBehaviour
     {
         FocusBagWindow(window);
         selected = item;
+        selectedSourceBagId = window?.Bag?.InstanceId;
         selectedFromSaleBasket = false;
         notice.text = item?.Definition != null ? $"열린 가방: {item.Definition.Name}" : "아이템을 선택하세요";
     }
@@ -464,6 +504,7 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         if (ok)
         {
             selected = null;
+            selectedSourceBagId = null;
             gridView.ClearSelection();
         }
     }
@@ -476,6 +517,7 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         if (ok)
         {
             selected = null;
+            selectedSourceBagId = null;
             gridView.ClearSelection();
         }
     }

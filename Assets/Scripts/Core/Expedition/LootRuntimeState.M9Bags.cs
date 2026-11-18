@@ -161,6 +161,24 @@ public static partial class LootRuntimeState
         return true;
     }
 
+    public static bool MoveBagItemToBag(string itemInstanceId, string sourceBagInstanceId,
+        string targetBagInstanceId)
+    {
+        if (sourceBagInstanceId == targetBagInstanceId)
+            return Fail("같은 가방으로 이동할 수 없습니다.");
+        LootItemInstance sourceBag = FindStoredItemRecursive(sourceBagInstanceId);
+        LootItemInstance targetBag = FindStoredItemRecursive(targetBagInstanceId);
+        LootGridPlacement placement = sourceBag?.BagGrid?.Find(itemInstanceId);
+        if (placement == null) return Fail("가방 안 아이템을 찾을 수 없습니다.");
+        if (!CanInsertIntoBag(placement.Item, targetBag, out string reason)) return Fail(reason);
+        if (!targetBag.BagGrid.TryAutoPlace(placement.Item, out _))
+            return Fail("대상 가방 공간이 부족합니다.");
+        sourceBag.BagGrid.Remove(itemInstanceId, out _);
+        LastFailureReason = null;
+        Changed?.Invoke();
+        return true;
+    }
+
     public static bool MoveNestedBagItem(string bagInstanceId, string itemInstanceId, int x, int y, bool rotated)
     {
         LootItemInstance bag = FindStoredItemRecursive(bagInstanceId);
