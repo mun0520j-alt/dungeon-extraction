@@ -248,6 +248,12 @@ public static partial class LootRuntimeState
         return true;
     }
 
+    // 루팅 더블클릭 규칙(결정 39): 해당 부위에 장착한 아이템이 없으면(기본 장비만 있으면 빈 것으로 본다) 장착, 아니면 가방으로.
+    public static bool IsEquipSlotFree(LootItemType type)
+    {
+        return !equippedLoot.TryGetValue(type, out LootItemInstance equipped) || equipped == null;
+    }
+
     public static bool TryEquipFromLootContainer(LootItemInstance item, LootGridModel sourceGrid)
     {
         if (item?.Definition == null || sourceGrid == null)

@@ -22,6 +22,8 @@ public sealed class LootingPanel : MonoBehaviour
         Build();
     }
 
+    private const string DefaultNotice = "첫 클릭: 선택 / 더블클릭: 빈 부위면 장착(2 Tick), 아니면 가방으로(1 Tick)";
+
     private void OnDestroy()
     {
         if (instance == this) instance = null;
@@ -33,7 +35,7 @@ public sealed class LootingPanel : MonoBehaviour
         instance.container = source;
         instance.player = actor;
         instance.title.text = source.DisplayName;
-        instance.notice.text = "첫 클릭: 선택 / 더블클릭: 이동 (1 Tick)";
+        instance.notice.text = DefaultNotice;
         instance.gridView.Bind(source.Grid, source.Grid.Move);
         instance.gridView.SetItemClickHandler(instance.SelectItem);
         instance.gridView.SetItemDoubleClickHandler(instance.ActivateItem);
@@ -61,7 +63,7 @@ public sealed class LootingPanel : MonoBehaviour
         {
             if (!LootRuntimeState.TryAddToRunBag(item))
             {
-                SetNotice("공간 부족");
+                SetNotice("출격 가방 공간이 부족합니다. 바꿔 끼우려면 선택 후 '장착'을 누르세요.");
                 return false;
             }
             if (!container.TryRemove(item.InstanceId, out _))
@@ -76,41 +78,56 @@ public sealed class LootingPanel : MonoBehaviour
         if (spent) RefreshBoth();
     }
 
+    // 더블클릭 규칙 (결정 39, 2026-11-18):
+    // 1) 장비(무기·방패·갑옷·가방)이고 그 부위가 비어 있으면 장착 (2 Tick)
+    // 2) 그 외에는 출격 가방에 넣기 (1 Tick)
+    // 3) 출격 가방이 꽉 차면 경고만, 0 Tick
+    // 부위가 차 있는데 바꿔 끼우려면 선택 후 '장착 (2 Tick)' 버튼을 쓴다.
     private void ActivateItem(LootItemInstance item)
     {
         if (item?.Definition == null) return;
-        if (item.Definition.Type == LootItemType.Junk || item.Definition.Type == LootItemType.Consumable)
-        {
-            TakeItem(item);
-            return;
-        }
+        LootItemType type = item.Definition.Type;
+        bool equippable = type == LootItemType.Weapon || type == LootItemType.Shield
+            || type == LootItemType.Armor || type == LootItemType.Bag;
+        if (equippable && LootRuntimeState.IsEquipSlotFree(type) && TryEquipFromContainer(item)) return;
+        TakeItem(item);
+    }
 
-        bool spent = player != null && player.TryPerformTimedAction(TickCost.SwapWeaponInCombat, "Equip", () =>
-        {
-            bool success = LootRuntimeState.TryEquipFromLootContainer(item, container?.Grid);
-            if (!success) SetNotice(LootRuntimeState.LastFailureReason);
-            return success;
-        });
-        if (!spent) return;
+    private bool TryEquipFromContainer(LootItemInstance item)
+    {
+        if (player == null || container == null) return false;
+        bool spent = player.TryPerformTimedAction(TickCost.SwapWeaponInCombat, "Equip", () =>
+            LootRuntimeState.TryEquipFromLootContainer(item, container.Grid));
+        if (!spent) return false;
         M3MeasurementAutomation.RecordItemAcquired();
-        container?.HandleContentsChanged();
+        container.HandleContentsChanged();
         selectedItem = null;
         RefreshBoth();
+        return true;
     }
 
     private void SelectItem(LootItemInstance item)
     {
         selectedItem = item;
         if (equipButton != null)
-            equipButton.gameObject.SetActive(item?.Definition?.Type == LootItemType.Bag);
+            equipButton.gameObject.SetActive(IsEquippable(item));
     }
 
+    private static bool IsEquippable(LootItemInstance item)
+    {
+        LootItemType? type = item?.Definition?.Type;
+        return type == LootItemType.Weapon || type == LootItemType.Shield
+            || type == LootItemType.Armor || type == LootItemType.Bag;
+    }
+
+    // '장착 (2 Tick)' 버튼: 부위가 차 있어도 바꿔 끼운다(기존 장비는 루팅 격자로).
     private void EquipSelectedBag()
     {
-        if (selectedItem?.Definition?.Type != LootItemType.Bag || container == null || player == null) return;
+        if (!IsEquippable(selectedItem) || container == null || player == null) return;
+        LootItemInstance target = selectedItem;
         bool spent = player.TryPerformTimedAction(TickCost.SwapWeaponInCombat, "Equip", () =>
         {
-            bool success = LootRuntimeState.TryEquipBagFromLootContainer(selectedItem, container.Grid);
+            bool success = LootRuntimeState.TryEquipFromLootContainer(target, container.Grid);
             if (!success) SetNotice(LootRuntimeState.LastFailureReason);
             return success;
         });
@@ -146,7 +163,7 @@ public sealed class LootingPanel : MonoBehaviour
 
     private void RefreshBoth()
     {
-        SetNotice("첫 클릭: 선택 / 더블클릭: 이동 (1 Tick)");
+        SetNotice(DefaultNotice);
         if (container == null)
         {
             InventoryPanel.ClearLootTransferHandler();
@@ -162,7 +179,7 @@ public sealed class LootingPanel : MonoBehaviour
     private void SetNotice(string message)
     {
         if (notice != null) notice.text = message;
-        if (!string.IsNullOrEmpty(message) && message != "첫 클릭: 선택 / 더블클릭: 이동 (1 Tick)")
+        if (!string.IsNullOrEmpty(message) && message != DefaultNotice)
             Debug.LogWarning($"[Looting] {message}");
     }
 
