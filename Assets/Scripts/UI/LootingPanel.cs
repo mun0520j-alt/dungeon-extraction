@@ -22,10 +22,9 @@ public sealed class LootingPanel : MonoBehaviour
         Build();
     }
 
-    private const string DefaultNotice = "더블클릭: 빈 부위면 장착(2 Tick), 아니면 가방으로(1 Tick) / Ctrl+클릭: 바로 옮기기 / 가방: 더블클릭·우클릭으로 열기";
+    private const string DefaultNotice = "더블클릭: 빈 부위면 장착(2 Tick), 아니면 가방으로(1 Tick) / Ctrl+클릭: 바로 옮기기";
 
-    // 결정 42: 루팅 중 하위 가방을 열면, 닫을 때(Esc) 원래 상자·바닥 더미로 돌아간다.
-    private ILootContainer returnContainer;
+    public static LootGridView ActiveGridView => instance != null ? instance.gridView : null;
 
     private void OnDestroy()
     {
@@ -35,9 +34,6 @@ public sealed class LootingPanel : MonoBehaviour
     public static void Open(ILootContainer source, PlayerTurnActor actor)
     {
         if (instance == null || source == null || actor == null) return;
-        if (!(source is NestedBagContainer)) instance.returnContainer = null;
-        else if (IsOpen && instance.container != null && !(instance.container is NestedBagContainer))
-            instance.returnContainer = instance.container;
         instance.container = source;
         instance.player = actor;
         instance.title.text = source.DisplayName;
@@ -47,26 +43,15 @@ public sealed class LootingPanel : MonoBehaviour
         instance.gridView.SetItemDoubleClickHandler(instance.ActivateItem);
         instance.gridView.SetItemOpenHandler(instance.OpenBagInContainer);
         instance.gridView.SetItemQuickMoveHandler(instance.TakeItem);
-        instance.gridView.SetBagDropHandler(instance.CanDropOnContainerBagIcon, instance.DropOnContainerBagIcon);
         instance.SelectItem(null);
         instance.panelRoot.SetActive(true);
         InventoryPanel.OpenForLoot(instance.PutItem);
-        InventoryPanel.LinkLootGrid(instance.gridView, instance.TakeItemAt, instance.PutItemAt);
+        DungeonBagWindows.RebuildLinks();
     }
 
-    public static bool CloseLootOnly() => CloseLootOnly(returnToParent: true);
-
-    public static bool CloseLootOnly(bool returnToParent)
+    public static bool CloseLootOnly()
     {
         if (!IsOpen) return false;
-        ILootContainer back = instance.returnContainer;
-        instance.returnContainer = null;
-        bool backAlive = back != null && !(back is UnityEngine.Object unityObject && unityObject == null);
-        if (returnToParent && backAlive && instance.container is NestedBagContainer && instance.player != null)
-        {
-            Open(back, instance.player);
-            return true;
-        }
         instance.panelRoot.SetActive(false);
         instance.container = null;
         instance.player = null;
@@ -76,35 +61,51 @@ public sealed class LootingPanel : MonoBehaviour
         return true;
     }
 
-    // ── 결정 43: 던전 드래그 (루팅 창 ↔ 출격 가방 칸, 가방 아이콘 자동 배치) ──
+    // ── 결정 43·44: 던전 드래그 (루팅 창 ↔ 출격 가방·가방 창, 가방 아이콘 자동 배치) ──
 
     public static bool ContainerHas(LootItemInstance item)
         => item != null && IsOpen && instance.container?.Grid?.Find(item.InstanceId) != null;
 
-    // 루팅 창 아이템을 출격 가방 안 가방 아이콘에 놓았을 때
     public static bool CanTakeIntoRunBagIcon(LootItemInstance item, LootItemInstance bag)
     {
         if (!ContainerHas(item) || bag == null) return false;
-        if (instance.container is NestedBagContainer nested && nested.Bag?.InstanceId == bag.InstanceId) return false;
         return LootRuntimeState.CanAddToRunNestedBag(bag, item, out _) && LootRuntimeState.BagHasFreeSpace(bag, item);
     }
 
     public static bool TakeIntoRunBagIcon(LootItemInstance item, LootItemInstance bag)
+        => ContainerHas(item) && instance.TakeIntoBag(item, bag, null);
+
+    public static bool TakeIntoBagAt(LootItemInstance item, LootItemInstance bag, int x, int y, bool rotated)
+        => ContainerHas(item) && instance.TakeIntoBag(item, bag, new Vector3Int(x, y, rotated ? 1 : 0));
+
+    public static bool TakeToRunBagAt(LootItemInstance item, int x, int y, bool rotated)
+        => instance != null && instance.TakeItemAt(item, x, y, rotated);
+
+    public static bool PutRunItemAt(LootItemInstance item, int x, int y, bool rotated)
+        => instance != null && instance.PutItemAt(item, x, y, rotated);
+
+    public static void PutRunItem(LootItemInstance item)
     {
-        if (!ContainerHas(item)) return false;
-        return instance.TakeIntoBag(item, bag);
+        if (instance != null) instance.PutItem(item);
     }
 
-    private bool TakeIntoBag(LootItemInstance item, LootItemInstance bag)
+    // position == null이면 빈칸 자동 배치, 아니면 (x, y, 회전 1/0) 칸에 놓기
+    private bool TakeIntoBag(LootItemInstance item, LootItemInstance bag, Vector3Int? position)
     {
-        if (player == null || container == null) return false;
+        if (player == null || container == null || bag?.BagGrid == null) return false;
         string failure = null;
         bool spent = player.TryPerformTimedAction(TickCost.PickUp, "LootTakeIntoBag", () =>
         {
             if (!LootRuntimeState.CanAddToRunNestedBag(bag, item, out failure)) return false;
-            if (!LootRuntimeState.BagHasFreeSpace(bag, item)) { failure = $"{bag.Definition?.Name}에 빈 공간이 없습니다."; return false; }
+            bool fits = position.HasValue
+                ? bag.BagGrid.CanPlace(item, position.Value.x, position.Value.y, position.Value.z == 1)
+                : LootRuntimeState.BagHasFreeSpace(bag, item);
+            if (!fits) { failure = position.HasValue ? "그 자리에 놓을 수 없습니다." : $"{bag.Definition?.Name}에 빈 공간이 없습니다."; return false; }
             if (!container.TryRemove(item.InstanceId, out _)) return false;
-            if (!bag.BagGrid.TryAutoPlace(item, out _))
+            bool placed = position.HasValue
+                ? bag.BagGrid.TryPlace(item, position.Value.x, position.Value.y, position.Value.z == 1)
+                : bag.BagGrid.TryAutoPlace(item, out _);
+            if (!placed)
             {
                 container.Grid.TryAutoPlace(item, out _);
                 failure = $"{bag.Definition?.Name}에 빈 공간이 없습니다.";
@@ -141,40 +142,21 @@ public sealed class LootingPanel : MonoBehaviour
         return spent;
     }
 
+    // 출격 가방 직속 또는 하위 가방(가방 창) 아이템을 루팅 창의 지정 칸에 놓는다 (버리기 Tick)
     private bool PutItemAt(LootItemInstance item, int x, int y, bool rotated)
     {
         if (item == null || container == null || player == null) return false;
-        string failure = null;
         bool spent = player.TryPerformTimedAction(TickCost.Drop, "LootPutAt", () =>
         {
-            var nested = container as NestedBagContainer;
-            if (nested != null && !LootRuntimeState.CanAddToRunNestedBag(nested.Bag, item, out failure)) return false;
-            if (!container.Grid.TryPlace(item, x, y, rotated)) { failure = "그 자리에 놓을 수 없습니다."; return false; }
-            if (LootRuntimeState.DropBagItem(item.InstanceId) == null)
-            {
-                container.Grid.Remove(item.InstanceId, out _);
-                return false;
-            }
-            if (nested != null) LootRuntimeState.MarkKeptInRun(item.InstanceId);
-            else M3MeasurementAutomation.RecordItemDroppedToContainer();
+            if (!container.Grid.CanPlace(item, x, y, rotated)) return false;
+            if (LootRuntimeState.DetachRunItemToWorld(item.InstanceId) == null) return false;
+            container.Grid.TryPlace(item, x, y, rotated);
+            M3MeasurementAutomation.RecordItemDroppedToContainer();
             container.HandleContentsChanged();
             return true;
         });
         if (spent) RefreshBoth();
-        else SetNotice(failure ?? "그 자리에 놓을 수 없습니다.");
-        return spent;
-    }
-
-    // 하위 가방 창 안의 가방 아이콘에 출격 가방·하위 가방 아이템을 놓을 때. 상자·바닥의 가방 아이콘은 대상 아님.
-    private bool CanDropOnContainerBagIcon(LootItemInstance item, LootItemInstance bag)
-        => container is NestedBagContainer && LootRuntimeState.CanMoveRunItemIntoBag(item, bag, out _);
-
-    private bool DropOnContainerBagIcon(LootItemInstance item, LootItemInstance bag)
-    {
-        if (!(container is NestedBagContainer) || player == null) return false;
-        bool spent = player.TryPerformTimedAction(TickCost.Drop, "MoveIntoBag", () => LootRuntimeState.MoveRunItemIntoBag(item, bag));
-        if (spent) RefreshBoth();
-        SetNotice(spent ? $"{bag.Definition?.Name}에 넣었습니다." : LootRuntimeState.LastFailureReason ?? "가방에 넣을 수 없습니다.");
+        else SetNotice("그 자리에 놓을 수 없습니다.");
         return spent;
     }
 
@@ -210,11 +192,6 @@ public sealed class LootingPanel : MonoBehaviour
     private void ActivateItem(LootItemInstance item)
     {
         if (item?.Definition == null) return;
-        if (container is NestedBagContainer && item.Definition.Type == LootItemType.Bag)
-        {
-            OpenBagInContainer(item);
-            return;
-        }
         LootItemType type = item.Definition.Type;
         bool equippable = type == LootItemType.Weapon || type == LootItemType.Shield
             || type == LootItemType.Armor || type == LootItemType.Bag;
@@ -222,16 +199,11 @@ public sealed class LootingPanel : MonoBehaviour
         TakeItem(item);
     }
 
-    // 하위 가방 창 안의 가방은 한 단계 더 연다. 상자·바닥의 가방은 아직 소지품이 아니라 열지 않는다.
+    // 상자·바닥의 가방은 아직 소지품이 아니라 열지 않는다 (결정 42).
     private void OpenBagInContainer(LootItemInstance item)
     {
-        if (item?.Definition?.Type != LootItemType.Bag || player == null) return;
-        if (!(container is NestedBagContainer))
-        {
-            SetNotice("상자·바닥의 가방은 출격 가방에 넣거나 장착한 뒤 열 수 있습니다.");
-            return;
-        }
-        Open(new NestedBagContainer(item), player);
+        if (item?.Definition?.Type != LootItemType.Bag) return;
+        SetNotice("상자·바닥의 가방은 출격 가방에 넣거나 장착한 뒤 열 수 있습니다.");
     }
 
     private bool TryEquipFromContainer(LootItemInstance item)
@@ -279,6 +251,7 @@ public sealed class LootingPanel : MonoBehaviour
         RefreshBoth();
     }
 
+    // 출격 가방(직속·가방 창) 아이템을 보관함 빈칸으로 (버리기 Tick)
     private void PutItem(LootItemInstance item)
     {
         if (item == null || container == null || player == null) return;
@@ -286,25 +259,17 @@ public sealed class LootingPanel : MonoBehaviour
         {
             if (!container.TryAdd(item))
             {
-                SetNotice(container is NestedBagContainer ? NestedBagContainer.LastFailureReason ?? "하위 가방 공간 부족" : "보관함 공간 부족");
+                SetNotice("보관함 공간 부족");
                 return false;
             }
-            LootItemInstance removed = LootRuntimeState.DropBagItem(item.InstanceId);
-            if (removed != null && container is NestedBagContainer)
+            if (LootRuntimeState.DetachRunItemToWorld(item.InstanceId) == null)
             {
-                // 내 하위 가방에 넣은 것은 버린 것이 아니다 (보험 버림 판정 제외).
-                LootRuntimeState.MarkKeptInRun(item.InstanceId);
-                container.HandleContentsChanged();
-                return true;
+                container.TryRemove(item.InstanceId, out _);
+                return false;
             }
-            if (removed != null)
-            {
-                M3MeasurementAutomation.RecordItemDroppedToContainer();
-                container.HandleContentsChanged();
-                return true;
-            }
-            container.TryRemove(item.InstanceId, out _);
-            return false;
+            M3MeasurementAutomation.RecordItemDroppedToContainer();
+            container.HandleContentsChanged();
+            return true;
         });
         if (spent) RefreshBoth();
     }
@@ -323,7 +288,7 @@ public sealed class LootingPanel : MonoBehaviour
         gridView.SetItemDoubleClickHandler(ActivateItem);
         SelectItem(null);
         InventoryPanel.OpenForLoot(PutItem);
-        InventoryPanel.LinkLootGrid(gridView, TakeItemAt, PutItemAt);
+        DungeonBagWindows.RebuildLinks();
     }
 
     private void SetNotice(string message)

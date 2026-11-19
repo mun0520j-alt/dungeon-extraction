@@ -72,6 +72,74 @@ public static partial class LootRuntimeState
         return true;
     }
 
+    // 결정 44: 출격 가방 트리 안 아이템을 bag의 지정 칸으로 (출격 가방 → 가방 창, 가방 창 → 가방 창)
+    public static bool MoveRunItemToBagAt(LootItemInstance item, LootItemInstance bag, int x, int y, bool rotated)
+    {
+        if (item == null || bag?.BagGrid == null || GetRunBagDepth(item.InstanceId) <= 0) return Fail("출격 가방 안의 아이템만 옮길 수 있습니다.");
+        LootItemInstance parent = FindRunParentBag(item.InstanceId);
+        if (parent?.InstanceId == bag.InstanceId) return Fail("이미 그 가방 안에 있습니다.");
+        if (!CanAddToRunNestedBag(bag, item, out string reason)) return Fail(reason);
+        if (!bag.BagGrid.CanPlace(item, x, y, rotated)) return Fail("그 자리에 놓을 수 없습니다.");
+        DetachFromRunTree(item, parent);
+        bag.BagGrid.TryPlace(item, x, y, rotated);
+        LastFailureReason = null;
+        Changed?.Invoke();
+        return true;
+    }
+
+    // 결정 44: 하위 가방 안 아이템을 출격 가방 직속으로 꺼낸다 (자동 배치 / 지정 칸)
+    public static bool MoveNestedItemToRunBag(LootItemInstance item)
+    {
+        LootItemInstance parent = item != null ? FindRunParentBag(item.InstanceId) : null;
+        if (parent == null) return Fail("하위 가방 안의 아이템이 아닙니다.");
+        parent.BagGrid.Remove(item.InstanceId, out _);
+        if (!runBagGrid.TryAutoPlace(item, out _))
+        {
+            parent.BagGrid.TryAutoPlace(item, out _);
+            return Fail("출격 가방 공간이 부족합니다.");
+        }
+        runBag.Add(item);
+        LastFailureReason = null;
+        Changed?.Invoke();
+        return true;
+    }
+
+    public static bool MoveNestedItemToRunBagAt(LootItemInstance item, int x, int y, bool rotated)
+    {
+        LootItemInstance parent = item != null ? FindRunParentBag(item.InstanceId) : null;
+        if (parent == null) return Fail("하위 가방 안의 아이템이 아닙니다.");
+        if (!runBagGrid.CanPlace(item, x, y, rotated)) return Fail("그 자리에 놓을 수 없습니다.");
+        parent.BagGrid.Remove(item.InstanceId, out _);
+        runBagGrid.TryPlace(item, x, y, rotated);
+        runBag.Add(item);
+        LastFailureReason = null;
+        Changed?.Invoke();
+        return true;
+    }
+
+    // 출격 가방 트리 어디에 있든(직속·하위 가방) 꺼내서 소지품에서 뺀다. 보험 장비면 버림 표시. 루팅 창에 놓기·버리기용.
+    public static LootItemInstance DetachRunItemToWorld(string instanceId)
+    {
+        LootItemInstance top = DropBagItem(instanceId);
+        if (top != null) return top;
+        LootItemInstance parent = FindRunParentBag(instanceId);
+        if (parent == null || !parent.BagGrid.Remove(instanceId, out LootItemInstance item)) return null;
+        if (insuredThisRun.Contains(instanceId)) droppedInsuredThisRun.Add(instanceId);
+        Changed?.Invoke();
+        return item;
+    }
+
+    private static void DetachFromRunTree(LootItemInstance item, LootItemInstance parent)
+    {
+        if (parent != null)
+        {
+            parent.BagGrid.Remove(item.InstanceId, out _);
+            return;
+        }
+        runBagGrid.Remove(item.InstanceId, out _);
+        runBag.Remove(item);
+    }
+
     public static bool MoveRunItemIntoBag(LootItemInstance item, LootItemInstance bag)
     {
         if (!CanMoveRunItemIntoBag(item, bag, out string reason)) return Fail(reason);

@@ -112,6 +112,7 @@ public class InventoryPanel : MonoBehaviour
     {
         if (activeInstance != null && activeInstance.panelRoot != null) activeInstance.panelRoot.SetActive(false);
         IsOpen = false;
+        DungeonBagWindows.CloseAll();
     }
 
     public static bool CloseForEscape()
@@ -120,6 +121,7 @@ public class InventoryPanel : MonoBehaviour
         activeInstance.HideItemActions();
         activeInstance.panelRoot.SetActive(false);
         IsOpen = false;
+        DungeonBagWindows.CloseAll();
         return true;
     }
 
@@ -149,7 +151,7 @@ public class InventoryPanel : MonoBehaviour
     {
         if (activeInstance == null) return;
         activeInstance.lootTransferHandler = null;
-        activeInstance.bagGridView?.ClearExternalDropTargets();
+        DungeonBagWindows.RebuildLinks();
         activeInstance.bagGridView?.SetItemClickHandler(activeInstance.SelectBagItem);
         activeInstance.bagGridView?.SetItemDoubleClickHandler(activeInstance.HandleDungeonItemDoubleClick);
         activeInstance.bagGridView?.SetItemOpenHandler(activeInstance.OpenRunNestedBag);
@@ -218,6 +220,7 @@ public class InventoryPanel : MonoBehaviour
             if (wasOpen) HideItemActions();
             panelRoot.SetActive(!wasOpen);
             IsOpen = panelRoot.activeSelf;
+            if (!IsOpen) DungeonBagWindows.CloseAll();
 
             // 아직 구독을 못 했다면(예: Player가 Start 이후에 늦게 생성된 경우) 열 때마다
             // 한 번씩 재시도 — 가벼운 null 체크뿐이라 비용 걱정 없음.
@@ -375,7 +378,7 @@ public class InventoryPanel : MonoBehaviour
         bagGridView.SetItemDoubleClickHandler(HandleDungeonItemDoubleClick);
         bagGridView.SetItemOpenHandler(OpenRunNestedBag);
         bagGridView.SetItemQuickMoveHandler(QuickMoveToLoot);
-        bagGridView.SetBagDropHandler(CanDropOnRunBagIcon, DropOnRunBagIcon);
+        bagGridView.SetBagDropHandler(DungeonBagWindows.CanDropOnBagIcon, DungeonBagWindows.DropOnBagIcon);
         if (dimensionsChanged) ReflowPanelForBagGrid();
     }
 
@@ -468,42 +471,14 @@ public class InventoryPanel : MonoBehaviour
     // 결정 41: 던전에서 하위 가방을 루팅 창처럼 연다 (하위 가방 아이템 합계 상한 적용).
     private void OpenRunNestedBag(LootItemInstance item)
     {
-        if (item?.Definition?.Type != LootItemType.Bag || item.BagGrid == null || PlayerTurnActor.Instance == null) return;
-        LootingPanel.Open(new NestedBagContainer(item), PlayerTurnActor.Instance);
+        if (item?.Definition?.Type != LootItemType.Bag || item.BagGrid == null) return;
+        DungeonBagWindows.Open(item); // 결정 44: 떠 있는 가방 창
     }
 
-    // 결정 43: 루팅 창 격자와 출격 가방 격자 사이 드래그를 연결한다.
-    public static void LinkLootGrid(LootGridView lootGrid,
-        System.Func<LootItemInstance, int, int, bool, bool> takeAt,
-        System.Func<LootItemInstance, int, int, bool, bool> putAt)
-    {
-        if (activeInstance?.bagGridView == null || lootGrid == null) return;
-        LootGridView bag = activeInstance.bagGridView;
-        bag.ClearExternalDropTargets();
-        lootGrid.ClearExternalDropTargets();
-        lootGrid.AddExternalDropTarget(bag, takeAt);
-        bag.AddExternalDropTarget(lootGrid, putAt);
-    }
+    // 결정 43·44: 드래그 연결은 DungeonBagWindows.RebuildLinks 한 곳에서 만든다.
+    public static LootGridView RunBagGridView => activeInstance != null ? activeInstance.bagGridView : null;
 
-    // 결정 43: 출격 가방 안 가방 아이콘에 아이템을 놓으면 빈칸에 자동 배치 (영지 결정 37과 같은 방식).
-    private bool CanDropOnRunBagIcon(LootItemInstance item, LootItemInstance bag)
-    {
-        if (!ExpeditionSession.IsActive) return false;
-        return LootingPanel.ContainerHas(item)
-            ? LootingPanel.CanTakeIntoRunBagIcon(item, bag)
-            : LootRuntimeState.CanMoveRunItemIntoBag(item, bag, out _);
-    }
-
-    private bool DropOnRunBagIcon(LootItemInstance item, LootItemInstance bag)
-    {
-        if (!ExpeditionSession.IsActive) return false;
-        if (LootingPanel.ContainerHas(item)) return LootingPanel.TakeIntoRunBagIcon(item, bag);
-        var player = PlayerTurnActor.Instance;
-        if (player == null) return false;
-        bool spent = player.TryPerformTimedAction(TickCost.Drop, "MoveIntoBag", () => LootRuntimeState.MoveRunItemIntoBag(item, bag));
-        SetBagNotice(spent ? $"{bag.Definition?.Name}에 넣었습니다." : LootRuntimeState.LastFailureReason);
-        return spent;
-    }
+    public static void ShowBagNotice(string message) => activeInstance?.SetBagNotice(message);
 
     private void QuickMoveToLoot(LootItemInstance item)
     {

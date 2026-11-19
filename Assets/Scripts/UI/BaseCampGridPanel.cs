@@ -6,7 +6,7 @@ using UnityEngine.UI;
 public sealed class BaseCampGridPanel : MonoBehaviour
 {
     private static BaseCampGridPanel instance;
-    private const int MaxOpenBagWindows = 5;
+    private static int MaxOpenBagWindows => M9StashConfig.BagWindowMax;
     private const float GridScrollSensitivity = 36f;
     private sealed class BagWindowState
     {

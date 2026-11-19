@@ -57,6 +57,7 @@ public class DungeonSceneBootstrapper : MonoBehaviour
         if (FindFirstObjectByType<DungeonClockDisplay>() == null) gameObject.AddComponent<DungeonClockDisplay>();
         if (FindFirstObjectByType<InventoryPanel>() == null) gameObject.AddComponent<InventoryPanel>();
         if (FindFirstObjectByType<LootingPanel>() == null) gameObject.AddComponent<LootingPanel>();
+        if (FindFirstObjectByType<DungeonBagWindows>() == null) gameObject.AddComponent<DungeonBagWindows>();
         var legacyBagPanel = FindFirstObjectByType<M2BagPanel>();
         if (legacyBagPanel != null) Destroy(legacyBagPanel);
         if (FindFirstObjectByType<MinimapController>() == null) gameObject.AddComponent<MinimapController>();
