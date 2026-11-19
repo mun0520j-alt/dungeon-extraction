@@ -7,3 +7,4 @@ sale_basket_width,5
 sale_basket_height,20
 run_nested_item_limit,10
 bag_window_max,5
+temp_storage_visible_rows,3

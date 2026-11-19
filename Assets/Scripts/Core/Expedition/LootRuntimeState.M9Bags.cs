@@ -186,7 +186,7 @@ public static partial class LootRuntimeState
         if (FindStoredItemRecursive(targetBag.InstanceId) == null) { reason = "영지 Stash의 가방에만 넣을 수 있습니다."; return false; }
         if (!HasFreeSpace(targetBag.BagGrid, item)) { reason = "가방 공간이 부족합니다."; return false; }
         if (stash.Find(value => value?.InstanceId == item.InstanceId) == null && FindParentBag(item.InstanceId) == null
-            && runBag.Find(value => value?.InstanceId == item.InstanceId) == null)
+            && runBag.Find(value => value?.InstanceId == item.InstanceId) == null && !IsInTemporaryStorage(item.InstanceId))
         { reason = "Stash·출격 가방·가방 안 아이템만 가방에 넣을 수 있습니다."; return false; }
         return true;
     }
@@ -196,6 +196,7 @@ public static partial class LootRuntimeState
         LootItemInstance targetBag = FindStoredItemRecursive(targetBagInstanceId);
         if (stash.Find(value => value?.InstanceId == itemInstanceId) != null)
             return MoveStashItemIntoBag(itemInstanceId, targetBagInstanceId);
+        if (IsInTemporaryStorage(itemInstanceId)) return MoveTemporaryItemIntoBag(itemInstanceId, targetBagInstanceId);
         LootItemInstance fromRunBag = runBag.Find(value => value?.InstanceId == itemInstanceId);
         if (fromRunBag != null)
         {

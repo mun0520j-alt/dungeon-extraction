@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -42,6 +43,53 @@ public static partial class LootRuntimeState
         Changed?.Invoke();
         return true;
     }
+
+    // 결정 45: 임시 보관함 표시용 격자. 위치는 저장하지 않고, 큰 아이템부터 채우며 다 들어갈 때까지 행을 늘린다.
+    public static LootGridModel BuildTemporaryStorageGrid(int width)
+    {
+        width = Math.Max(1, width);
+        var items = temporaryStorage.Where(item => item?.Definition != null)
+            .OrderByDescending(item => item.Definition.GridWidth * item.Definition.GridHeight).ToList();
+        int height = 1;
+        foreach (LootItemInstance item in items)
+            height = Math.Max(height, Math.Min(item.Definition.GridWidth, item.Definition.GridHeight));
+        const int MaxRows = 200;
+        while (true)
+        {
+            var grid = new LootGridModel(width, height);
+            bool allPlaced = items.All(item => grid.TryAutoPlace(item, out _));
+            if (allPlaced || height >= MaxRows) return grid;
+            height++;
+        }
+    }
+
+    public static bool MoveTemporaryItemToStashAt(string instanceId, int x, int y, bool rotated)
+    {
+        LootItemInstance item = temporaryStorage.Find(value => value?.InstanceId == instanceId);
+        if (item == null) return Fail("임시 보관함 아이템을 찾을 수 없습니다.");
+        EnsureStashGrid();
+        if (!stashGrid.TryPlace(item, x, y, rotated)) return Fail("Stash의 해당 위치에 놓을 수 없습니다.");
+        temporaryStorage.Remove(item);
+        stash.Add(item);
+        LastFailureReason = null;
+        Changed?.Invoke();
+        return true;
+    }
+
+    public static bool MoveTemporaryItemIntoBagAt(string instanceId, string bagInstanceId, int x, int y, bool rotated)
+    {
+        LootItemInstance item = temporaryStorage.Find(value => value?.InstanceId == instanceId);
+        LootItemInstance bag = FindStoredItemRecursive(bagInstanceId);
+        if (item == null) return Fail("임시 보관함 아이템을 찾을 수 없습니다.");
+        if (!CanInsertIntoBag(item, bag, out string reason)) return Fail(reason);
+        if (!bag.BagGrid.TryPlace(item, x, y, rotated)) return Fail("가방의 해당 위치에 놓을 수 없습니다.");
+        temporaryStorage.Remove(item);
+        LastFailureReason = null;
+        Changed?.Invoke();
+        return true;
+    }
+
+    public static bool IsInTemporaryStorage(string instanceId) => temporaryStorage.Exists(value => value?.InstanceId == instanceId);
 
     public static bool MoveTemporaryItemIntoBag(string instanceId, string bagInstanceId)
     {

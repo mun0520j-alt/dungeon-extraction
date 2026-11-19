@@ -76,6 +76,20 @@ public static partial class LootRuntimeState
         return true;
     }
 
+    public static bool MoveTemporaryItemToSaleBasketAt(string instanceId, int x, int y, bool rotated)
+    {
+        LootItemInstance item = temporaryStorage.Find(value => value?.InstanceId == instanceId);
+        if (item == null) return Fail("임시 보관함 아이템을 찾을 수 없습니다.");
+        if (!CanEnterSaleBasket(item)) return false;
+        if (!SaleBasketGrid.TryPlace(item, x, y, rotated)) return Fail("판매 바구니의 해당 위치에 놓을 수 없습니다.");
+        saleOrigins[item.InstanceId] = new SaleOrigin { Source = SaleSource.Temporary };
+        temporaryStorage.Remove(item);
+        saleBasket.Add(item);
+        LastFailureReason = null;
+        Changed?.Invoke();
+        return true;
+    }
+
     public static bool MoveTemporaryItemToSaleBasket(string instanceId)
     {
         LootItemInstance item = temporaryStorage.Find(value => value?.InstanceId == instanceId);
