@@ -44,6 +44,26 @@ public sealed class LootItemInstance
     public string InstanceId;
     public LootItemData Definition;
     public bool IsFoundInRaid;
+    [NonSerialized] private LootGridModel bagGrid;
+
+    public LootGridModel BagGrid
+    {
+        get
+        {
+            if (Definition?.Type != LootItemType.Bag) return null;
+            int width = Math.Max(1, Definition.BagGridWidth);
+            int height = Math.Max(1, Definition.BagGridHeight);
+            if (bagGrid == null || bagGrid.Width != width || bagGrid.Height != height)
+                bagGrid = new LootGridModel(width, height);
+            return bagGrid;
+        }
+    }
+
+    internal void SetBagGrid(LootGridModel value)
+    {
+        if (Definition?.Type != LootItemType.Bag) return;
+        bagGrid = value;
+    }
 
     public LootItemInstance(LootItemData definition, bool foundInRaid = false)
     {

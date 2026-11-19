@@ -5,12 +5,22 @@ using UnityEngine.UI;
 // M1용 임시 영지/결과 화면. 영지에서는 TickManager를 만들지 않아 시간이 흐르지 않는다.
 public sealed class ExpeditionResultPanel : MonoBehaviour
 {
+    private RectTransform panelRect;
+    private Button startButton;
+    private Text startLabel;
+
     private void Start()
     {
         Build();
+        LootRuntimeState.Changed += RefreshStartButton;
         if (GetComponent<BaseCampManagementPanel>() == null) gameObject.AddComponent<BaseCampManagementPanel>();
         if (GetComponent<BaseCampGridPanel>() == null) gameObject.AddComponent<BaseCampGridPanel>();
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        if (GetComponent<ExpeditionDebugCommands>() == null) gameObject.AddComponent<ExpeditionDebugCommands>();
+#endif
     }
+
+    private void OnDestroy() => LootRuntimeState.Changed -= RefreshStartButton;
 
     private void Build()
     {
@@ -19,12 +29,8 @@ public sealed class ExpeditionResultPanel : MonoBehaviour
         var panel = CreateUiObject("M1ResultPanel", root);
         var panelImage = panel.AddComponent<Image>();
         panelImage.color = new Color(0.04f, 0.05f, 0.08f, 0.96f);
-        var panelRect = panel.GetComponent<RectTransform>();
-        // BaseCamp는 왼쪽 상인과 오른쪽 장비·Stash·격자 패널을 항상 함께 표시한다.
-        // 중앙 정렬 680px은 오른쪽 관리 패널을 덮으므로, 두 사이의 실제 여백 중앙에 맞춘다.
-        panelRect.anchorMin = new Vector2(0.385f, 0.5f);
-        panelRect.anchorMax = new Vector2(0.385f, 0.5f);
-        panelRect.sizeDelta = new Vector2(460f, 520f);
+        panelRect = panel.GetComponent<RectTransform>();
+        ApplyLayout();
 
         string body;
         var result = ExpeditionSession.LastResult;
@@ -57,25 +63,33 @@ public sealed class ExpeditionResultPanel : MonoBehaviour
         var buttonGo = CreateUiObject("StartExpeditionButton", panel.transform);
         var buttonImage = buttonGo.AddComponent<Image>();
         buttonImage.color = new Color(0.18f, 0.48f, 0.28f, 1f);
-        var button = buttonGo.AddComponent<Button>();
-        button.targetGraphic = buttonImage;
-        button.onClick.AddListener(StartExpedition);
+        startButton = buttonGo.AddComponent<Button>();
+        startButton.targetGraphic = buttonImage;
+        startButton.onClick.AddListener(StartExpedition);
         var buttonRect = buttonGo.GetComponent<RectTransform>();
         buttonRect.anchorMin = new Vector2(0.3f, 0.08f);
         buttonRect.anchorMax = new Vector2(0.7f, 0.22f);
         buttonRect.offsetMin = buttonRect.offsetMax = Vector2.zero;
 
         var labelGo = CreateUiObject("Label", buttonGo.transform);
-        var label = labelGo.AddComponent<Text>();
-        label.font = HudFont.GetDefault();
-        label.fontSize = 28;
-        label.alignment = TextAnchor.MiddleCenter;
-        label.color = Color.white;
-        label.text = result == null ? "출격" : "다시 출격";
+        startLabel = labelGo.AddComponent<Text>();
+        startLabel.font = HudFont.GetDefault();
+        startLabel.fontSize = 28;
+        startLabel.alignment = TextAnchor.MiddleCenter;
+        startLabel.color = Color.white;
+        startLabel.text = result == null ? "출격" : "다시 출격";
         var labelRect = labelGo.GetComponent<RectTransform>();
         labelRect.anchorMin = Vector2.zero;
         labelRect.anchorMax = Vector2.one;
         labelRect.offsetMin = labelRect.offsetMax = Vector2.zero;
+        RefreshStartButton();
+    }
+
+    private void Update() => ApplyLayout();
+
+    private void ApplyLayout()
+    {
+        if (panelRect != null) BaseCampLayout.ApplyTo(panelRect, BaseCampLayout.Calculate().Expedition);
     }
 
     private static GameObject CreateUiObject(string objectName, Transform parent)
@@ -87,8 +101,20 @@ public sealed class ExpeditionResultPanel : MonoBehaviour
 
     private static void StartExpedition()
     {
+        if (!LootRuntimeState.CanStartExpedition) return;
+        LootRuntimeState.CancelSaleBasket();
         M5SaveService.PrepareForExpedition();
         ExpeditionSession.BeginNewRun();
         SceneManager.LoadScene("InDungeon");
+    }
+
+    private void RefreshStartButton()
+    {
+        if (startButton == null || startLabel == null) return;
+        startButton.interactable = LootRuntimeState.CanStartExpedition;
+        startLabel.text = LootRuntimeState.CanStartExpedition
+            ? (ExpeditionSession.LastResult == null ? "출격" : "다시 출격")
+            : "임시 보관함을 정리하세요";
+        startLabel.fontSize = LootRuntimeState.CanStartExpedition ? 28 : 15;
     }
 }

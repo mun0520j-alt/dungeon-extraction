@@ -112,6 +112,7 @@ public class InventoryPanel : MonoBehaviour
     {
         if (activeInstance != null && activeInstance.panelRoot != null) activeInstance.panelRoot.SetActive(false);
         IsOpen = false;
+        DungeonBagWindows.CloseAll();
     }
 
     public static bool CloseForEscape()
@@ -120,6 +121,7 @@ public class InventoryPanel : MonoBehaviour
         activeInstance.HideItemActions();
         activeInstance.panelRoot.SetActive(false);
         IsOpen = false;
+        DungeonBagWindows.CloseAll();
         return true;
     }
 
@@ -138,7 +140,9 @@ public class InventoryPanel : MonoBehaviour
         activeInstance.EnsureBagBindings();
         activeInstance.lootTransferHandler = transferToLoot;
         activeInstance.bagGridView?.SetItemClickHandler(activeInstance.SelectBagItem);
-        activeInstance.bagGridView?.SetItemDoubleClickHandler(transferToLoot);
+        activeInstance.bagGridView?.SetItemDoubleClickHandler(activeInstance.HandleDungeonItemDoubleClick);
+        activeInstance.bagGridView?.SetItemOpenHandler(activeInstance.OpenRunNestedBag);
+        activeInstance.bagGridView?.SetItemQuickMoveHandler(activeInstance.QuickMoveToLoot);
         activeInstance.HideItemActions();
         activeInstance.RefreshBagSlots();
     }
@@ -147,8 +151,11 @@ public class InventoryPanel : MonoBehaviour
     {
         if (activeInstance == null) return;
         activeInstance.lootTransferHandler = null;
+        DungeonBagWindows.RebuildLinks();
         activeInstance.bagGridView?.SetItemClickHandler(activeInstance.SelectBagItem);
-        activeInstance.bagGridView?.SetItemDoubleClickHandler(null);
+        activeInstance.bagGridView?.SetItemDoubleClickHandler(activeInstance.HandleDungeonItemDoubleClick);
+        activeInstance.bagGridView?.SetItemOpenHandler(activeInstance.OpenRunNestedBag);
+        activeInstance.bagGridView?.SetItemQuickMoveHandler(activeInstance.QuickMoveToLoot);
     }
 
     // [2026-09-04 신규] 에디터 메뉴(BuildHudInScene)가 "컴포넌트는 이미 붙어있는데(Awake가 다시
@@ -213,6 +220,7 @@ public class InventoryPanel : MonoBehaviour
             if (wasOpen) HideItemActions();
             panelRoot.SetActive(!wasOpen);
             IsOpen = panelRoot.activeSelf;
+            if (!IsOpen) DungeonBagWindows.CloseAll();
 
             // 아직 구독을 못 했다면(예: Player가 Start 이후에 늦게 생성된 경우) 열 때마다
             // 한 번씩 재시도 — 가벼운 null 체크뿐이라 비용 걱정 없음.
@@ -338,8 +346,16 @@ public class InventoryPanel : MonoBehaviour
     {
         var player = PlayerTurnActor.Instance;
         if (player == null || player.Equipment == null) return;
-        bool spent = player.TryPerformTimedAction(TickCost.SwapWeaponInCombat, "Unequip", () => player.Equipment.TryUnequip(slot));
-        SetBagNotice(spent ? null : LootRuntimeState.LastFailureReason);
+        // 던전에서 큰 가방은 기본 3×2에 안 들어가므로 내용물째 발밑 바닥 더미로 내려놓는다 (결정 40).
+        bool dropBagToGround = slot == EquipmentSlotType.Bag && ExpeditionSession.IsActive
+            && LootRuntimeState.GetEquipped(LootItemType.Bag) != null && !LootRuntimeState.CanUnequipBagIntoBaseBag();
+        bool spent = player.TryPerformTimedAction(TickCost.SwapWeaponInCombat, "Unequip", () => dropBagToGround
+            ? LootRuntimeState.TryUnequipBagOntoGround(bag => player.FloorTilemap != null
+                && GroundLootPile.TryAddOrCreate(player.FloorTilemap, player.CurrentCell, bag, out _))
+            : player.Equipment.TryUnequip(slot));
+        SetBagNotice(spent
+            ? (dropBagToGround ? "가방을 내용물째 발밑에 내려놓았습니다. 바닥 더미에서 더블클릭하면 다시 장착합니다." : null)
+            : LootRuntimeState.LastFailureReason);
     }
 
     private void EnsureBagBindings()
@@ -359,7 +375,10 @@ public class InventoryPanel : MonoBehaviour
         bagGridView = grid.GetComponent<LootGridView>() ?? grid.gameObject.AddComponent<LootGridView>();
         bagGridView.Bind(LootRuntimeState.RunBagGrid, LootRuntimeState.MoveRunBagItem);
         bagGridView.SetItemClickHandler(SelectBagItem);
-        bagGridView.SetItemDoubleClickHandler(lootTransferHandler);
+        bagGridView.SetItemDoubleClickHandler(HandleDungeonItemDoubleClick);
+        bagGridView.SetItemOpenHandler(OpenRunNestedBag);
+        bagGridView.SetItemQuickMoveHandler(QuickMoveToLoot);
+        bagGridView.SetBagDropHandler(DungeonBagWindows.CanDropOnBagIcon, DungeonBagWindows.DropOnBagIcon);
         if (dimensionsChanged) ReflowPanelForBagGrid();
     }
 
@@ -435,6 +454,36 @@ public class InventoryPanel : MonoBehaviour
             return success;
         });
         if (spent) SetBagNotice(null);
+    }
+
+    // 결정 42 (타르코프식): 가방은 더블클릭·우클릭이면 항상 연다(루팅 창이 열려 있어도).
+    // 가방째 보관함으로 옮기려면 Ctrl+좌클릭 또는 드래그. 가방이 아닌 아이템 더블클릭은 기존처럼 보관함으로 옮긴다.
+    private void HandleDungeonItemDoubleClick(LootItemInstance item)
+    {
+        if (item?.Definition?.Type == LootItemType.Bag)
+        {
+            OpenRunNestedBag(item);
+            return;
+        }
+        lootTransferHandler?.Invoke(item);
+    }
+
+    // 결정 41: 던전에서 하위 가방을 루팅 창처럼 연다 (하위 가방 아이템 합계 상한 적용).
+    private void OpenRunNestedBag(LootItemInstance item)
+    {
+        if (item?.Definition?.Type != LootItemType.Bag || item.BagGrid == null) return;
+        DungeonBagWindows.Open(item); // 결정 44: 떠 있는 가방 창
+    }
+
+    // 결정 43·44: 드래그 연결은 DungeonBagWindows.RebuildLinks 한 곳에서 만든다.
+    public static LootGridView RunBagGridView => activeInstance != null ? activeInstance.bagGridView : null;
+
+    public static void ShowBagNotice(string message) => activeInstance?.SetBagNotice(message);
+
+    private void QuickMoveToLoot(LootItemInstance item)
+    {
+        if (lootTransferHandler != null) lootTransferHandler(item);
+        else SelectBagItem(item);
     }
 
     private void SetBagNotice(string message)

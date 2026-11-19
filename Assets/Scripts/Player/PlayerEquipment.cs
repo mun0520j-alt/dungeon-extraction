@@ -93,6 +93,8 @@ public class PlayerEquipment : MonoBehaviour
         {
             if (LootRuntimeState.IsBasicSlotUnequipped(type)) equippedItems.Remove(slot);
             else if (defaultItems.TryGetValue(slot, out var fallback)) equippedItems[slot] = fallback;
+            // 기본 아이템이 없는 슬롯(가방)은 비워야 이전 장착 이름이 남지 않는다 (BUG-048)
+            else equippedItems.Remove(slot);
             return;
         }
         if (!lootAdapters.TryGetValue(loot.InstanceId, out var adapter))

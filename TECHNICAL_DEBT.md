@@ -16,6 +16,8 @@
 | TD-012 | 기본 출격 가방 3×2가 코드 상수 | `LootRuntimeState.BaseBagGridWidth/Height`가 const라 기본 격자 조정 시 코드 수정 필요. 아이템·가방 크기는 CSV, 기본 격자만 코드에 있음 | Low | Open | M7 |
 | TD-013 | Unity 6 폐기 예정 탐색 API 일괄 교체 | `FindObjectOfType`·`FindObjectsOfType`·`GetInstanceID` obsolete 경고가 남아 있어 향후 Unity 업데이트 시 호환성과 유지보수 비용이 증가함 | Medium | 부분 해결 (2026-11-15): `FindObjectOfType` → `FindFirstObjectByType` 교체 완료. `GetInstanceID`(M2BagPanel·StashPanel)는 `GetEntityId` 반환형이 달라 남김 | M8 |
 | TD-014 | HUD Canvas를 이름·컴포넌트로 명시 식별 | `ScreenSpaceCanvasProvider`가 첫 Canvas를 재사용해 BUG-044처럼 별도 Canvas 추가가 전체 UI 입력을 끊을 수 있음 | High | 해결 (2026-11-15): GraphicRaycaster가 있는 루트 Overlay Canvas만 재사용 | M8 |
+| TD-015 | `BaseCampGridPanel` 역할별 partial 분리 | M9 임시 보관함·판매 바구니 UI가 추가되어 500줄을 넘어 빌드·선택·거래 입력 책임이 한 파일에 모임 | Medium | Open | M9.1 |
+| TD-016 | `M5SaveService` v6 직렬화·마이그레이션 분리 | 재귀 아이템 직렬화와 v2~v6 마이그레이션이 500줄 단일 파일에 있어 다음 세이브 버전 변경 위험이 증가함 | Medium | Open | M9.1 |
 
 ## 관리 규칙
 

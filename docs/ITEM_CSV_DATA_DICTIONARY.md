@@ -1,6 +1,6 @@
 # 아이템 CSV 데이터 사전
 
-> 원본: `Assets/Resources/Data/items.csv`. M6부터 출격 가방 격자 크기의 권위 데이터도 이 파일에 둔다. M7 경제 수치는 `Assets/Resources/Data/m7_economy.csv`, M8 퀘스트·우호도 수치는 `m8_quests.csv`와 `m8_economy.csv`에서 관리한다.
+> 원본: `Assets/Resources/Data/items.csv`. M6부터 출격 가방 격자 크기의 권위 데이터도 이 파일에 둔다. M7 경제 수치는 `Assets/Resources/Data/m7_economy.csv`, M8 퀘스트·우호도 수치는 `m8_quests.csv`와 `m8_economy.csv`, M9 Stash 크기는 `m9_stash.csv`에서 관리한다.
 
 ## 컬럼
 
@@ -43,8 +43,9 @@
 | Armor 방어 보너스 | 7 | 8 | 9 | 10 |
 
 - 기본 지급 장비는 CSV 드롭 장비와 별도로 기본 검 +20, 기본 방패 +6, 기본 갑옷 +6이다.
-- M6 아이템 크기는 무기 1×3, 방패 2×2, 갑옷 2×3, 가방 아이템 2×2다.
+- 아이템 크기는 무기 1×3, 방패 2×2, 갑옷 2×3이다. 가방은 외부 크기와 내부 수납 크기를 동일하게 사용한다(Normal 4×2, Rare 3×3, Epic 5×3, Unique 4×5).
 - 출격 가방 격자는 기본 3×2, Normal 4×2, Rare 3×3, Epic 5×3, Unique 4×5다.
+- 하위 가방은 부모 격자에서 내부 수납량과 같은 면적을 차지하므로 순수 용량 이득이 없고 분류·정리 용도로만 사용한다.
 - `capacity_bonus`의 +2/+3/+4/+6은 v2 데이터 해석을 위해 남기며 M6 격자 배치에는 영향을 주지 않는다.
 - `basic_weapon`, `basic_shield`, `basic_armor`는 크기를 코드에 하드코딩하지 않기 위한 드롭 가중치 0의 기본 지급 데이터다.
 - 가방 `drop_weight=50`은 같은 등급 내 약 14% 드롭을 노린 초안으로, 통합 Play 후 확정한다.
@@ -84,6 +85,23 @@
 
 - Lv2/Lv3 필요 우호도와 Gold, 레벨당 판매 보너스·구매 할인·보험 반환 보너스를 관리한다.
 - 런타임 가격과 보험 판정은 UI가 아니라 `LootRuntimeState`에서 이 설정을 적용한다.
+
+## M9 Stash CSV
+
+원본: `Assets/Resources/Data/m9_stash.csv`
+
+| 키 | 의미 | 현재값 |
+|---|---|---:|
+| `base_width` | Stash 기본 가로 | 10 |
+| `base_height` | Stash 기본 세로 | 20 |
+| `rows_after_q03` | q03 완료 확장 행 | 2 |
+| `rows_after_q06` | q06a 또는 q06b 완료 확장 행 | 2 |
+| `sale_basket_width` | 판매 바구니 가로 | 5 |
+| `sale_basket_height` | 판매 바구니 세로 | 20 |
+
+- 기본 크기는 10×20, 최대 크기는 10×24이며 Gold 확장은 없다.
+- Stash와 판매 바구니는 각자 세로 스크롤한다. 판매 바구니는 좁은 UI 폭에 맞춰 5칸 폭을 사용한다.
+- 확장 여부는 세이브에 중복 저장하지 않고 완료 퀘스트에서 계산한다.
 
 ## 알려진 제한
 

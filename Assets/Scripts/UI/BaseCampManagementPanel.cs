@@ -6,6 +6,12 @@ using UnityEngine;
 // BaseCamp 전용 영지 정비 UI. 데이터 변경은 LootRuntimeState가 소유한다.
 public sealed class BaseCampManagementPanel : MonoBehaviour
 {
+    public static int StashFilterVersion { get; private set; }
+    public static string CurrentTypeFilterLabel => activeInstance?.TypeFilterLabel() ?? "전체";
+    public static string CurrentRarityFilterLabel => activeInstance?.rarityFilter?.ToString() ?? "전체";
+    public static string CurrentRaidFilterLabel => activeInstance?.RaidFilterLabel() ?? "전체";
+    public static bool IsSellMode => activeInstance != null && activeInstance.merchantMode == MerchantMode.Sell;
+    private static BaseCampManagementPanel activeInstance;
     private enum SortMode { Acquired, RarityHigh, RarityLow, Type }
     private enum MerchantMode { Sell, Buy, Quest }
     private enum FoundInRaidFilter { All, FoundOnly, NotFound }
@@ -19,36 +25,71 @@ public sealed class BaseCampManagementPanel : MonoBehaviour
     private string notice;
     private string pendingUniqueSale;
     private bool pendingLevelUp;
+    private bool pendingInsuredBasketSale;
     private GUIStyle foundInRaidStarStyle;
     private GUIStyle itemRichTextStyle;
 
+    private void OnEnable() => activeInstance = this;
+    private void OnDisable()
+    {
+        LootRuntimeState.CancelSaleBasket();
+        if (activeInstance == this) activeInstance = null;
+    }
+
+    private void OnApplicationQuit() => LootRuntimeState.CancelSaleBasket();
+
     private void OnGUI()
     {
-        float sideWidth = Mathf.Clamp(Screen.width * 0.24f, 360f, 480f);
-        DrawMerchantPanel(new Rect(20, 20, sideWidth, Screen.height - 40));
-        float gridReserve = Mathf.Clamp(Screen.width * 0.25f, 300f, 420f);
-        DrawStashPanel(new Rect(Screen.width - sideWidth - gridReserve - 40, 20, sideWidth, Screen.height - 40));
+        BaseCampLayoutRects layout = BaseCampLayout.Calculate();
+        DrawMerchantPanel(layout.Merchant);
+        DrawInsuranceArea(layout.Insurance);
+    }
+
+    private void DrawInsuranceArea(Rect area)
+    {
+        GUILayout.BeginArea(area, GUI.skin.box);
+        DrawInsurancePanel();
+        if (!string.IsNullOrEmpty(notice)) GUILayout.Label(notice);
+        GUILayout.EndArea();
     }
 
     private void DrawMerchantPanel(Rect area)
     {
         GUILayout.BeginArea(area, GUI.skin.box);
         GUILayout.Label($"상인   Gold {LootRuntimeState.Gold}");
+        MerchantMode previousMode = merchantMode;
         GUILayout.BeginHorizontal();
         if (GUILayout.Toggle(merchantMode == MerchantMode.Sell, "판매", GUI.skin.button)) merchantMode = MerchantMode.Sell;
         if (GUILayout.Toggle(merchantMode == MerchantMode.Buy, "구매", GUI.skin.button)) merchantMode = MerchantMode.Buy;
         if (GUILayout.Toggle(merchantMode == MerchantMode.Quest, "퀘스트", GUI.skin.button)) merchantMode = MerchantMode.Quest;
         GUILayout.EndHorizontal();
+        if (previousMode == MerchantMode.Sell && merchantMode != MerchantMode.Sell)
+        {
+            LootRuntimeState.CancelSaleBasket();
+            pendingInsuredBasketSale = false;
+        }
 
         merchantScroll = GUILayout.BeginScrollView(merchantScroll);
         if (merchantMode == MerchantMode.Sell)
         {
             DrawFoundInRaidLegend();
-            GUILayout.Label("Stash");
-            foreach (var item in LootRuntimeState.Stash.ToArray()) DrawSaleItem(item, "Stash");
-            GUILayout.Space(6);
-            GUILayout.Label("출격 가방");
-            foreach (var item in LootRuntimeState.RunBag.ToArray()) DrawSaleItem(item, "가방");
+            GUILayout.Label("Stash 또는 임시 보관함에서 아이템을 판매 바구니로 옮기세요.");
+            GUILayout.Label($"판매 바구니 {LootRuntimeState.SaleBasket.Count}개 · 합계 {LootRuntimeState.SaleBasketTotal}G");
+            foreach (LootItemInstance item in LootRuntimeState.SaleBasket)
+                GUILayout.Label($"- {(LootRuntimeState.IsInsured(item.InstanceId) ? "[보험] " : "")}{item.Definition.Name}");
+            if (LootRuntimeState.SaleBasketHasInsuredItems)
+                GUILayout.Label("경고: 보험 아이템이 포함되어 있습니다. 판매하면 보험이 종료됩니다.");
+            GUILayout.BeginHorizontal();
+            GUI.enabled = LootRuntimeState.SaleBasket.Count > 0;
+            if (GUILayout.Button(pendingInsuredBasketSale ? "보험 포함 판매 재확인" : "판매 확정")) ConfirmSaleBasket();
+            if (GUILayout.Button("전부 되돌리기"))
+            {
+                LootRuntimeState.CancelSaleBasket();
+                pendingInsuredBasketSale = false;
+                notice = "판매 바구니를 원래 위치로 되돌렸습니다.";
+            }
+            GUI.enabled = true;
+            GUILayout.EndHorizontal();
         }
         else if (merchantMode == MerchantMode.Buy)
         {
@@ -62,6 +103,20 @@ public sealed class BaseCampManagementPanel : MonoBehaviour
         GUILayout.EndArea();
     }
 
+    private void ConfirmSaleBasket()
+    {
+        if (LootRuntimeState.SaleBasketHasInsuredItems && !pendingInsuredBasketSale)
+        {
+            pendingInsuredBasketSale = true;
+            notice = "보험 아이템이 포함되어 있습니다. 판매 확정을 다시 누르세요.";
+            return;
+        }
+        int total = LootRuntimeState.SaleBasketTotal;
+        bool sold = LootRuntimeState.ConfirmSaleBasket();
+        notice = sold ? $"판매 완료 · {total}G" : LootRuntimeState.LastFailureReason;
+        pendingInsuredBasketSale = false;
+    }
+
     private void DrawStashPanel(Rect area)
     {
         GUILayout.BeginArea(area, GUI.skin.box);
@@ -70,12 +125,15 @@ public sealed class BaseCampManagementPanel : MonoBehaviour
 
         GUILayout.Space(6);
         GUILayout.BeginHorizontal();
-        if (GUILayout.Button($"정렬: {sortMode}")) sortMode = (SortMode)(((int)sortMode + 1) % 4);
-        if (GUILayout.Button($"부위: {(typeFilter?.ToString() ?? "전체")}")) CycleType();
-        if (GUILayout.Button($"등급: {(rarityFilter?.ToString() ?? "전체")}")) CycleRarity();
+        if (GUILayout.Button($"정렬: {sortMode}")) { sortMode = (SortMode)(((int)sortMode + 1) % 4); StashFilterVersion++; }
+        if (GUILayout.Button($"부위: {(typeFilter?.ToString() ?? "전체")}")) { CycleType(); StashFilterVersion++; }
+        if (GUILayout.Button($"등급: {(rarityFilter?.ToString() ?? "전체")}")) { CycleRarity(); StashFilterVersion++; }
         GUILayout.EndHorizontal();
         if (GUILayout.Button(FoundInRaidFilterLabel()))
+        {
             foundInRaidFilter = (FoundInRaidFilter)(((int)foundInRaidFilter + 1) % 3);
+            StashFilterVersion++;
+        }
 
         DrawFoundInRaidLegend();
         GUILayout.Label("Stash");
@@ -175,7 +233,11 @@ public sealed class BaseCampManagementPanel : MonoBehaviour
         if (GUILayout.Button($"{LootRuntimeState.GetSellPrice(item.Definition)}G", GUILayout.Width(70)))
         {
             if (item.Definition.Rarity >= LootRarity.Unique) pendingUniqueSale = item.InstanceId;
-            else if (LootRuntimeState.TrySell(item.InstanceId)) notice = $"{item.Definition.Name} 판매 완료";
+            else
+            {
+                bool sold = LootRuntimeState.TrySell(item.InstanceId);
+                notice = sold ? $"{item.Definition.Name} 판매 완료" : LootRuntimeState.LastFailureReason;
+            }
         }
         GUILayout.EndHorizontal();
     }
@@ -277,7 +339,8 @@ public sealed class BaseCampManagementPanel : MonoBehaviour
         GUILayout.BeginHorizontal();
         if (GUILayout.Button("판매 확정"))
         {
-            LootRuntimeState.TrySell(pendingUniqueSale);
+            bool sold = LootRuntimeState.TrySell(pendingUniqueSale);
+            notice = sold ? "Unique 장비 판매 완료" : LootRuntimeState.LastFailureReason;
             pendingUniqueSale = null;
         }
         if (GUILayout.Button("취소")) pendingUniqueSale = null;
@@ -297,6 +360,70 @@ public sealed class BaseCampManagementPanel : MonoBehaviour
             case SortMode.RarityLow: return items.OrderBy(x => x.Definition.Rarity).ThenBy(x => x.Definition.Name).ToArray();
             case SortMode.Type: return items.OrderBy(x => x.Definition.Type).ThenByDescending(x => x.Definition.Rarity).ToArray();
             default: return items.ToArray();
+        }
+    }
+
+    public static bool ShouldDimStashItem(LootItemInstance item)
+    {
+        BaseCampManagementPanel panel = activeInstance;
+        if (panel == null || item?.Definition == null) return false;
+        if (panel.typeFilter.HasValue && item.Definition.Type != panel.typeFilter.Value) return true;
+        if (panel.rarityFilter.HasValue && item.Definition.Rarity != panel.rarityFilter.Value) return true;
+        if (panel.foundInRaidFilter == FoundInRaidFilter.FoundOnly && !item.IsFoundInRaid) return true;
+        return panel.foundInRaidFilter == FoundInRaidFilter.NotFound && item.IsFoundInRaid;
+    }
+
+    public static void CycleTypeFilterFromGrid()
+    {
+        if (activeInstance == null) return;
+        activeInstance.CycleType();
+        StashFilterVersion++;
+    }
+
+    public static void CycleRarityFilterFromGrid()
+    {
+        if (activeInstance == null) return;
+        activeInstance.CycleRarity();
+        StashFilterVersion++;
+    }
+
+    public static void CycleRaidFilterFromGrid()
+    {
+        if (activeInstance == null) return;
+        activeInstance.foundInRaidFilter = (FoundInRaidFilter)(((int)activeInstance.foundInRaidFilter + 1) % 3);
+        StashFilterVersion++;
+    }
+
+    public static void ResetFiltersFromGrid()
+    {
+        if (activeInstance == null) return;
+        activeInstance.typeFilter = null;
+        activeInstance.rarityFilter = null;
+        activeInstance.foundInRaidFilter = FoundInRaidFilter.All;
+        StashFilterVersion++;
+    }
+
+    private string TypeFilterLabel()
+    {
+        if (!typeFilter.HasValue) return "전체";
+        switch (typeFilter.Value)
+        {
+            case LootItemType.Weapon: return "무기";
+            case LootItemType.Shield: return "방패";
+            case LootItemType.Armor: return "갑옷";
+            case LootItemType.Bag: return "가방";
+            case LootItemType.Junk: return "잡동사니";
+            default: return typeFilter.Value.ToString();
+        }
+    }
+
+    private string RaidFilterLabel()
+    {
+        switch (foundInRaidFilter)
+        {
+            case FoundInRaidFilter.FoundOnly: return "★만";
+            case FoundInRaidFilter.NotFound: return "비인레이드";
+            default: return "전체";
         }
     }
 

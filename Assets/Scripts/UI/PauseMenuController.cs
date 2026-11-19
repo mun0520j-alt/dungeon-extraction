@@ -64,6 +64,16 @@ public sealed class PauseMenuController : MonoBehaviour
             Close();
             return;
         }
+        if (BaseCampGridPanel.CloseNewestBagWindowForEscape())
+        {
+            escapeConsumedFrame = Time.frameCount;
+            return;
+        }
+        if (DungeonBagWindows.CloseNewestForEscape())
+        {
+            escapeConsumedFrame = Time.frameCount;
+            return;
+        }
         if (LootingPanel.CloseLootOnly())
         {
             escapeConsumedFrame = Time.frameCount;
