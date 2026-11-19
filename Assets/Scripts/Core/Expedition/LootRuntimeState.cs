@@ -77,8 +77,22 @@ public static partial class LootRuntimeState
     {
         if (item == null) return Fail("공간 부족");
         if (ExpeditionSession.IsActive && RunNestedCountAfterTakingToRunBag(item) > M9StashConfig.RunNestedItemLimit)
-            return Fail("이 가방의 내용물이 많아 들 수 없습니다. " + RunNestedLimitReason);
+            return Fail(RunNestedLimitReason);
         if (!runBagGrid.TryAutoPlace(item, out _)) return Fail("공간 부족");
+        runBag.Add(item);
+        droppedInsuredThisRun.Remove(item.InstanceId);
+        LastFailureReason = null;
+        Changed?.Invoke();
+        return true;
+    }
+
+    // 드래그로 출격 가방의 지정 칸에 넣는다 (던전 루팅 창 → 출격 가방, 결정 43).
+    public static bool TryAddToRunBagAt(LootItemInstance item, int x, int y, bool rotated)
+    {
+        if (item == null) return Fail("공간 부족");
+        if (ExpeditionSession.IsActive && RunNestedCountAfterTakingToRunBag(item) > M9StashConfig.RunNestedItemLimit)
+            return Fail(RunNestedLimitReason);
+        if (!runBagGrid.TryPlace(item, x, y, rotated)) return Fail("그 자리에 놓을 수 없습니다.");
         runBag.Add(item);
         droppedInsuredThisRun.Remove(item.InstanceId);
         LastFailureReason = null;

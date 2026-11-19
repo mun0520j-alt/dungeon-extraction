@@ -149,6 +149,7 @@ public class InventoryPanel : MonoBehaviour
     {
         if (activeInstance == null) return;
         activeInstance.lootTransferHandler = null;
+        activeInstance.bagGridView?.ClearExternalDropTargets();
         activeInstance.bagGridView?.SetItemClickHandler(activeInstance.SelectBagItem);
         activeInstance.bagGridView?.SetItemDoubleClickHandler(activeInstance.HandleDungeonItemDoubleClick);
         activeInstance.bagGridView?.SetItemOpenHandler(activeInstance.OpenRunNestedBag);
@@ -374,6 +375,7 @@ public class InventoryPanel : MonoBehaviour
         bagGridView.SetItemDoubleClickHandler(HandleDungeonItemDoubleClick);
         bagGridView.SetItemOpenHandler(OpenRunNestedBag);
         bagGridView.SetItemQuickMoveHandler(QuickMoveToLoot);
+        bagGridView.SetBagDropHandler(CanDropOnRunBagIcon, DropOnRunBagIcon);
         if (dimensionsChanged) ReflowPanelForBagGrid();
     }
 
@@ -468,6 +470,39 @@ public class InventoryPanel : MonoBehaviour
     {
         if (item?.Definition?.Type != LootItemType.Bag || item.BagGrid == null || PlayerTurnActor.Instance == null) return;
         LootingPanel.Open(new NestedBagContainer(item), PlayerTurnActor.Instance);
+    }
+
+    // 결정 43: 루팅 창 격자와 출격 가방 격자 사이 드래그를 연결한다.
+    public static void LinkLootGrid(LootGridView lootGrid,
+        System.Func<LootItemInstance, int, int, bool, bool> takeAt,
+        System.Func<LootItemInstance, int, int, bool, bool> putAt)
+    {
+        if (activeInstance?.bagGridView == null || lootGrid == null) return;
+        LootGridView bag = activeInstance.bagGridView;
+        bag.ClearExternalDropTargets();
+        lootGrid.ClearExternalDropTargets();
+        lootGrid.AddExternalDropTarget(bag, takeAt);
+        bag.AddExternalDropTarget(lootGrid, putAt);
+    }
+
+    // 결정 43: 출격 가방 안 가방 아이콘에 아이템을 놓으면 빈칸에 자동 배치 (영지 결정 37과 같은 방식).
+    private bool CanDropOnRunBagIcon(LootItemInstance item, LootItemInstance bag)
+    {
+        if (!ExpeditionSession.IsActive) return false;
+        return LootingPanel.ContainerHas(item)
+            ? LootingPanel.CanTakeIntoRunBagIcon(item, bag)
+            : LootRuntimeState.CanMoveRunItemIntoBag(item, bag, out _);
+    }
+
+    private bool DropOnRunBagIcon(LootItemInstance item, LootItemInstance bag)
+    {
+        if (!ExpeditionSession.IsActive) return false;
+        if (LootingPanel.ContainerHas(item)) return LootingPanel.TakeIntoRunBagIcon(item, bag);
+        var player = PlayerTurnActor.Instance;
+        if (player == null) return false;
+        bool spent = player.TryPerformTimedAction(TickCost.Drop, "MoveIntoBag", () => LootRuntimeState.MoveRunItemIntoBag(item, bag));
+        SetBagNotice(spent ? $"{bag.Definition?.Name}에 넣었습니다." : LootRuntimeState.LastFailureReason);
+        return spent;
     }
 
     private void QuickMoveToLoot(LootItemInstance item)

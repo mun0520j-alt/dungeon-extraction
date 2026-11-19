@@ -47,9 +47,11 @@ public sealed class LootingPanel : MonoBehaviour
         instance.gridView.SetItemDoubleClickHandler(instance.ActivateItem);
         instance.gridView.SetItemOpenHandler(instance.OpenBagInContainer);
         instance.gridView.SetItemQuickMoveHandler(instance.TakeItem);
+        instance.gridView.SetBagDropHandler(instance.CanDropOnContainerBagIcon, instance.DropOnContainerBagIcon);
         instance.SelectItem(null);
         instance.panelRoot.SetActive(true);
         InventoryPanel.OpenForLoot(instance.PutItem);
+        InventoryPanel.LinkLootGrid(instance.gridView, instance.TakeItemAt, instance.PutItemAt);
     }
 
     public static bool CloseLootOnly() => CloseLootOnly(returnToParent: true);
@@ -72,6 +74,108 @@ public sealed class LootingPanel : MonoBehaviour
         InventoryPanel.ClearLootTransferHandler();
         InventoryPanel.CloseForEscape();
         return true;
+    }
+
+    // ── 결정 43: 던전 드래그 (루팅 창 ↔ 출격 가방 칸, 가방 아이콘 자동 배치) ──
+
+    public static bool ContainerHas(LootItemInstance item)
+        => item != null && IsOpen && instance.container?.Grid?.Find(item.InstanceId) != null;
+
+    // 루팅 창 아이템을 출격 가방 안 가방 아이콘에 놓았을 때
+    public static bool CanTakeIntoRunBagIcon(LootItemInstance item, LootItemInstance bag)
+    {
+        if (!ContainerHas(item) || bag == null) return false;
+        if (instance.container is NestedBagContainer nested && nested.Bag?.InstanceId == bag.InstanceId) return false;
+        return LootRuntimeState.CanAddToRunNestedBag(bag, item, out _) && LootRuntimeState.BagHasFreeSpace(bag, item);
+    }
+
+    public static bool TakeIntoRunBagIcon(LootItemInstance item, LootItemInstance bag)
+    {
+        if (!ContainerHas(item)) return false;
+        return instance.TakeIntoBag(item, bag);
+    }
+
+    private bool TakeIntoBag(LootItemInstance item, LootItemInstance bag)
+    {
+        if (player == null || container == null) return false;
+        string failure = null;
+        bool spent = player.TryPerformTimedAction(TickCost.PickUp, "LootTakeIntoBag", () =>
+        {
+            if (!LootRuntimeState.CanAddToRunNestedBag(bag, item, out failure)) return false;
+            if (!LootRuntimeState.BagHasFreeSpace(bag, item)) { failure = $"{bag.Definition?.Name}에 빈 공간이 없습니다."; return false; }
+            if (!container.TryRemove(item.InstanceId, out _)) return false;
+            if (!bag.BagGrid.TryAutoPlace(item, out _))
+            {
+                container.Grid.TryAutoPlace(item, out _);
+                failure = $"{bag.Definition?.Name}에 빈 공간이 없습니다.";
+                return false;
+            }
+            LootRuntimeState.MarkKeptInRun(item.InstanceId);
+            M3MeasurementAutomation.RecordItemAcquired();
+            container.HandleContentsChanged();
+            LootRuntimeState.NotifyChanged();
+            return true;
+        });
+        if (spent) RefreshBoth();
+        SetNotice(spent ? $"{bag.Definition?.Name}에 넣었습니다." : failure ?? "가방에 넣을 수 없습니다.");
+        return spent;
+    }
+
+    private bool TakeItemAt(LootItemInstance item, int x, int y, bool rotated)
+    {
+        if (item == null || container == null || player == null) return false;
+        bool spent = player.TryPerformTimedAction(TickCost.PickUp, "LootTakeAt", () =>
+        {
+            if (!container.TryRemove(item.InstanceId, out _)) return false;
+            if (!LootRuntimeState.TryAddToRunBagAt(item, x, y, rotated))
+            {
+                container.Grid.TryAutoPlace(item, out _);
+                return false;
+            }
+            M3MeasurementAutomation.RecordItemAcquired();
+            container.HandleContentsChanged();
+            return true;
+        });
+        if (spent) RefreshBoth();
+        else SetNotice(LootRuntimeState.LastFailureReason ?? "그 자리에 놓을 수 없습니다.");
+        return spent;
+    }
+
+    private bool PutItemAt(LootItemInstance item, int x, int y, bool rotated)
+    {
+        if (item == null || container == null || player == null) return false;
+        string failure = null;
+        bool spent = player.TryPerformTimedAction(TickCost.Drop, "LootPutAt", () =>
+        {
+            var nested = container as NestedBagContainer;
+            if (nested != null && !LootRuntimeState.CanAddToRunNestedBag(nested.Bag, item, out failure)) return false;
+            if (!container.Grid.TryPlace(item, x, y, rotated)) { failure = "그 자리에 놓을 수 없습니다."; return false; }
+            if (LootRuntimeState.DropBagItem(item.InstanceId) == null)
+            {
+                container.Grid.Remove(item.InstanceId, out _);
+                return false;
+            }
+            if (nested != null) LootRuntimeState.MarkKeptInRun(item.InstanceId);
+            else M3MeasurementAutomation.RecordItemDroppedToContainer();
+            container.HandleContentsChanged();
+            return true;
+        });
+        if (spent) RefreshBoth();
+        else SetNotice(failure ?? "그 자리에 놓을 수 없습니다.");
+        return spent;
+    }
+
+    // 하위 가방 창 안의 가방 아이콘에 출격 가방·하위 가방 아이템을 놓을 때. 상자·바닥의 가방 아이콘은 대상 아님.
+    private bool CanDropOnContainerBagIcon(LootItemInstance item, LootItemInstance bag)
+        => container is NestedBagContainer && LootRuntimeState.CanMoveRunItemIntoBag(item, bag, out _);
+
+    private bool DropOnContainerBagIcon(LootItemInstance item, LootItemInstance bag)
+    {
+        if (!(container is NestedBagContainer) || player == null) return false;
+        bool spent = player.TryPerformTimedAction(TickCost.Drop, "MoveIntoBag", () => LootRuntimeState.MoveRunItemIntoBag(item, bag));
+        if (spent) RefreshBoth();
+        SetNotice(spent ? $"{bag.Definition?.Name}에 넣었습니다." : LootRuntimeState.LastFailureReason ?? "가방에 넣을 수 없습니다.");
+        return spent;
     }
 
     private void TakeItem(LootItemInstance item)
@@ -219,6 +323,7 @@ public sealed class LootingPanel : MonoBehaviour
         gridView.SetItemDoubleClickHandler(ActivateItem);
         SelectItem(null);
         InventoryPanel.OpenForLoot(PutItem);
+        InventoryPanel.LinkLootGrid(gridView, TakeItemAt, PutItemAt);
     }
 
     private void SetNotice(string message)
@@ -262,7 +367,13 @@ public sealed class LootingPanel : MonoBehaviour
         noticeRect.anchorMax = new Vector2(1f, 0f);
         noticeRect.pivot = new Vector2(0.5f, 0f);
         noticeRect.anchoredPosition = new Vector2(0f, 8f);
-        noticeRect.sizeDelta = new Vector2(0f, 28f);
+        noticeRect.sizeDelta = new Vector2(-12f, 34f);
+        // 긴 안내·실패 사유가 잘리지 않게 두 줄까지 줄여 맞춘다 (3-1V9 텍스트 잘림)
+        notice.horizontalOverflow = HorizontalWrapMode.Wrap;
+        notice.verticalOverflow = VerticalWrapMode.Truncate;
+        notice.resizeTextForBestFit = true;
+        notice.resizeTextMinSize = 9;
+        notice.resizeTextMaxSize = 13;
 
         var equipObject = new GameObject("EquipBag", typeof(RectTransform), typeof(Image), typeof(Button));
         equipObject.transform.SetParent(panelRoot.transform, false);

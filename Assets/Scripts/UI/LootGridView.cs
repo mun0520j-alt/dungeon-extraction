@@ -78,7 +78,7 @@ public sealed class LootGridView : MonoBehaviour
         Refresh();
     }
 
-    // 이 격자에 놓인 가방 아이콘 위로 다른 아이템을 놓으면 그 가방에 자동으로 넣는다(영지 전용). check는 미리보기 색, handler는 실제 이동.
+    // 이 격자에 놓인 가방 아이콘 위로 다른 아이템을 놓으면 그 가방에 자동으로 넣는다(영지 결정 37, 던전 결정 43). check는 미리보기 색, handler는 실제 이동.
     public void SetBagDropHandler(Func<LootItemInstance, LootItemInstance, bool> check, Func<LootItemInstance, LootItemInstance, bool> handler)
     {
         bagDropCheck = check;
