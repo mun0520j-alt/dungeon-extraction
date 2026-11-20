@@ -64,7 +64,7 @@ goblin, tiny_zombie, zombie, ice_zombie, big_zombie, skelet, slug, tiny_slug, mu
 ### 결정 17·18 (2026-11-20, Codex 구현 검토 후)
 
 - **17 엘리트 표시**: 특별할 필요 없이 "아 쟤구나" 정도. 크기 배율(`m10_enemies.csv` visual_scale 1.15~1.2) + 옅은 붉은 색조(`m10_dungeon.csv` elite_tint_r/g/b, %). 패턴은 여전히 일반과 동일
-- **18 5층 등급**: 5층(보스 층)부터 레전더리가 나오므로 다른 등급도 살짝 조정 — 임시값 Normal 50 / Rare 34 / Epic 13 / Unique 2 / Legendary 1 (기존 3층+ 표: 59/30/10/0/1). Play 후 조정
+- **18 레전더리는 6층부터**: 5층 이하는 레전더리 드롭 없음(5층 최고 등급 Unique). 6층부터 레전더리가 나오면서 다른 등급도 살짝 조정 — 5층 임시값 Normal 49 / Rare 35 / Epic 14 / Unique 2 / Legendary 0, 6~10층은 `m10_loot_rarity.csv` 단계별 임시값. Play 후 조정
 - 5층 미믹 처치 후 **생환 또는 6층 하강 선택** 유지 (Codex 구현, 사용자 확인)
 
 ## 2. 결정 3(1Tick = 30초)의 영향 — 구현 전 확인 필요
