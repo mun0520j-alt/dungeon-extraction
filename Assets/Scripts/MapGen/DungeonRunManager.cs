@@ -395,6 +395,10 @@ public class DungeonRunManager : MonoBehaviour
         var roomIds = new List<int>(candidatesByRoom.Keys);
         Shuffle(roomIds, rng);
 
+        M10FloorSpawnDefinition spawnDefinition = M10EnemyDatabase.Floor(floorIndex + 1);
+        int normalTarget = spawnDefinition != null ? spawnDefinition.NormalCount : enemiesPerFloor;
+        int eliteTarget = spawnDefinition != null ? rng.Next(spawnDefinition.EliteMin, spawnDefinition.EliteMax + 1) : 0;
+        int targetCount = normalTarget + eliteTarget;
         var occupied = new List<Vector3Int> { playerCell };
         int spawned = 0;
         foreach (int roomId in roomIds)
@@ -407,14 +411,17 @@ public class DungeonRunManager : MonoBehaviour
                 bool tooClose = occupied.Exists(other => Mathf.Abs(other.x - cell.x) + Mathf.Abs(other.y - cell.y) < 3);
                 if (tooClose) continue;
 
-                CreateRuntimeEnemy(floorIndex, spawned, cell, floorTilemap, wallTilemap);
+                bool elite = spawned >= normalTarget;
+                string[] ids = elite ? spawnDefinition?.EliteIds : spawnDefinition?.NormalIds;
+                string id = ids != null && ids.Length > 0 ? ids[rng.Next(ids.Length)] : null;
+                CreateRuntimeEnemy(floorIndex, spawned, cell, floorTilemap, wallTilemap, M10EnemyDatabase.Find(id));
                 occupied.Add(cell);
                 spawned++;
                 placed = true;
                 break;
             }
             if (!placed) continue;
-            if (spawned >= enemiesPerFloor) break;
+            if (spawned >= targetCount) break;
         }
 
         Debug.Log($"[DungeonRunManager] {floorIndex + 1}층 Enemy {spawned}개 배치 및 TickManager 등록 완료.");
@@ -425,15 +432,12 @@ public class DungeonRunManager : MonoBehaviour
         var floorTilemap = floorTileTilemaps[floorIndex];
         var wallTilemap = floorWallTilemaps[floorIndex];
         var bossCell = new Vector3Int(bossArenaSize / 2, bossArenaSize - 4, 0);
-        GameObject boss = CreateRuntimeEnemy(floorIndex, 0, bossCell, floorTilemap, wallTilemap);
         int floor = floorIndex + 1;
+        M10EnemyDefinition bossDefinition = M10EnemyDatabase.Boss(floor);
+        GameObject boss = CreateRuntimeEnemy(floorIndex, 0, bossCell, floorTilemap, wallTilemap, bossDefinition);
         boss.name = $"Boss_F{floor}";
-        boss.transform.localScale = floor == M10DungeonConfig.FirstBossFloor
-            ? new Vector3(0.9f, 0.9f, 1f) : new Vector3(1.35f, 1.35f, 1f);
-        var renderer = boss.GetComponent<SpriteRenderer>();
-        if (renderer != null) renderer.color = new Color(0.75f, 0.15f, 0.2f, 1f);
         var bossActor = boss.GetComponent<EnemyTurnActor>();
-        bossActor.ConfigureCombatStats(bossMaxHP, bossAttackPower, bossDefensePower);
+        if (bossDefinition == null) bossActor.ConfigureCombatStats(bossMaxHP, bossAttackPower, bossDefensePower);
         bossActor.ConfigureBoss(floorSeeds[floorIndex] ^ 0x4D345F42);
         Debug.Log($"[DungeonRunManager] {floor}층 단일 보스 아레나 생성 — 일반 Enemy 0, 일반 상자 0.");
     }
@@ -449,7 +453,7 @@ public class DungeonRunManager : MonoBehaviour
         }
     }
 
-    private GameObject CreateRuntimeEnemy(int floorIndex, int enemyIndex, Vector3Int cell, Tilemap floorTilemap, Tilemap wallTilemap)
+    private GameObject CreateRuntimeEnemy(int floorIndex, int enemyIndex, Vector3Int cell, Tilemap floorTilemap, Tilemap wallTilemap, M10EnemyDefinition definition = null)
     {
         var enemy = new GameObject($"Enemy_F{floorIndex + 1}_{enemyIndex + 1}");
         enemy.SetActive(false);
@@ -458,7 +462,10 @@ public class DungeonRunManager : MonoBehaviour
         var visual = new GameObject("Visual");
         visual.transform.SetParent(enemy.transform, false);
         var renderer = visual.AddComponent<SpriteRenderer>();
-        renderer.sprite = enemySprite != null ? enemySprite : ProceduralSprite.GetWhiteSpriteCenterPivot();
+        var catalog = Resources.Load<M10EnemyVisualCatalog>("Data/M10EnemyVisualCatalog");
+        M10EnemyVisualCatalog.Entry visualEntry = catalog != null ? catalog.Find(definition?.SpriteKey) : null;
+        renderer.sprite = visualEntry?.idleFrames != null && visualEntry.idleFrames.Length > 0
+            ? visualEntry.idleFrames[0] : (enemySprite != null ? enemySprite : ProceduralSprite.GetWhiteSpriteCenterPivot());
         renderer.color = enemySprite != null ? Color.white : new Color(0.35f, 0.85f, 0.3f, 1f);
         renderer.sortingOrder = 2;
         if (renderer.sprite != null)
@@ -467,8 +474,11 @@ public class DungeonRunManager : MonoBehaviour
             float scaleX = spriteSize.x > 0f ? floorTilemap.cellSize.x * 0.9f / spriteSize.x : 1f;
             float scaleY = spriteSize.y > 0f ? floorTilemap.cellSize.y * 0.9f / spriteSize.y : 1f;
             float visualScale = Mathf.Min(scaleX, scaleY);
+            visualScale *= definition?.VisualScale ?? 1f;
             visual.transform.localScale = new Vector3(visualScale, visualScale, 1f);
         }
+        if (visualEntry?.idleFrames != null && visualEntry.idleFrames.Length > 1)
+            visual.AddComponent<M10SpriteAnimation>().Configure(renderer, visualEntry.idleFrames);
         if (enemyAnimatorController != null)
         {
             var animator = visual.AddComponent<Animator>();
@@ -481,8 +491,8 @@ public class DungeonRunManager : MonoBehaviour
         enemy.transform.position = floorTilemap.GetCellCenterWorld(cell);
 
         var actor = enemy.AddComponent<EnemyTurnActor>();
-        actor.ConfigureCombatStats(enemyMaxHP, enemyAttackPower, enemyDefensePower);
-        actor.ConfigureRuntime(wallTilemap, floorTilemap, EnemyBehaviorType.Wander, enemyMoveDuration, enemyHopHeight);
+        actor.ConfigureCombatStats(definition?.HP ?? enemyMaxHP, definition?.Attack ?? enemyAttackPower, definition?.Defense ?? enemyDefensePower);
+        actor.ConfigureRuntime(wallTilemap, floorTilemap, definition?.Behavior ?? EnemyBehaviorType.Wander, enemyMoveDuration, enemyHopHeight);
         enemy.SetActive(true);
         return enemy;
     }
