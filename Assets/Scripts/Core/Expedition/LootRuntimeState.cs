@@ -570,7 +570,7 @@ public static partial class LootRuntimeState
     public static bool IsMerchantPurchaseItem(LootItemData definition)
     {
         if (definition == null || definition.Id.StartsWith("basic_", StringComparison.Ordinal)) return false;
-        if (definition.Id == "escape_scroll") return true;
+        if (definition.Id == "escape_scroll") return false;
         if (definition.Type == LootItemType.Bag)
             return definition.Rarity == LootRarity.Normal || definition.Rarity == LootRarity.Rare;
         return definition.Rarity == LootRarity.Normal
@@ -593,6 +593,8 @@ public static partial class LootRuntimeState
     {
         AdvanceInsuranceTicks(ExpeditionSession.ElapsedTicks);
         ResolveCurrentInsurance(result, ExpeditionSession.CurrentFloor);
+        PurgeExpeditionScrolls(runBagGrid);
+        runBag.RemoveAll(item => item?.Definition?.Id == "escape_scroll");
         if (result == ExpeditionResult.Escaped) return;
         runBag.Clear();
         runBagGrid = new LootGridModel(BaseBagGridWidth, BaseBagGridHeight);
@@ -601,6 +603,17 @@ public static partial class LootRuntimeState
         EquippedBagCapacityBonus = 0;
         HasBasicLoadout = false;
         Changed?.Invoke();
+    }
+
+    private static void PurgeExpeditionScrolls(LootGridModel grid)
+    {
+        if (grid == null) return;
+        foreach (LootGridPlacement placement in grid.Placements.ToArray())
+        {
+            LootItemInstance item = placement.Item;
+            if (item?.Definition?.Type == LootItemType.Bag) PurgeExpeditionScrolls(item.BagGrid);
+            if (item?.Definition?.Id == "escape_scroll") grid.Remove(item.InstanceId, out _);
+        }
     }
 
     // 보험은 원정이 아니라 장비 인스턴스에 건다 (사용자 결정 2026-11-12).

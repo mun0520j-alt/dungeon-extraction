@@ -494,6 +494,7 @@ public class DungeonRunManager : MonoBehaviour
         var actor = enemy.AddComponent<EnemyTurnActor>();
         actor.ConfigureCombatStats(definition?.HP ?? enemyMaxHP, definition?.Attack ?? enemyAttackPower, definition?.Defense ?? enemyDefensePower);
         actor.ConfigureRuntime(wallTilemap, floorTilemap, definition?.Behavior ?? EnemyBehaviorType.Wander, enemyMoveDuration, enemyHopHeight);
+        actor.ConfigureM10Identity(definition?.IsElite ?? false, definition?.ScrollDropChance ?? 0f);
         enemy.SetActive(true);
         return enemy;
     }

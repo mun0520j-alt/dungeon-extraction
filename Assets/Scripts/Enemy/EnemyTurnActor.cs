@@ -75,6 +75,8 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
     private bool bossAoePending;
     private Vector3Int bossAoeCell;
     private int bossLootSeed;
+    private bool isElite;
+    private float eliteScrollDropChance;
     [SerializeField, Min(1)] private int bossAoeFinalDamage = 35;
     private GameObject bossTelegraph;
 
@@ -88,6 +90,12 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
         transform.position = GetCellCenterWorldPosition(cell);
     }
 #endif
+
+    public void ConfigureM10Identity(bool elite, float scrollDropChance)
+    {
+        isElite = elite;
+        eliteScrollDropChance = Mathf.Clamp01(scrollDropChance);
+    }
 
     // behaviorType(Idle/Wander)은 "Player를 못 봤을 때의 평소 기본 행동"이고, 추적은 그 위에
     // 얹히는 임시 상태다(2026-08-28 결정, "감지 -> 추적 -> 놓치면 마지막 위치 -> 배회 복귀"
@@ -624,6 +632,7 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
                 ExpeditionRunRecord.RecordBossDefeated();
                 DropBossLoot();
             }
+            else if (isElite) DropEliteScroll();
             M3MeasurementAutomation.RecordEnemyKill();
             if (TickManager.Instance != null)
             {
@@ -631,6 +640,18 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
             }
             Destroy(gameObject);
         }
+    }
+
+    private void DropEliteScroll()
+    {
+        int seed = currentCell.x * 73856093 ^ currentCell.y * 19349663 ^ ExpeditionSession.CurrentFloor * 83492791;
+        var rng = new System.Random(seed);
+        if (rng.NextDouble() >= eliteScrollDropChance) return;
+        LootItemData definition = LootItemDatabase.FindById("escape_scroll");
+        if (definition == null) return;
+        GroundLootPile.Create(floorTilemap, currentCell,
+            new System.Collections.Generic.List<LootItemInstance> { new LootItemInstance(definition, foundInRaid: true) }, "엘리트 전리품");
+        Debug.Log("[M10] Elite가 원정 한정 탈출 스크롤을 드롭했습니다.");
     }
 
     private void DropBossLoot()
