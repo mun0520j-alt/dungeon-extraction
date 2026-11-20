@@ -268,7 +268,7 @@ public sealed class M3QaAutomationWindow : EditorWindow
     {
         var checks = new List<string>();
         Check(checks, TickCost.PerTileMove == 1f, "이동 1Tick");
-        Check(checks, TickCost.Attack == 5f, "공격 5Tick");
+        Check(checks, TickCost.Attack == 10f, "공격 10Tick");
         Check(checks, TickCost.PickUp == 1f, "줍기 1Tick");
         Check(checks, TickCost.Drop == 1f, "버리기 1Tick");
         Check(checks, TickCost.SwapWeaponInCombat == 2f, "장비 교체 2Tick");

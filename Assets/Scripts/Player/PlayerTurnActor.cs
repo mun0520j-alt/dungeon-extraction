@@ -392,7 +392,7 @@ public class PlayerTurnActor : MonoBehaviour, ITurnActor
     private void SpendWaitTick()
     {
         consecutiveWaitTicks++;
-        bool shouldHeal = consecutiveWaitTicks >= 5;
+        bool shouldHeal = consecutiveWaitTicks >= 10;
         if (shouldHeal) consecutiveWaitTicks = 0;
         pendingRestHeal = shouldHeal;
         isMyTurn = false;

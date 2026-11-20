@@ -14,11 +14,12 @@
 // ("실제 공격 tick은 통일해서 밸런스 붕괴 방지").
 public static class TickCost
 {
-    public const float PerTileMove = 1f;     // 1타일 = 1tick(=1분) (기본값, 액터별 배율은 여기 곱해서 사용)
-    public const float Attack = 5f;          // =5분(구 1tick과 동일 시간). 속도 배율 영향 없음 — 항상 고정
-    public const float SwapWeaponInCombat = 2f; // 장비 한 부위 교체. 재선택·실패는 비용 없음
-    public const float UseItem = 5f;         // 포션/스크롤, =5분
-    public const float Interact = 5f;        // 상자/문 개방 등, =5분
-    public const float PickUp = 1f;          // 바닥 아이템 획득 성공
-    public const float Drop = 1f;            // 가방 아이템 버리기 성공
+    public const float PerTileMove = 1f;     // 1타일 = 1tick(=30초)
+    public const float Attack = 10f;         // 5분. 속도 배율 영향 없음
+    public const float SwapWeaponInCombat = 4f; // 장비 한 부위 교체. 재선택·실패는 비용 없음
+    public const float UseItem = 10f;        // 포션/일반 아이템, 5분
+    public const float Interact = 10f;       // 상자 개봉 등, 5분
+    public const float Door = 2f;            // 문 개폐, 1분
+    public const float PickUp = 2f;          // 바닥 아이템 획득, 1분
+    public const float Drop = 2f;            // 가방 아이템 버리기, 1분
 }

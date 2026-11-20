@@ -25,7 +25,7 @@ public class DungeonRunManager : MonoBehaviour
     [SerializeField] private int runSeed = 20261106;
 
     [Header("M1 Temporary Balance")]
-    [SerializeField, Min(1)] private int escapeProcedureTickCost = 10;
+    [SerializeField, Min(1)] private int escapeProcedureTickCost = 20;
 
     [Header("Test Scene Visual Settings")]
     [SerializeField] private float playerCellOffsetX = 0.5f;
