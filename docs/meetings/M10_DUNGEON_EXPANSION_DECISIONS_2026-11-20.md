@@ -40,6 +40,19 @@
 goblin, tiny_zombie, zombie, ice_zombie, big_zombie, skelet, slug, tiny_slug, muddy, swampy, masked_orc, orc_warrior, orc_shaman, ogre, imp, chort, big_demon, necromancer, wogol, pumpkin_dude, doc, angel, chest_mimic.
 큰 스프라이트(32×36급): big_demon, big_zombie, ogre. 영웅 스프라이트(knight·elf·dwarf·lizard·wizzard)는 적 사용 여부 미정.
 
+### 결정 15 — 몹 배치 (초안 확정, Play 후 수정 전제)
+
+| 구분 | 1~4층 | 6~9층 |
+|---|---|---|
+| 일반 | goblin, tiny_zombie, tiny_slug, skelet, slug, zombie, muddy | swampy, ice_zombie, orc_shaman, wogol, pumpkin_dude, doc, angel |
+| 엘리트 | masked_orc, big_zombie | ogre, necromancer |
+| 보스 | 5층 미믹 | 10층 오크(orc_warrior) |
+| 심야 | chort, imp, big_demon (전 층 공통) | |
+
+- 1~2층은 작은 몹 위주, 3~4층에 중간 몹. 6~9층은 신규 몹만 사용(타일 변경과 함께 "새 구역").
+- 층당 일반 몹 종류 수·엘리트 수는 **임시값을 CSV로** 두고 Play 후 조정 (예: 층마다 일반 2~3종 랜덤, 엘리트 0~2마리).
+- 사용자 메모: "안 어울리면 수정하면 되는 문제" — 배치는 데이터(CSV)로만 바꿀 수 있게 구현.
+
 ## 2. 결정 3(1Tick = 30초)의 영향 — 구현 전 확인 필요
 
 - `DungeonClock.MinutesPerTick` 1 → 0.5, `MIAThresholdTicks` 1440 → 2880 (선례: 2026-09-03에 5 → 1 변경)
@@ -49,7 +62,7 @@ goblin, tiny_zombie, zombie, ice_zombie, big_zombie, skelet, slug, tiny_slug, mu
 
 ## 3. 미정 (다음 회의)
 
-- [ ] 몹 배치: 층별 일반 몹 구성, 엘리트 몹 선정, 출현 빈도
+- [ ] 몹 배치 수치(층당 종류 수·엘리트 수)는 Play 후 조정
 - [ ] 엘리트 행동 패턴, 엘리트 드롭 스크롤 확률
 - [ ] 미믹·오크 보스 패턴 (기존 5층 보스 패턴: 단일 + 광역 2종)
 - [ ] 6~10층 타일 선택, 층별 방 개수
