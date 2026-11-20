@@ -89,7 +89,9 @@ public static class ExpeditionSession
             AcquiredItems = new List<string>(acquiredItems)
         };
         M3MeasurementAutomation.Finish(result, ElapsedTicks, CurrentFloor);
+        bool scrollShopWasUnlocked = LootRuntimeState.IsEscapeScrollShopUnlocked;
         QuestRuntimeState.RecordExpeditionCompleted(run, carriedItems);
+        LootRuntimeState.RecordExpeditionTicksForEscapeScrollShop(ElapsedTicks, scrollShopWasUnlocked);
         LootRuntimeState.ResolveRun(result);
         IsActive = false;
         M5SaveService.CompleteExpedition();

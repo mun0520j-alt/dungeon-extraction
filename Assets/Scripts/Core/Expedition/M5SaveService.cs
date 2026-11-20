@@ -303,6 +303,7 @@ public static class M5SaveService
             LootRuntimeState.RestoreM9Storage(restoredStash, restoredTemporary);
             LootRuntimeState.RestoreInsurance(data.insurance_returns);
             LootRuntimeState.RestoreConfirmedInsurance(data.insured_this_run);
+            LootRuntimeState.RestoreM10ScrollShop(data.escape_scroll_restock_progress, data.escape_scroll_purchase_stock);
             currentSettings = data.settings != null ? data.settings.Normalized() : SaveSettings.Default();
         }
         finally
@@ -465,6 +466,8 @@ public static class M5SaveService
                 ItemId = LootRuntimeState.GetInsuredItemId(instanceId)
             }).ToList()
             ,quest_state = QuestRuntimeState.CapturePersistentState()
+            ,escape_scroll_restock_progress = LootRuntimeState.EscapeScrollRestockProgress
+            ,escape_scroll_purchase_stock = LootRuntimeState.EscapeScrollPurchaseStock
         };
     }
 
@@ -587,6 +590,8 @@ public static class M5SaveService
         public List<LootRuntimeState.InsuranceReturn> insurance_returns = new List<LootRuntimeState.InsuranceReturn>();
         public List<LootRuntimeState.InsurancePolicy> insured_this_run = new List<LootRuntimeState.InsurancePolicy>();
         public QuestRuntimeState.PersistentState quest_state = new QuestRuntimeState.PersistentState();
+        public float escape_scroll_restock_progress;
+        public int escape_scroll_purchase_stock;
     }
 
     [Serializable]

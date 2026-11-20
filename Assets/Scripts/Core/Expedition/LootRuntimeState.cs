@@ -64,6 +64,7 @@ public static partial class LootRuntimeState
         insuranceReturns.Clear();
         ResetM9Storage();
         ResetM9Trade();
+        ResetM10ScrollShop();
     }
 
     public static void BeginNewRun()
@@ -517,8 +518,10 @@ public static partial class LootRuntimeState
         if (definition == null) return Fail("구매할 아이템을 찾을 수 없습니다.");
         if (!IsMerchantPurchaseItem(definition)) return Fail("상인이 판매하지 않는 아이템입니다.");
 
+        bool escapeScroll = string.Equals(definition.Id, "escape_scroll", StringComparison.Ordinal);
         int price = GetPurchasePrice(definition);
         if (Gold < price) return Fail("Gold가 부족합니다.");
+        if (escapeScroll && !TryConsumeEscapeScrollPurchaseStock()) return false;
 
         Gold -= price;
         StoreIncomingItem(new LootItemInstance(definition));
@@ -570,7 +573,7 @@ public static partial class LootRuntimeState
     public static bool IsMerchantPurchaseItem(LootItemData definition)
     {
         if (definition == null || definition.Id.StartsWith("basic_", StringComparison.Ordinal)) return false;
-        if (definition.Id == "escape_scroll") return false;
+        if (definition.Id == "escape_scroll") return IsEscapeScrollShopUnlocked;
         if (definition.Type == LootItemType.Bag)
             return definition.Rarity == LootRarity.Normal || definition.Rarity == LootRarity.Rare;
         return definition.Rarity == LootRarity.Normal

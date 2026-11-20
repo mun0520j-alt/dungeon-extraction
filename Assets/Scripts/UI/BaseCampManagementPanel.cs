@@ -93,6 +93,7 @@ public sealed class BaseCampManagementPanel : MonoBehaviour
         }
         else if (merchantMode == MerchantMode.Buy)
         {
+            DrawEscapeScrollShopStatus();
             foreach (LootItemData item in LootItemDatabase.Items.Where(LootRuntimeState.IsMerchantPurchaseItem)) DrawPurchaseItem(item);
         }
         else DrawQuestPanel();
@@ -213,9 +214,10 @@ public sealed class BaseCampManagementPanel : MonoBehaviour
     private void DrawPurchaseItem(LootItemData item)
     {
         int price = LootRuntimeState.GetPurchasePrice(item);
+        bool escapeScroll = item.Id == "escape_scroll";
         GUILayout.BeginHorizontal();
         GUILayout.Label($"[{item.Rarity}] {item.Name}");
-        GUI.enabled = LootRuntimeState.Gold >= price;
+        GUI.enabled = LootRuntimeState.Gold >= price && (!escapeScroll || LootRuntimeState.EscapeScrollPurchaseStock > 0);
         if (GUILayout.Button($"{price}G", GUILayout.Width(70)))
         {
             bool purchased = LootRuntimeState.TryBuy(item.Id);
@@ -223,6 +225,19 @@ public sealed class BaseCampManagementPanel : MonoBehaviour
         }
         GUI.enabled = true;
         GUILayout.EndHorizontal();
+    }
+
+    private void DrawEscapeScrollShopStatus()
+    {
+        if (!LootRuntimeState.IsEscapeScrollShopUnlocked)
+        {
+            GUILayout.Label("탈출 스크롤: 마지막 퀘스트 완료 시 해금");
+            return;
+        }
+        string restock = LootRuntimeState.EscapeScrollPurchaseStock >= M10DungeonConfig.EscapeScrollStockCap
+            ? "최대 보유"
+            : $"다음 충전까지 {LootRuntimeState.EscapeScrollTicksUntilRestock:N0} Tick";
+        GUILayout.Label($"탈출 스크롤 구매 가능 {LootRuntimeState.EscapeScrollPurchaseStock}/{M10DungeonConfig.EscapeScrollStockCap} · {restock}");
     }
 
     private void DrawSaleItem(LootItemInstance item, string source)
