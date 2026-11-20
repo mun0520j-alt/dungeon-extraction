@@ -1,0 +1,5 @@
+min_floor,max_floor,floor_hex,wall_hex,decoration_set
+1,5,FFFFFF,FFFFFF,classic
+6,7,B7D9D6,759A95,swamp
+8,9,BCD4E6,718DA5,frost
+10,10,D6A8A1,8E5650,orc_keep

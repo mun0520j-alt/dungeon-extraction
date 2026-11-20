@@ -213,6 +213,7 @@ public class DungeonRunManager : MonoBehaviour
 
             var painter = new FloorTilemapPainter(floorTilemap, wallTilemap, floorTile, wallTile) { ChunkSize = paintChunkSize };
             painter.Paint(layout);
+            M10FloorThemeDatabase.Apply(i + 1, floorTilemap, wallTilemap);
             DungeonRoomRegistry.Register(floorTilemap, layout, paintChunkSize);
             if (!bossFloor) SpawnDoors(layout, floorTilemap, wallTilemap, floorRoot.transform);
 
