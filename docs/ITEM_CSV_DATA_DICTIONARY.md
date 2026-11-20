@@ -108,3 +108,11 @@
 - 현재 `items.csv`는 M6 장비·가방 최소 데이터이며 장신구·소모품·수집품 전체 설계를 포함하지 않는다.
 - `ITEM_SYSTEM_DESIGN.md`는 장기 설계 근거이고 CSV는 현재 런타임 데이터다.
 - 가방 이름과 드롭 가중치는 M5 통합 Play 전 임시값이다.
+## M10 추가 CSV (2026-11-20)
+
+- `m10_dungeon.csv`: 최종 층, 보스 층, 깊은 층 방 개수.
+- `m10_enemies.csv`: 몬스터 ID·스프라이트 키·등급·HP·공격·방어·행동·크기·스크롤 확률.
+- `m10_floor_spawns.csv`: 층별 일반/엘리트 후보와 생성 수.
+- `m10_floor_themes.csv`: 층 구간별 바닥·벽 색조와 장식 세트 키.
+- `m10_loot_rarity.csv`: 층별 Normal~Legendary 및 보스 수량·등급 확률. 각 확률 묶음은 100이어야 한다.
+
