@@ -95,6 +95,30 @@ public class DungeonRunManager : MonoBehaviour
     }
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
+    public bool DebugSpawnEnemy(string enemyId)
+    {
+        M10EnemyDefinition definition = M10EnemyDatabase.Find(enemyId);
+        PlayerTurnActor actor = PlayerTurnActor.Instance;
+        int floorIndex = ExpeditionSession.CurrentFloor - 1;
+        if (definition == null || actor == null || floorIndex < 0 || floorIndex >= floorTileTilemaps.Count) return false;
+        Tilemap floor = floorTileTilemaps[floorIndex];
+        Tilemap walls = floorWallTilemaps[floorIndex];
+        Vector3Int best = default;
+        int bestDistance = int.MaxValue;
+        foreach (Vector3Int cell in floor.cellBounds.allPositionsWithin)
+        {
+            int distance = Mathf.Abs(cell.x - actor.CurrentCell.x) + Mathf.Abs(cell.y - actor.CurrentCell.y);
+            if (distance < 2 || distance >= bestDistance || !floor.HasTile(cell) || walls.HasTile(cell)) continue;
+            if (TickManager.Instance != null && TickManager.Instance.IsCellOccupied(cell)) continue;
+            best = cell;
+            bestDistance = distance;
+        }
+        if (bestDistance == int.MaxValue) return false;
+        CreateRuntimeEnemy(floorIndex, 9000, best, floor, walls, definition);
+        Debug.Log($"[QA] {enemyId} 생성 — {ExpeditionSession.CurrentFloor}층 {best}");
+        return true;
+    }
+
     [ContextMenu("QA/Validate Generated Run")]
     public bool ValidateGeneratedRun()
     {

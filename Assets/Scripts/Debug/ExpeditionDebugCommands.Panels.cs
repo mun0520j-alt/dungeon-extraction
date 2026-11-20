@@ -23,6 +23,7 @@ public sealed partial class ExpeditionDebugCommands
             M5SaveService.SaveNow();
             Debug.Log($"[QA] 보험 대기 시간을 {insuranceAdvanceTicks:0} Tick 진행했습니다.");
         }
+        DrawM10QaControls(inDungeon);
         itemPanelScroll = GUILayout.BeginScrollView(itemPanelScroll);
         foreach (LootItemData item in LootItemDatabase.Items)
         {
@@ -36,6 +37,55 @@ public sealed partial class ExpeditionDebugCommands
         GUILayout.EndScrollView();
         if (GUILayout.Button("닫기 (F9)", GUILayout.Height(32f))) showM6ItemPanel = false;
         GUILayout.EndArea();
+    }
+
+    private void DrawM10QaControls(bool inDungeon)
+    {
+        GUILayout.Label("M10 던전 확장 QA");
+        if (inDungeon)
+        {
+            GUILayout.BeginHorizontal();
+            for (int floor = 1; floor <= ExpeditionSession.FinalFloor; floor++)
+            {
+                int target = floor;
+                if (GUILayout.Button(target.ToString(), GUILayout.Width(34f))) JumpToFloor(target);
+            }
+            GUILayout.EndHorizontal();
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("현재 층 보스 처치")) DefeatCurrentFloorBoss();
+            if (GUILayout.Button("엘리트 소환"))
+            {
+                M10EnemyDefinition elite = System.Linq.Enumerable.FirstOrDefault(M10EnemyDatabase.All, value => value.IsElite);
+                if (elite != null) SpawnDebugEnemy(elite.Id);
+            }
+            if (GUILayout.Button("엘리트 스크롤 드롭")) DropEliteEscapeScroll();
+            GUILayout.EndHorizontal();
+            GUILayout.BeginHorizontal();
+            qaEnemyIdInput = GUILayout.TextField(qaEnemyIdInput ?? string.Empty);
+            if (GUILayout.Button("지정 몹 소환", GUILayout.Width(100f))) SpawnDebugEnemy(qaEnemyIdInput);
+            GUILayout.EndHorizontal();
+        }
+
+        GUILayout.BeginHorizontal();
+        if (GUILayout.Button("스크롤 상점 해금"))
+        {
+            M3MeasurementAutomation.MarkDebugRun();
+            QuestRuntimeState.DebugUnlockEscapeScrollShop();
+            M5SaveService.SaveNow();
+        }
+        GUILayout.Label("누적");
+        qaShopProgressInput = GUILayout.TextField(qaShopProgressInput ?? "0", GUILayout.Width(60f));
+        GUILayout.Label("재고");
+        qaShopStockInput = GUILayout.TextField(qaShopStockInput ?? "0", GUILayout.Width(35f));
+        if (GUILayout.Button("설정", GUILayout.Width(45f))
+            && float.TryParse(qaShopProgressInput, out float progress)
+            && int.TryParse(qaShopStockInput, out int stock))
+        {
+            M3MeasurementAutomation.MarkDebugRun();
+            LootRuntimeState.DebugSetEscapeScrollShop(progress, stock);
+            M5SaveService.SaveNow();
+        }
+        GUILayout.EndHorizontal();
     }
 
     private static void GiveDebugItem(LootItemData definition)

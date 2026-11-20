@@ -23,6 +23,7 @@ public static class M10EnemyDatabase
     private static Dictionary<string, M10EnemyDefinition> enemies;
     private static Dictionary<int, M10FloorSpawnDefinition> floors;
     public static M10EnemyDefinition Find(string id) { EnsureLoaded(); return id != null && enemies.TryGetValue(id, out var value) ? value : null; }
+    public static IEnumerable<M10EnemyDefinition> All { get { EnsureLoaded(); return enemies.Values; } }
     public static M10FloorSpawnDefinition Floor(int floor) { EnsureLoaded(); return floors.TryGetValue(floor, out var value) ? value : null; }
     public static M10EnemyDefinition Boss(int floor) => Find(floor == M10DungeonConfig.FirstBossFloor ? "chest_mimic" : "orc_warrior");
     private static void EnsureLoaded()
