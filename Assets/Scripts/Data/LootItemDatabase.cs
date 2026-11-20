@@ -61,24 +61,17 @@ public static class LootItemDatabase
 
     public static LootRarity RollRarity(int floor, System.Random rng)
     {
-        int roll = rng.Next(100);
-        if (roll == 0) return floor <= 4 ? LootRarity.Unique : LootRarity.Legendary;
-
-        if (floor <= 1) return roll < 3 ? LootRarity.Epic : roll < 21 ? LootRarity.Rare : LootRarity.Normal;
-        if (floor == 2) return roll < 6 ? LootRarity.Epic : roll < 31 ? LootRarity.Rare : LootRarity.Normal;
-        return roll < 11 ? LootRarity.Epic : roll < 41 ? LootRarity.Rare : LootRarity.Normal;
+        return M10LootRarityTable.Rarity(floor, rng);
     }
 
-    public static int RollBossDropCount(System.Random rng)
+    public static int RollBossDropCount(System.Random rng, int floor = 5)
     {
-        int roll = rng.Next(100);
-        return roll < 10 ? 0 : roll < 80 ? 1 : 2;
+        return M10LootRarityTable.BossCount(floor, rng);
     }
 
-    public static LootRarity RollBossDropRarity(System.Random rng)
+    public static LootRarity RollBossDropRarity(System.Random rng, int floor = 5)
     {
-        int roll = rng.Next(100);
-        return roll < 50 ? LootRarity.Rare : roll < 90 ? LootRarity.Epic : LootRarity.Unique;
+        return M10LootRarityTable.BossRarity(floor, rng);
     }
 
     private static void EnsureLoaded()

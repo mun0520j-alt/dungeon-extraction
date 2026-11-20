@@ -636,11 +636,11 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
     private void DropBossLoot()
     {
         var rng = new System.Random(bossLootSeed);
-        int count = LootItemDatabase.RollBossDropCount(rng);
+        int count = LootItemDatabase.RollBossDropCount(rng, ExpeditionSession.CurrentFloor);
         var drops = new System.Collections.Generic.List<LootItemInstance>();
         for (int i = 0; i < count; i++)
         {
-            LootRarity rarity = LootItemDatabase.RollBossDropRarity(rng);
+            LootRarity rarity = LootItemDatabase.RollBossDropRarity(rng, ExpeditionSession.CurrentFloor);
             LootItemData definition = LootItemDatabase.Roll(rarity, rng);
             if (definition == null) continue;
             // 보스 전리품은 바닥에 놓이기 전 생성 순간부터 인레이드 상태를 소유한다.
