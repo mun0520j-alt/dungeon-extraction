@@ -7,6 +7,7 @@ public sealed class M10EnemyVisualCatalog : ScriptableObject
 {
     [Serializable] public sealed class Entry { public string key; public Sprite[] idleFrames; public Sprite[] runFrames; }
     [SerializeField] private List<Entry> entries = new List<Entry>();
+    public int EntryCount => entries?.Count ?? 0;
     public Entry Find(string key) => entries.Find(value => value != null && value.key == key);
 #if UNITY_EDITOR
     public void EditorSetEntries(List<Entry> values) => entries = values ?? new List<Entry>();

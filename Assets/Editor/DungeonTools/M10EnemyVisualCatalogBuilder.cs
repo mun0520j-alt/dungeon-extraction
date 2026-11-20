@@ -13,7 +13,8 @@ public static class M10EnemyVisualCatalogBuilder
     [InitializeOnLoadMethod]
     private static void BuildWhenMissing()
     {
-        if (AssetDatabase.LoadAssetAtPath<M10EnemyVisualCatalog>(AssetPath) == null) Build();
+        var catalog = AssetDatabase.LoadAssetAtPath<M10EnemyVisualCatalog>(AssetPath);
+        if (catalog == null || catalog.EntryCount == 0) Build();
     }
 
     [MenuItem("Tools/Dungeon/M10/Rebuild Enemy Visual Catalog")]
@@ -40,12 +41,14 @@ public static class M10EnemyVisualCatalogBuilder
         Debug.Log($"[M10] Enemy visual catalog rebuilt: {entries.Count} entries.");
     }
 
-    private static Sprite[] LoadFrames(string key, string action) =>
-        AssetDatabase.FindAssets($"{key}_{action}_anim", new[] { Frames })
-            .Select(AssetDatabase.GUIDToAssetPath)
-            .OrderBy(path => path)
-            .SelectMany(path => AssetDatabase.LoadAllAssetsAtPath(path).OfType<Sprite>())
-            .ToArray();
+    private static Sprite[] LoadFrames(string key, string action)
+    {
+        string[] guids = AssetDatabase.FindAssets($"{key}_{action}_anim", new[] { Frames });
+        if (guids.Length == 0 && action == "idle") guids = AssetDatabase.FindAssets($"{key}_anim", new[] { Frames });
+        if (guids.Length == 0 && key == "chest_mimic") guids = AssetDatabase.FindAssets("chest_mimic_open_anim", new[] { Frames });
+        return guids.Select(AssetDatabase.GUIDToAssetPath).OrderBy(path => path)
+            .SelectMany(path => AssetDatabase.LoadAllAssetsAtPath(path).OfType<Sprite>()).ToArray();
+    }
 
     private static IEnumerable<string> EnemyKeys()
     {
