@@ -12,6 +12,8 @@ public static class M10DungeonConfig
     public static int FinalBossFloor => Get("boss_floor_2", 10);
     public static int DeepMinRooms => Get("deep_min_rooms", 9);
     public static int DeepMaxRooms => Mathf.Max(DeepMinRooms, Get("deep_max_rooms", 12));
+    // 결정 17: 엘리트는 "아 쟤구나" 정도로만 구분 — 크기 배율(m10_enemies.csv visual_scale) + 옅은 색조(%).
+    public static Color EliteTint => new Color(Get("elite_tint_r", 100) / 100f, Get("elite_tint_g", 72) / 100f, Get("elite_tint_b", 72) / 100f, 1f);
     public static bool IsBossFloor(int floor) => floor == FirstBossFloor || floor == FinalBossFloor;
     private static int Get(string key, int fallback) { EnsureLoaded(); return values.TryGetValue(key, out int value) ? value : fallback; }
     private static void EnsureLoaded()

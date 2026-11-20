@@ -61,6 +61,12 @@ goblin, tiny_zombie, zombie, ice_zombie, big_zombie, skelet, slug, tiny_slug, mu
 
 다른 에셋 팩은 쓰지 않는다(라이선스·크레딧·규격 부담). 이후 직접 그린 타일로 교체할 수 있게 층 구간별 타일 설정을 데이터로 분리한다.
 
+### 결정 17·18 (2026-11-20, Codex 구현 검토 후)
+
+- **17 엘리트 표시**: 특별할 필요 없이 "아 쟤구나" 정도. 크기 배율(`m10_enemies.csv` visual_scale 1.15~1.2) + 옅은 붉은 색조(`m10_dungeon.csv` elite_tint_r/g/b, %). 패턴은 여전히 일반과 동일
+- **18 5층 등급**: 5층(보스 층)부터 레전더리가 나오므로 다른 등급도 살짝 조정 — 임시값 Normal 50 / Rare 34 / Epic 13 / Unique 2 / Legendary 1 (기존 3층+ 표: 59/30/10/0/1). Play 후 조정
+- 5층 미믹 처치 후 **생환 또는 6층 하강 선택** 유지 (Codex 구현, 사용자 확인)
+
 ## 2. 결정 3(1Tick = 30초)의 영향 — 구현 전 확인 필요
 
 - `DungeonClock.MinutesPerTick` 1 → 0.5, `MIAThresholdTicks` 1440 → 2880 (선례: 2026-09-03에 5 → 1 변경)

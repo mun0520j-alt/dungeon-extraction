@@ -95,6 +95,11 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
     {
         isElite = elite;
         eliteScrollDropChance = Mathf.Clamp01(scrollDropChance);
+        if (elite)
+        {
+            SpriteRenderer body = spriteRenderer != null ? spriteRenderer : GetComponentInChildren<SpriteRenderer>();
+            if (body != null) body.color = M10DungeonConfig.EliteTint;
+        }
     }
 
     // behaviorType(Idle/Wander)은 "Player를 못 봤을 때의 평소 기본 행동"이고, 추적은 그 위에
