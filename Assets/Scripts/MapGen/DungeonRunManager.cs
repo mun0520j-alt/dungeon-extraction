@@ -214,6 +214,8 @@ public class DungeonRunManager : MonoBehaviour
             var painter = new FloorTilemapPainter(floorTilemap, wallTilemap, floorTile, wallTile) { ChunkSize = paintChunkSize };
             painter.Paint(layout);
             M10FloorThemeDatabase.Apply(i + 1, floorTilemap, wallTilemap);
+            int decorationCount = M10FloorDecorationPlacer.Place(i + 1, seed, floorTilemap, wallTilemap, floorRoot.transform);
+            if (decorationCount > 0) Debug.Log($"[M10] F{i + 1} 장식 {decorationCount}개 배치 — Seed {seed}");
             DungeonRoomRegistry.Register(floorTilemap, layout, paintChunkSize);
             if (!bossFloor) SpawnDoors(layout, floorTilemap, wallTilemap, floorRoot.transform);
 
