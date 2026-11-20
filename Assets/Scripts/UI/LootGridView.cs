@@ -354,6 +354,7 @@ public sealed class LootGridView : MonoBehaviour
         tooltip.text = $"{data.Name} [{data.Rarity}]\n크기 {data.GridWidth}×{data.GridHeight}"
             + $"\n공격 +{data.AttackBonus} / 방어 +{data.DefenseBonus}"
             + (item.Item.IsFoundInRaid ? "\n인레이드" : string.Empty)
+            + (item.Item.IsExpeditionBound ? "\n원정 종료 시 사라짐" : string.Empty)
             + (LootRuntimeState.IsInsured(item.Item.InstanceId) ? "\n보험됨" : string.Empty);
         tooltip.transform.parent.gameObject.SetActive(true);
         PositionTooltip(screenPosition);

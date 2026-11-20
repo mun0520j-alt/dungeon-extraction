@@ -593,8 +593,9 @@ public static partial class LootRuntimeState
     {
         AdvanceInsuranceTicks(ExpeditionSession.ElapsedTicks);
         ResolveCurrentInsurance(result, ExpeditionSession.CurrentFloor);
+        // 결정 11: 엘리트 드롭(원정 한정) 아이템만 사라진다. 퀘스트 보상 스크롤은 일반 아이템으로 남는다.
         PurgeExpeditionScrolls(runBagGrid);
-        runBag.RemoveAll(item => item?.Definition?.Id == "escape_scroll");
+        runBag.RemoveAll(item => item != null && item.IsExpeditionBound);
         if (result == ExpeditionResult.Escaped) return;
         runBag.Clear();
         runBagGrid = new LootGridModel(BaseBagGridWidth, BaseBagGridHeight);
@@ -612,7 +613,7 @@ public static partial class LootRuntimeState
         {
             LootItemInstance item = placement.Item;
             if (item?.Definition?.Type == LootItemType.Bag) PurgeExpeditionScrolls(item.BagGrid);
-            if (item?.Definition?.Id == "escape_scroll") grid.Remove(item.InstanceId, out _);
+            if (item != null && item.IsExpeditionBound) grid.Remove(item.InstanceId, out _);
         }
     }
 

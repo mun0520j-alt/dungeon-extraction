@@ -649,8 +649,9 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
         if (rng.NextDouble() >= eliteScrollDropChance) return;
         LootItemData definition = LootItemDatabase.FindById("escape_scroll");
         if (definition == null) return;
+        var scroll = new LootItemInstance(definition, foundInRaid: true) { IsExpeditionBound = true };
         GroundLootPile.Create(floorTilemap, currentCell,
-            new System.Collections.Generic.List<LootItemInstance> { new LootItemInstance(definition, foundInRaid: true) }, "엘리트 전리품");
+            new System.Collections.Generic.List<LootItemInstance> { scroll }, "엘리트 전리품");
         Debug.Log("[M10] Elite가 원정 한정 탈출 스크롤을 드롭했습니다.");
     }
 
