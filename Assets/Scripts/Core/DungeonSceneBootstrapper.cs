@@ -102,7 +102,7 @@ public class DungeonSceneBootstrapper : MonoBehaviour
 
         // 중간 생환 지점은 3층에 유지한다. M4의 최종 진행 목표는 5층이지만,
         // Player는 3층에서 조기 생환하거나 4층으로 계속 내려갈 수 있다.
-        if (ExpeditionSession.CurrentFloor == 3)
+        if (ExpeditionSession.CurrentFloor == 3 || ExpeditionSession.CurrentFloor == M10DungeonConfig.FirstBossFloor)
         {
             Vector3Int escapeCell = playerCell;
             int distanceFromStairs = -1;

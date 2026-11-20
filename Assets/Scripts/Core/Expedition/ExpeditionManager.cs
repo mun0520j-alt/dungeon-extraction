@@ -76,7 +76,9 @@ public sealed class ExpeditionManager : MonoBehaviour
     private bool TryCompleteExtraction(PlayerTurnActor player, bool allowAnyFloor)
     {
         if (transitionRequested || player == null || player.IsDead || !ExpeditionSession.IsActive) return false;
-        if (!allowAnyFloor && ExpeditionSession.CurrentFloor != 3 && ExpeditionSession.CurrentFloor != 5) return false;
+        if (!allowAnyFloor && ExpeditionSession.CurrentFloor != 3
+            && ExpeditionSession.CurrentFloor != M10DungeonConfig.FirstBossFloor
+            && ExpeditionSession.CurrentFloor != ExpeditionSession.FinalFloor) return false;
         if (miaResolutionPending || (dungeonClock != null && dungeonClock.IsMIA)) return false;
 
         transitionRequested = true;

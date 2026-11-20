@@ -60,7 +60,8 @@ public sealed class EscapeScrollZone : MonoBehaviour
             failure = "탈출 구역 안에서만 사용할 수 있습니다.";
             return false;
         }
-        if (ExpeditionSession.CurrentFloor == 5 && GameObject.Find("Boss_F5") != null)
+        if (M10DungeonConfig.IsBossFloor(ExpeditionSession.CurrentFloor)
+            && GameObject.Find($"Boss_F{ExpeditionSession.CurrentFloor}") != null)
         {
             failure = "보스를 처치해야 탈출 구역을 활성화할 수 있습니다.";
             return false;

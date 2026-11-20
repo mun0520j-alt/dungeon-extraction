@@ -5,7 +5,7 @@ using UnityEngine;
 public static class ExpeditionSession
 {
     public const int FirstFloor = 1;
-    public const int FinalFloor = 5;
+    public static int FinalFloor => M10DungeonConfig.FinalFloor;
 
     public static bool IsActive { get; private set; }
     public static int CurrentFloor { get; private set; } = FirstFloor;

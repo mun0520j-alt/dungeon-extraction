@@ -598,7 +598,7 @@ public class PlayerTurnActor : MonoBehaviour, ITurnActor
         healthBar?.SetFill((float)currentHP / maxHP);
         healthViewDirty = true;
         string context = bossDefeatedOnFloorFive ? " (보스 처치 후 정비)" : string.Empty;
-        Debug.Log($"[Rest] 연속 대기 5 Tick{context} — HP {before} → {currentHP}/{maxHP}");
+        Debug.Log($"[Rest] 연속 대기 10 Tick{context} — HP {before} → {currentHP}/{maxHP}");
         if (currentHP >= maxHP) autoRestActive = false;
     }
 

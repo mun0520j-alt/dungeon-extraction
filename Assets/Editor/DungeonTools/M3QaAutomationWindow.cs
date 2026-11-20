@@ -273,7 +273,7 @@ public sealed class M3QaAutomationWindow : EditorWindow
         Check(checks, TickCost.Drop == 1f, "버리기 1Tick");
         Check(checks, TickCost.SwapWeaponInCombat == 2f, "장비 교체 2Tick");
         Check(checks, LootRuntimeState.BaseBagCapacity == 6, "기본 가방 6칸");
-        Check(checks, ExpeditionSession.FirstFloor == 1 && ExpeditionSession.FinalFloor == 5, "M4 원정 1~5층");
+        Check(checks, ExpeditionSession.FirstFloor == 1 && ExpeditionSession.FinalFloor == 10, "M10 원정 1~10층");
 
         bool layoutDeterministic = true;
         bool lootDeterministic = true;
