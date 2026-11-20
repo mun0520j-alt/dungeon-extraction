@@ -63,3 +63,14 @@
 4. `docs/m9-jira` 커밋 해시와 수정 파일
 5. 사용자 판단 필요 목록
 6. 막힌 것 (차단 / 다음 MX / 백로그)
+
+## 완료 기록 (2026-11-19)
+
+- 태그: `m9` = `162d636` (PR #18 merge), `beta-0.2` = `7192f44` (m8)
+- 결과: 91항목 Pass 90 / 보류 1(1-1) / Fail 0. TC-M9-46(3-1V8) 사용자 Pass
+- Jira: DUN-67 완료(결과 댓글, Fix Version m9 릴리즈)
+  - 버그: BUG-045 DUN-75 / BUG-046 DUN-76 / BUG-047 DUN-73 / BUG-048 DUN-74 / BUG-049 DUN-77 (모두 완료)
+  - 백로그: DUN-78 영지 Ctrl+클릭 / DUN-79 던전 하위 가방 무게 제한 / DUN-80 특수 보관함 / DUN-81 beta v3 세이브 변환
+  - beta-0.2 Jira 이슈 없음, M9 범위 열린 이슈 없음
+- Confluence: 회의록 — M9 Stash 격자, TC — M9(Pass 90 / 보류 1) 생성. 결함 목록 BUG-045~049 반영 확인. 홈·로드맵은 Claude가 beta-0.2 공개·beta-0.3 준비·M9 완료·M10 미정으로 정정
+- 리포 반영은 Codex 중단 후 재진행. PR 없이 `release/beta-0.3`에 합칠 예정

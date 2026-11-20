@@ -1215,7 +1215,7 @@ DungeonRunManager.CreateRuntimeEnemy () (at Assets/Scripts/MapGen/DungeonRunMana
 | 항목 | 내용 |
 |---|---|
 | 상태 | Closed — Play Pass 2026-11-19 (TC-M9-41) |
-| Jira | 미등록 |
+| Jira | DUN-75 |
 | 심각도 | Major |
 | 우선순위 | P1 |
 | 발견 단계 | M9 Play (사용자, 2026-11-18) |
@@ -1233,7 +1233,7 @@ DungeonRunManager.CreateRuntimeEnemy () (at Assets/Scripts/MapGen/DungeonRunMana
 | 항목 | 내용 |
 |---|---|
 | 상태 | Closed — Play Pass 2026-11-19 (TC-M9-44) |
-| Jira | 미등록 |
+| Jira | DUN-76 |
 | 심각도 | Major |
 | 우선순위 | P1 |
 | 발견 단계 | M9 Play (사용자, 2026-11-18) |
@@ -1251,7 +1251,7 @@ DungeonRunManager.CreateRuntimeEnemy () (at Assets/Scripts/MapGen/DungeonRunMana
 | 항목 | 내용 |
 |---|---|
 | 상태 | Closed — Play Pass 2026-11-19 (TC-M9-45) |
-| Jira | 미등록 |
+| Jira | DUN-73 |
 | 심각도 | Major |
 | 우선순위 | P1 |
 | 발견 단계 | M9 Play (사용자, 2026-11-18) |
@@ -1273,6 +1273,7 @@ DungeonRunManager.CreateRuntimeEnemy () (at Assets/Scripts/MapGen/DungeonRunMana
 - 원인: `PlayerEquipment.ApplyLootSlot`이 루트 장비가 없을 때 기본 아이템으로만 덮어쓴다. 무기·방패·갑옷은 기본 아이템이 있지만 가방 슬롯은 없어서 이전 어댑터가 남았다
 - 수정: 기본 아이템이 없는 슬롯은 비운다
 - 상태: Closed — Play Pass 2026-11-19 (체크리스트 3-1V15)
+- Jira: DUN-74
 
 ## BUG-049 세이브 로드 시 JsonUtility 직렬화 깊이 경고
 
@@ -1282,3 +1283,4 @@ DungeonRunManager.CreateRuntimeEnemy () (at Assets/Scripts/MapGen/DungeonRunMana
 - 원인: v6 `SavedItem`이 자기 자신 목록(`children`)을 가지는 재귀 타입. JsonUtility는 재귀 타입을 깊이 10에서 자르고 경고한다 (데이터는 4단계라 손실 없음)
 - 수정: 가방 내용물을 `bag_contents` 평면 목록 + `parent_id`로 저장. 기존 `children` 형식 v6 세이브는 깊이별 고정 클래스로 읽어 자동 변환 (세이브 버전 6 유지)
 - 상태: Closed — Play Pass 2026-11-19 (체크리스트 6-3, 깊이 경고 0)
+- Jira: DUN-77
