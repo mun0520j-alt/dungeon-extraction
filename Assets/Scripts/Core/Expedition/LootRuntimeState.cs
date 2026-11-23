@@ -574,6 +574,7 @@ public static partial class LootRuntimeState
     {
         if (definition == null || definition.Id.StartsWith("basic_", StringComparison.Ordinal)) return false;
         if (definition.Id == "escape_scroll") return IsEscapeScrollShopUnlocked;
+        if (M10ProgressionDatabase.Potion(definition.Id) != null) return true;
         if (definition.Type == LootItemType.Bag)
             return definition.Rarity == LootRarity.Normal || definition.Rarity == LootRarity.Rare;
         return definition.Rarity == LootRarity.Normal
@@ -950,6 +951,12 @@ public static partial class LootRuntimeState
     {
         LastFailureReason = reason;
         return false;
+    }
+
+    public static bool TryConsumeRunBagItemByItemId(string itemId)
+    {
+        LootItemInstance item = FindCarriedItem(itemId, preferExpeditionBound: false);
+        return item != null && TryConsumeRunBagItem(item.InstanceId, itemId);
     }
 }
 

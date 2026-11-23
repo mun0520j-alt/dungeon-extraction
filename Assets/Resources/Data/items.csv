@@ -29,3 +29,6 @@ junk_old_relic,오래된 성물,Junk,Epic,0,0,0,,50,120,2,1,0,0
 junk_crown_shard,금관 조각,Junk,Unique,0,0,0,,50,300,1,1,0,0
 junk_orc_seal,오크 왕의 인장,Junk,Legendary,0,0,0,,50,750,1,1,0,0
 escape_scroll,탈출 스크롤,Consumable,Normal,0,0,0,scroll_01h,0,15,1,1,0,0
+potion_small,소형 힐 포션,Consumable,Normal,0,0,0,,70,10,1,1,0,0
+potion_medium,중형 힐 포션,Consumable,Rare,0,0,0,,35,30,1,2,0,0
+potion_large,대형 힐 포션,Consumable,Epic,0,0,0,,15,80,2,2,0,0

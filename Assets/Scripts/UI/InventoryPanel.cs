@@ -862,6 +862,16 @@ public class InventoryPanel : MonoBehaviour
         if (selectedBagItem?.Definition == null) return;
         if (selectedBagItem.Definition.Type == LootItemType.Consumable)
         {
+            if (M10ProgressionDatabase.Potion(selectedBagItem.Definition.Id) != null)
+            {
+                if (!M10RunProgression.TryUsePotion(selectedBagItem.Definition.Id, PlayerTurnActor.Instance, out string potionFailure))
+                {
+                    SetBagNotice(potionFailure);
+                    return;
+                }
+                HideItemActions();
+                return;
+            }
             if (!EscapeScrollZone.TryUseEscapeScroll(selectedBagItem.InstanceId, out string failure))
             {
                 SetBagNotice(failure);
