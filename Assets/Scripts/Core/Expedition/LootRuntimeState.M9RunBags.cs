@@ -8,6 +8,24 @@ public static partial class LootRuntimeState
 {
     public static int RunNestedItemCount => CountNestedItems(runBag);
 
+    // 출격 가방 전체 트리에서 같은 item_id를 찾는다. 원정 한정 아이템을 먼저 반환할 수 있어
+    // 자동 사용 시 하위 가방에 든 원정 한정 스크롤이 일반 스크롤보다 뒤로 밀리지 않는다.
+    public static LootItemInstance FindCarriedItem(string itemId, bool preferExpeditionBound)
+    {
+        LootItemInstance fallback = null;
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        foreach (LootItemInstance root in runBag)
+        {
+            foreach (LootItemInstance item in EnumerateRecursive(root, visited))
+            {
+                if (item?.Definition?.Id != itemId) continue;
+                if (preferExpeditionBound && item.IsExpeditionBound) return item;
+                if (fallback == null) fallback = item;
+            }
+        }
+        return fallback;
+    }
+
     // roots 중 가방들의 하위 아이템(재귀) 수. roots 자신은 세지 않는다.
     public static int CountNestedItems(IEnumerable<LootItemInstance> roots)
     {

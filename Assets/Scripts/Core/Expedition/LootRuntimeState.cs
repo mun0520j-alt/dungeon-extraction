@@ -583,10 +583,20 @@ public static partial class LootRuntimeState
     public static bool TryConsumeRunBagItem(string instanceId, string expectedItemId)
     {
         LootItemInstance item = runBag.Find(candidate => candidate.InstanceId == instanceId);
+        LootItemInstance parent = null;
+        if (item == null)
+        {
+            parent = FindRunParentBag(instanceId);
+            if (parent != null) item = parent.BagGrid.Find(instanceId)?.Item;
+        }
         if (item?.Definition == null || !string.Equals(item.Definition.Id, expectedItemId, StringComparison.Ordinal))
             return Fail("사용할 아이템을 찾을 수 없습니다.");
-        runBagGrid.Remove(instanceId, out _);
-        runBag.Remove(item);
+        if (parent != null) parent.BagGrid.Remove(instanceId, out _);
+        else
+        {
+            runBagGrid.Remove(instanceId, out _);
+            runBag.Remove(item);
+        }
         LastFailureReason = null;
         Changed?.Invoke();
         return true;

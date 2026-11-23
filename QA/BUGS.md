@@ -1284,3 +1284,22 @@ DungeonRunManager.CreateRuntimeEnemy () (at Assets/Scripts/MapGen/DungeonRunMana
 - 수정: 가방 내용물을 `bag_contents` 평면 목록 + `parent_id`로 저장. 기존 `children` 형식 v6 세이브는 깊이별 고정 클래스로 읽어 자동 변환 (세이브 버전 6 유지)
 - 상태: Closed — Play Pass 2026-11-19 (체크리스트 6-3, 깊이 경고 0)
 - Jira: DUN-77
+
+## BUG-050 탈출 구역 E 자동 사용 컴파일 실패·하위 가방 우선순위 누락
+
+| 항목 | 내용 |
+|---|---|
+| 상태 | Fixed — Play 검증 대기 (TC-M10-33) |
+| Jira | 미등록 |
+| 심각도 | Critical |
+| 우선순위 | P0 |
+| 발견 단계 | M10 코드 리뷰 (2026-11-23) |
+| 관련 코드 | `EscapeScrollZone`, `LootRuntimeState`, `LootRuntimeState.M9RunBags` |
+
+- **재현 1:** `eed2c81`을 컴파일한다.
+- **실제 1:** `EscapeScrollZone.Update()`가 두 번 선언돼 컴파일할 수 없다.
+- **재현 2:** 일반 스크롤은 출격 가방 직속, 원정 한정 스크롤은 하위 가방에 둔 뒤 탈출 구역에서 E를 누른다.
+- **기대:** 원정 종료 시 사라지는 하위 가방의 원정 한정 스크롤을 먼저 소모한다.
+- **실제:** 직속 가방만 검색해 일반 스크롤을 소모한다.
+- **수정:** E 입력 처리를 기존 상태 갱신 `Update()`에 통합하고, 출격 가방 전체 트리를 재귀 검색·소모하도록 상태 API를 확장했다.
+- **회귀 범위:** 탈출 구역 E, 하위 가방 소모품, 문·상자·바닥 더미·계단 E 우선순위, 일시정지·인벤토리·루팅창 입력 차단.

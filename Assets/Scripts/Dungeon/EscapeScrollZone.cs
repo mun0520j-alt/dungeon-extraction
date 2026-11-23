@@ -42,7 +42,7 @@ public sealed class EscapeScrollZone : MonoBehaviour
     private static readonly System.Collections.Generic.List<DungeonChest> nearbyChests = new System.Collections.Generic.List<DungeonChest>();
     private static readonly System.Collections.Generic.List<GroundLootPile> nearbyPiles = new System.Collections.Generic.List<GroundLootPile>();
 
-    private void Update()
+    private void HandleUseInput()
     {
         if (Active != this || activated || !Input.GetKeyDown(KeyCode.E)) return;
         if (PauseMenuController.BlocksWorldInput || InventoryPanel.IsOpen || LootingPanel.IsOpen || GroundLoot.IsSelectionOpen) return;
@@ -58,7 +58,7 @@ public sealed class EscapeScrollZone : MonoBehaviour
         nearbyDoors.Clear(); nearbyChests.Clear(); nearbyPiles.Clear();
         if (otherInteraction) return;
 
-        LootItemInstance scroll = FindScrollInRunBag();
+        LootItemInstance scroll = LootRuntimeState.FindCarriedItem("escape_scroll", preferExpeditionBound: true);
         if (scroll == null)
         {
             InventoryPanel.ShowBagNotice("출격 가방에 탈출 스크롤이 없습니다.");
@@ -66,19 +66,6 @@ public sealed class EscapeScrollZone : MonoBehaviour
         }
         if (!LootInteractionGate.TryClaim()) return;
         if (!TryUseEscapeScroll(scroll.InstanceId, out string failure)) InventoryPanel.ShowBagNotice(failure);
-    }
-
-    // 출격 가방 직속의 탈출 스크롤 (사용 처리 TryConsumeRunBagItem이 직속만 지원). 원정 한정 스크롤 우선.
-    private static LootItemInstance FindScrollInRunBag()
-    {
-        LootItemInstance normal = null;
-        foreach (LootItemInstance item in LootRuntimeState.RunBag)
-        {
-            if (item?.Definition?.Id != "escape_scroll") continue;
-            if (item.IsExpeditionBound) return item;
-            if (normal == null) normal = item;
-        }
-        return normal;
     }
 
     public bool Contains(Vector3Int cell)
@@ -176,6 +163,7 @@ public sealed class EscapeScrollZone : MonoBehaviour
 
     private void Update()
     {
+        HandleUseInput();
         if (!activated || completionRequested) return;
         PlayerTurnActor player = PlayerTurnActor.Instance;
         if (player != null) RefreshState(player);
