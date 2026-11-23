@@ -22,8 +22,21 @@ public static class M10DataValidator
         ok &= M10DungeonConfig.EscapeScrollRestockTicks == 10000
             && M10DungeonConfig.EscapeScrollRestockAmount == 3
             && M10DungeonConfig.EscapeScrollStockCap == 3;
+        string[] legendaryIds =
+        {
+            "weapon_legendary", "shield_legendary", "armor_legendary", "bag_legendary", "junk_orc_seal"
+        };
+        foreach (string itemId in legendaryIds)
+        {
+            LootItemData item = LootItemDatabase.FindById(itemId);
+            ok &= item != null && item.Rarity == LootRarity.Legendary && item.DropWeight > 0;
+            ok &= !LootRuntimeState.IsMerchantPurchaseItem(item);
+        }
+        LootItemData legendaryBag = LootItemDatabase.FindById("bag_legendary");
+        ok &= legendaryBag != null && legendaryBag.GridWidth == 5 && legendaryBag.GridHeight == 6
+            && legendaryBag.BagGridWidth == 5 && legendaryBag.BagGridHeight == 6;
         if (!ok) throw new InvalidOperationException("M10 data validation failed. CSV/clock/floor configuration을 확인하세요.");
-        Debug.Log("[M10 Validation] PASS — 10층, 보스 5/10층, MIA 2880, 몬스터·드롭·장식·스크롤 상점 CSV 확인.");
+        Debug.Log("[M10 Validation] PASS — 10층, 보스 5/10층, MIA 2880, 몬스터·드롭·장식·스크롤 상점·Legendary 5종 확인.");
     }
 }
 #endif
