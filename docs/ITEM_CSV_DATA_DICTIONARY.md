@@ -113,6 +113,10 @@
 - `m10_dungeon.csv`: 최종 층, 보스 층, 깊은 층 방 개수, 탈출 스크롤 충전 Tick·수량·재고 상한.
 - `m10_enemies.csv`: 몬스터 ID·스프라이트 키·등급·HP·공격·방어·행동·크기·스크롤 확률.
 - `m10_floor_spawns.csv`: 층별 일반/엘리트 후보와 생성 수.
+- `m10_levels.csv`: 원정 레벨 1~12의 누적 XP와 HP·공격·방어 보너스. 영구 세이브하지 않는다.
+- `m10_potions.csv`: 힐 포션 `item_id`, 최대 HP 비율(`heal_pct`), 지속 Tick, 사용 Tick.
+- `m10_enemies.csv` 추가 열: `xp`, `potion_drop_chance`. 수치는 M10 임시 밸런스다.
+- `m10_dungeon.csv` 추가 키: 얕은/깊은 층 도착 XP, 층당 빠른 도착 Tick, 보너스 %, 보스 광역 고정 피해, 심야 층 배율 설계값.
 - `m10_floor_themes.csv`: 층 구간별 바닥·벽 색조와 장식 세트 키.
 - `m10_floor_decorations.csv`: 장식 세트별 바닥·벽 1,000칸당 밀도와 0x72 장식 키 목록.
 - `m10_loot_rarity.csv`: 층별 Normal~Legendary 및 보스 수량·등급 확률. 각 확률 묶음은 100이어야 한다.

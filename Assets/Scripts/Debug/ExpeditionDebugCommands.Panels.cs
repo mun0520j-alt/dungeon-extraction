@@ -65,6 +65,18 @@ public sealed partial class ExpeditionDebugCommands
             if (GUILayout.Button("지정 몹 소환", GUILayout.Width(100f))) SpawnDebugEnemy(qaEnemyIdInput);
             GUILayout.EndHorizontal();
             DrawElapsedTickControls();
+            GUILayout.Label($"레벨 Lv.{M10RunProgression.Level} · XP {M10RunProgression.Experience}/{M10RunProgression.NextLevelXP}");
+            GUILayout.BeginHorizontal();
+            for (int level = 1; level <= M10RunProgression.MaxLevel; level++)
+            {
+                int targetLevel = level;
+                if (GUILayout.Button(level.ToString(), GUILayout.Width(28f))) M10RunProgression.DebugSetLevel(targetLevel);
+            }
+            GUILayout.EndHorizontal();
+            if (GUILayout.Button("경험치 +100")) { M3MeasurementAutomation.MarkDebugRun(); M10RunProgression.AddExperience(100, "QA"); }
+            GUILayout.Label(M10RunProgression.IsHealing
+                ? $"포션 회복: {M10RunProgression.ActivePotionId}, 남은 {M10RunProgression.HealingTicksRemaining:0.#} Tick"
+                : "포션 회복: 없음");
         }
         DrawScrollShopControls();
     }

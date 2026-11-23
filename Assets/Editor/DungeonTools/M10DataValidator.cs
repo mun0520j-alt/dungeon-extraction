@@ -35,6 +35,27 @@ public static class M10DataValidator
         LootItemData legendaryBag = LootItemDatabase.FindById("bag_legendary");
         ok &= legendaryBag != null && legendaryBag.GridWidth == 5 && legendaryBag.GridHeight == 6
             && legendaryBag.BagGridWidth == 5 && legendaryBag.BagGridHeight == 6;
+        ok &= M10ProgressionDatabase.Levels.Count == 12;
+        int previousXP = -1;
+        foreach (M10LevelDefinition level in M10ProgressionDatabase.Levels)
+        {
+            ok &= level.CumulativeXP > previousXP;
+            previousXP = level.CumulativeXP;
+        }
+        foreach (string potionId in new[] { "potion_small", "potion_medium", "potion_large" })
+        {
+            LootItemData item = LootItemDatabase.FindById(potionId);
+            M10PotionDefinition potion = M10ProgressionDatabase.Potion(potionId);
+            ok &= item != null && item.Type == LootItemType.Consumable && potion != null
+                && Mathf.Approximately(potion.DurationTicks, 10f) && Mathf.Approximately(potion.UseTicks, 2f);
+        }
+        for (int floor = 1; floor <= 9; floor++)
+        {
+            if (M10DungeonConfig.IsBossFloor(floor)) continue;
+            M10FloorSpawnDefinition spawn = M10EnemyDatabase.Floor(floor);
+            int expected = floor >= 3 ? 1 : 0;
+            ok &= spawn != null && spawn.EliteMin == expected && spawn.EliteMax == expected;
+        }
         if (!ok) throw new InvalidOperationException("M10 data validation failed. CSV/clock/floor configuration을 확인하세요.");
         Debug.Log("[M10 Validation] PASS — 10층, 보스 5/10층, MIA 2880, 몬스터·드롭·장식·스크롤 상점·Legendary 5종 확인.");
     }
