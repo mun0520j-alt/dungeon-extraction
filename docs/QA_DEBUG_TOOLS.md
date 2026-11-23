@@ -54,3 +54,8 @@
 
 - 경로: `%USERPROFILE%\AppData\LocalLow\Watshoi_Maker\Dungeon Extraction\M3Measurements\expedition_runs_v4.csv`
 - 디버그 기능을 쓴 원정은 기록하지 않는다.
+
+## F9 — M10 시간·스크롤 상점 (2026-11-23 개선)
+
+- **던전 경과**: 현재 `경과 / 2880 Tick`과 MIA까지 남은 분을 표시. `MIA 직전(2879)` · `+10` · `+100` · 직접 입력 후 `이 값으로`. (Inspector의 `QA/Set Elapsed Tick` 기본값도 2879로 변경)
+- **스크롤 상점**: 해금 여부·재고(n/3)·충전 진행(n/10000, 원정 끝날 때 반영) 표시. `해금` · `충전 직전(9999/재고 0)` · `재고 가득(3)` · `재고 0` · 직접 입력(`충전 진행 Tick`, `재고`) 후 `적용`.

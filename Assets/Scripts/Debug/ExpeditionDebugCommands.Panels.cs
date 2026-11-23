@@ -64,28 +64,59 @@ public sealed partial class ExpeditionDebugCommands
             qaEnemyIdInput = GUILayout.TextField(qaEnemyIdInput ?? string.Empty);
             if (GUILayout.Button("지정 몹 소환", GUILayout.Width(100f))) SpawnDebugEnemy(qaEnemyIdInput);
             GUILayout.EndHorizontal();
+            DrawElapsedTickControls();
         }
+        DrawScrollShopControls();
+    }
 
+    // 던전 경과 시간: 현재 값 표시 + 바로 쓰는 버튼(MIA 경계 직전, +10/+100) + 직접 입력
+    private void DrawElapsedTickControls()
+    {
+        float mia = DungeonClock.MIAThresholdTicks;
+        float now = ExpeditionSession.ElapsedTicks;
+        GUILayout.Label($"던전 경과: {now:0} / {mia:0} Tick (MIA까지 {Mathf.Max(0f, mia - now):0} Tick = {Mathf.Max(0f, mia - now) * DungeonClock.MinutesPerTick:0}분)");
         GUILayout.BeginHorizontal();
-        if (GUILayout.Button("스크롤 상점 해금"))
-        {
-            M3MeasurementAutomation.MarkDebugRun();
-            QuestRuntimeState.DebugUnlockEscapeScrollShop();
-            M5SaveService.SaveNow();
-        }
-        GUILayout.Label("누적");
+        if (GUILayout.Button($"MIA 직전 ({mia - 1:0})")) SetElapsedTicks(mia - 1f);
+        if (GUILayout.Button("+10", GUILayout.Width(44f))) SetElapsedTicks(now + 10f);
+        if (GUILayout.Button("+100", GUILayout.Width(50f))) SetElapsedTicks(now + 100f);
+        qaElapsedInput = GUILayout.TextField(qaElapsedInput ?? "0", GUILayout.Width(60f));
+        if (GUILayout.Button("이 값으로", GUILayout.Width(70f)) && float.TryParse(qaElapsedInput, out float target))
+            SetElapsedTicks(target);
+        GUILayout.EndHorizontal();
+    }
+
+    // 탈출 스크롤 상점: 현재 상태 표시 + 자주 쓰는 상태 버튼 + 직접 입력(항목 이름 표시)
+    private void DrawScrollShopControls()
+    {
+        int cap = M10DungeonConfig.EscapeScrollStockCap;
+        int restock = M10DungeonConfig.EscapeScrollRestockTicks;
+        GUILayout.Label(LootRuntimeState.IsEscapeScrollShopUnlocked
+            ? $"스크롤 상점: 해금됨 · 재고 {LootRuntimeState.EscapeScrollPurchaseStock}/{cap} · 충전 진행 {LootRuntimeState.EscapeScrollRestockProgress:0}/{restock} Tick (원정 끝날 때 반영)"
+            : "스크롤 상점: 잠김 (q06a·q06b 완료 시 해금)");
+        GUILayout.BeginHorizontal();
+        if (GUILayout.Button("해금")) { M3MeasurementAutomation.MarkDebugRun(); QuestRuntimeState.DebugUnlockEscapeScrollShop(); M5SaveService.SaveNow(); }
+        if (GUILayout.Button($"충전 직전 ({restock - 1}/재고 0)")) ApplyScrollShop(restock - 1, 0);
+        if (GUILayout.Button($"재고 가득 ({cap})")) ApplyScrollShop(0, cap);
+        if (GUILayout.Button("재고 0")) ApplyScrollShop(0, 0);
+        GUILayout.EndHorizontal();
+        GUILayout.BeginHorizontal();
+        GUILayout.Label("충전 진행 Tick", GUILayout.Width(90f));
         qaShopProgressInput = GUILayout.TextField(qaShopProgressInput ?? "0", GUILayout.Width(60f));
-        GUILayout.Label("재고");
+        GUILayout.Label($"재고(0~{cap})", GUILayout.Width(70f));
         qaShopStockInput = GUILayout.TextField(qaShopStockInput ?? "0", GUILayout.Width(35f));
-        if (GUILayout.Button("설정", GUILayout.Width(45f))
+        if (GUILayout.Button("적용", GUILayout.Width(45f))
             && float.TryParse(qaShopProgressInput, out float progress)
             && int.TryParse(qaShopStockInput, out int stock))
-        {
-            M3MeasurementAutomation.MarkDebugRun();
-            LootRuntimeState.DebugSetEscapeScrollShop(progress, stock);
-            M5SaveService.SaveNow();
-        }
+            ApplyScrollShop(progress, stock);
         GUILayout.EndHorizontal();
+    }
+
+    private static void ApplyScrollShop(float progress, int stock)
+    {
+        M3MeasurementAutomation.MarkDebugRun();
+        LootRuntimeState.DebugSetEscapeScrollShop(progress, stock);
+        M5SaveService.SaveNow();
+        Debug.Log($"[QA] 스크롤 상점: 충전 진행 {progress:0} Tick, 재고 {stock}");
     }
 
     private static void GiveDebugItem(LootItemData definition)

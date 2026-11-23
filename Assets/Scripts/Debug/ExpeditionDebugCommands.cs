@@ -16,7 +16,7 @@ public sealed partial class ExpeditionDebugCommands : MonoBehaviour
     private const string DungeonSceneName = "InDungeon";
     private const int DebugChestSeed = 20261105;
 
-    [Min(0f)] public float targetElapsedTicks = 1439f;
+    [Min(0f)] public float targetElapsedTicks = 2879f; // M10: MIA 경계 직전 (2880 = 24시간)
     [Min(1)] public int targetPlayerHP = 1;
     [Min(1f)] public float insuranceAdvanceTicks = 1500f;
     [SerializeField] private bool showTileGrid;
@@ -27,6 +27,7 @@ public sealed partial class ExpeditionDebugCommands : MonoBehaviour
     private string qaEnemyIdInput = "masked_orc";
     private string qaShopProgressInput = "0";
     private string qaShopStockInput = "0";
+    private string qaElapsedInput = "2879";
     private GUIStyle gridLabelStyle;
 
     private readonly struct Hotkey

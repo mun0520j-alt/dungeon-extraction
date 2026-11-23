@@ -35,6 +35,52 @@ public sealed class EscapeScrollZone : MonoBehaviour
         transform.localScale = sprite != null ? new Vector3(2.4f, 2.4f, 1f) : new Vector3(3f, 3f, 1f);
     }
 
+    // 2026-11-23: 탈출 구역 안에서 E를 누르면 출격 가방의 탈출 스크롤을 바로 사용한다.
+    // 문·상자·바닥 더미·계단이 함께 있으면 그쪽 E 상호작용을 우선하고 여기서는 아무것도 하지 않는다.
+    // 원정 한정(엘리트 드롭) 스크롤을 먼저 쓴다 — 어차피 원정이 끝나면 사라지므로.
+    private static readonly System.Collections.Generic.List<DungeonDoor> nearbyDoors = new System.Collections.Generic.List<DungeonDoor>();
+    private static readonly System.Collections.Generic.List<DungeonChest> nearbyChests = new System.Collections.Generic.List<DungeonChest>();
+    private static readonly System.Collections.Generic.List<GroundLootPile> nearbyPiles = new System.Collections.Generic.List<GroundLootPile>();
+
+    private void Update()
+    {
+        if (Active != this || activated || !Input.GetKeyDown(KeyCode.E)) return;
+        if (PauseMenuController.BlocksWorldInput || InventoryPanel.IsOpen || LootingPanel.IsOpen || GroundLoot.IsSelectionOpen) return;
+        PlayerTurnActor player = PlayerTurnActor.Instance;
+        if (player == null || !player.IsReadyForInput || player.FloorTilemap != Floor || !Contains(player.CurrentCell)) return;
+
+        nearbyDoors.Clear(); nearbyChests.Clear(); nearbyPiles.Clear();
+        DungeonDoor.CollectAdjacent(player.FloorTilemap, player.CurrentCell, nearbyDoors);
+        DungeonChest.CollectAdjacent(player.CurrentCell, nearbyChests);
+        GroundLootPile.CollectAdjacent(player.CurrentCell, nearbyPiles);
+        bool otherInteraction = nearbyDoors.Count + nearbyChests.Count + nearbyPiles.Count > 0
+            || DungeonStairs.TryGetDebugLabel(player.CurrentCell, out _);
+        nearbyDoors.Clear(); nearbyChests.Clear(); nearbyPiles.Clear();
+        if (otherInteraction) return;
+
+        LootItemInstance scroll = FindScrollInRunBag();
+        if (scroll == null)
+        {
+            InventoryPanel.ShowBagNotice("출격 가방에 탈출 스크롤이 없습니다.");
+            return;
+        }
+        if (!LootInteractionGate.TryClaim()) return;
+        if (!TryUseEscapeScroll(scroll.InstanceId, out string failure)) InventoryPanel.ShowBagNotice(failure);
+    }
+
+    // 출격 가방 직속의 탈출 스크롤 (사용 처리 TryConsumeRunBagItem이 직속만 지원). 원정 한정 스크롤 우선.
+    private static LootItemInstance FindScrollInRunBag()
+    {
+        LootItemInstance normal = null;
+        foreach (LootItemInstance item in LootRuntimeState.RunBag)
+        {
+            if (item?.Definition?.Id != "escape_scroll") continue;
+            if (item.IsExpeditionBound) return item;
+            if (normal == null) normal = item;
+        }
+        return normal;
+    }
+
     public bool Contains(Vector3Int cell)
     {
         return Mathf.Abs(cell.x - CenterCell.x) <= 1 && Mathf.Abs(cell.y - CenterCell.y) <= 1;
