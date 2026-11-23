@@ -216,3 +216,10 @@
 - 액션 없는 프레임은 idle/run 양쪽에 재사용하고, chest_mimic은 idle f0·run open f0~f2로 제한했다.
 - Validate Data에 모든 sprite_key의 idle/run 존재와 타 몬스터 프레임 혼입 검사를 추가했다.
 
+# 2026-11-23 — M10 보스 사망 스케줄 정지
+
+- Editor.log에서 같은 전역 시각 `[870]`에 Boss_F5가 단일·예고·광역을 반복하고 `actorTime`만 139만 이상 증가한 근거를 확인했다.
+- `RequestDeathResolution()`의 다음 프레임 코루틴보다 `TickManager.AdvanceSchedule()` 동기 반복이 먼저 메인 스레드를 점유한 것이 직접 원인이다.
+- 각 액터 행동 전후에 사망·원정 종료를 확인하고, `OnTurnStart` 호출 스택을 빠져나온 뒤 `CompleteDeath()`를 호출하도록 수정했다.
+- 재발 시 Editor 전체가 멈추지 않도록 한 번의 스케줄 진행에 동기 행동 10,000회 상한을 추가했다.
+

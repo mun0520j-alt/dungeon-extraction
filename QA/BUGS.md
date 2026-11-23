@@ -1316,3 +1316,20 @@ DungeonRunManager.CreateRuntimeEnemy () (at Assets/Scripts/MapGen/DungeonRunMana
 | 원인 | `AssetDatabase.FindAssets` 부분 일치와 idle 전용 `M10SpriteAnimation.Configure` |
 | 수정 | 정규식 전체 이름 매칭·정수 정렬, idle/run 상태 전환, 미믹 예외, Validate Data 프레임 소유권 검사 |
 | 관련 TC | TC-M10-50~53 |
+
+## BUG-052 — 보스에게 사망하면 Tick 스케줄러가 무한 반복
+
+| 항목 | 내용 |
+|---|---|
+| 상태 | Fixed — Play 검증 대기 |
+| Jira | 미등록 |
+| 우선순위 | Critical / P0 |
+| 발견 단계 | M10 보스 Play (사용자, 2026-11-23) |
+| 관련 결함 | BUG-032, BUG-034 재발 |
+| 재현 | 5층 미믹 또는 10층 오크 보스 공격으로 Player HP를 0으로 만든다 |
+| 실제 | Unity Editor 전체가 응답하지 않고 Dead 결과 화면으로 전환되지 않음 |
+| 기대 | 현재 보스 행동을 끝낸 뒤 스케줄을 즉시 중단하고 Dead 결과를 한 번만 확정 |
+| 원인 | 사망 처리를 다음 프레임으로 미룬 동안 `AdvanceSchedule()`이 Player 입력 차례 없이 보스 행동만 동기 반복해 다음 프레임에 도달하지 못함 |
+| 로그 근거 | 같은 전역 시각 `[870]`에서 Boss_F5 행동이 반복되며 `actorTime`이 1,394,375 이상까지 증가 |
+| 수정 | 각 동기 행동 전후에 활성 원정·Player 사망을 검사해 반복문 밖에서 `CompleteDeath()` 호출. 호출당 10,000회 안전 상한 추가 |
+| 관련 TC | TC-M10-54~58 |

@@ -58,5 +58,10 @@
 | TC-M10-51 | 액션 없는 몹(ice_zombie·muddy·necromancer·swampy·tiny_slug) 이동 | `_anim` 프레임을 idle/run 양쪽에서 사용해 정지·깜빡임 없음 | Play 검증 대기 |
 | TC-M10-52 | 5층 chest_mimic 대기 후 이동 | 대기 중 닫힌 f0 정지, 이동 중에만 open f0~f2 재생 | Play 검증 대기 |
 | TC-M10-53 | ogre·big_zombie·orc_warrior·big_demon 생성·이동 | 타일 중심/pivot 정상, 크기 차이에도 발 위치가 타일에서 벗어나지 않음 | Play 검증 대기 |
+| TC-M10-54 | 5층 미믹 단일 공격으로 Player 사망 | 현재 행동 뒤 즉시 스케줄 중단, Dead 결과 화면 1회, Editor 응답 유지 | Play 검증 대기 |
+| TC-M10-55 | 5층 미믹 광역 공격으로 Player 사망 | 예약 패턴 추가 실행 없이 Dead 결과 화면 1회, Editor 응답 유지 | Play 검증 대기 |
+| TC-M10-56 | 10층 orc_warrior 공격으로 Player 사망 | 현재 행동 뒤 즉시 스케줄 중단, Dead 결과 화면 1회 | Play 검증 대기 |
+| TC-M10-57 | 포션 지속 회복 중·레벨업 직후 보스에게 사망 | 회복이 사망을 되돌리지 않고 Dead 우선, 결과 처리 1회 | Play 검증 대기 |
+| TC-M10-58 | 비정상 동기 액터가 한 호출에서 10,000회 초과 행동 | 오류 로그 1회 후 스케줄 중단, Editor 응답 유지 | 정적 검증 완료 / Play 검증 대기 |
 
 우선순위는 기존과 동일하게 `Dead > MIA > Escape/Loot`를 유지한다.
