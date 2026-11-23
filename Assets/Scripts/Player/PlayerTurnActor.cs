@@ -661,6 +661,14 @@ public class PlayerTurnActor : MonoBehaviour, ITurnActor
         healthViewDirty = true;
     }
 
+    public void ClampHealthToM10Max()
+    {
+        currentHP = Mathf.Min(currentHP, CurrentMaxHP);
+        ExpeditionSession.RecordPlayerHealth(currentHP);
+        healthBar?.SetFill((float)currentHP / CurrentMaxHP);
+        healthViewDirty = true;
+    }
+
     // 예약된 경로를 한 칸 진행한다. 몹을 발견하면(지금은 항상 false — 몹 시스템 붙기 전까지의
     // 스텁) 남은 경로를 버리고 자동 이동을 멈춘다 — 이 시점엔 턴이 안 넘어가고 플레이어
     // 입력 대기 상태로 조용히 돌아간다(정상적인 "내 턴" 상태와 동일).

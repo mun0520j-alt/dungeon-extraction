@@ -130,6 +130,7 @@ public static class M10RunProgression
         level = target;
         experience = M10ProgressionDatabase.Level(level).CumulativeXP;
         if (difference > 0) PlayerTurnActor.Instance?.ApplyM10LevelUp(difference);
+        else if (difference < 0) PlayerTurnActor.Instance?.ClampHealthToM10Max();
         M3MeasurementAutomation.MarkDebugRun();
     }
 #endif

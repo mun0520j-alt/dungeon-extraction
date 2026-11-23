@@ -15,6 +15,12 @@ public static class M10DungeonConfig
     public static int EscapeScrollRestockTicks => Mathf.Max(1, Get("escape_scroll_restock_ticks", 10000));
     public static int EscapeScrollRestockAmount => Mathf.Max(1, Get("escape_scroll_restock_amount", 3));
     public static int EscapeScrollStockCap => Mathf.Max(1, Get("escape_scroll_stock_cap", 3));
+    public static int FloorArrivalXPShallow => Mathf.Max(0, Get("floor_arrival_xp_shallow", 20));
+    public static int FloorArrivalXPDeep => Mathf.Max(0, Get("floor_arrival_xp_deep", 60));
+    public static int FastArrivalTicksPerFloor => Mathf.Max(1, Get("fast_arrival_ticks_per_floor", 200));
+    public static int FastArrivalBonusPercent => Mathf.Max(0, Get("fast_arrival_bonus_pct", 50));
+    public static int BossAoeFinalDamage => Mathf.Max(1, Get("boss_aoe_final_damage", 35));
+    public static int NightFloorMultiplierPercent => Mathf.Max(100, Get("night_floor_multiplier_pct", 100));
     // 결정 17: 엘리트는 "아 쟤구나" 정도로만 구분 — 크기 배율(m10_enemies.csv visual_scale) + 옅은 색조(%).
     public static Color EliteTint => new Color(Get("elite_tint_r", 100) / 100f, Get("elite_tint_g", 72) / 100f, Get("elite_tint_b", 72) / 100f, 1f);
     public static bool IsBossFloor(int floor) => floor == FirstBossFloor || floor == FinalBossFloor;
