@@ -6,8 +6,8 @@ using UnityEngine;
 public sealed class M10EnemyDefinition
 {
     public string Id, SpriteKey, Tier;
-    public int HP, Attack, Defense;
-    public float MoveCostMultiplier, VisualScale, ScrollDropChance;
+    public int HP, Attack, Defense, XP;
+    public float MoveCostMultiplier, VisualScale, ScrollDropChance, PotionDropChance;
     public EnemyBehaviorType Behavior;
     public bool IsElite => string.Equals(Tier, "elite", StringComparison.OrdinalIgnoreCase);
 }
@@ -37,10 +37,11 @@ public static class M10EnemyDatabase
             string[] lines = enemyCsv.text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
             for (int i = 1; i < lines.Length; i++)
             {
-                string[] f = lines[i].Split(','); if (f.Length < 10) continue;
+                string[] f = lines[i].Split(','); if (f.Length < 12) continue;
                 Enum.TryParse(f[7], true, out EnemyBehaviorType behavior);
                 var d = new M10EnemyDefinition { Id=f[0], SpriteKey=f[1], Tier=f[2], HP=I(f[3]), Attack=I(f[4]), Defense=I(f[5]),
-                    MoveCostMultiplier=F(f[6],1), Behavior=behavior, VisualScale=F(f[8],1), ScrollDropChance=F(f[9],0) };
+                    MoveCostMultiplier=F(f[6],1), Behavior=behavior, VisualScale=F(f[8],1), ScrollDropChance=F(f[9],0),
+                    XP=I(f[10]), PotionDropChance=F(f[11],0) };
                 enemies[d.Id] = d;
             }
         }

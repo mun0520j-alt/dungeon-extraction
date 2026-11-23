@@ -1,9 +1,9 @@
 floor,normal_ids,normal_count,elite_ids,elite_min,elite_max
-1,goblin;tiny_zombie;tiny_slug,3,masked_orc,0,1
-2,goblin;tiny_zombie;tiny_slug;skelet,3,masked_orc,0,1
-3,skelet;slug;zombie;muddy,3,masked_orc;big_zombie,0,2
-4,skelet;slug;zombie;muddy,3,masked_orc;big_zombie,1,2
-6,swampy;ice_zombie;orc_shaman;wogol,3,ogre;necromancer,0,1
-7,swampy;ice_zombie;orc_shaman;wogol;pumpkin_dude,3,ogre;necromancer,0,2
-8,ice_zombie;orc_shaman;wogol;pumpkin_dude;doc,3,ogre;necromancer,1,2
-9,orc_shaman;wogol;pumpkin_dude;doc;angel,3,ogre;necromancer,1,2
+1,goblin;tiny_zombie;tiny_slug,3,masked_orc,0,0
+2,goblin;tiny_zombie;tiny_slug;skelet,3,masked_orc,0,0
+3,skelet;slug;zombie;muddy,3,masked_orc;big_zombie,1,1
+4,skelet;slug;zombie;muddy,3,masked_orc;big_zombie,1,1
+6,swampy;ice_zombie;orc_shaman;wogol,3,ogre;necromancer,1,1
+7,swampy;ice_zombie;orc_shaman;wogol;pumpkin_dude,3,ogre;necromancer,1,1
+8,ice_zombie;orc_shaman;wogol;pumpkin_dude;doc,3,ogre;necromancer,1,1
+9,orc_shaman;wogol;pumpkin_dude;doc;angel,3,ogre;necromancer,1,1

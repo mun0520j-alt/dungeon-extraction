@@ -49,6 +49,7 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
     // 피격 플래시와 애니메이션 제어에 사용한다.
     private SpriteRenderer spriteRenderer;
     private Animator spriteAnimator;
+    private M10EnemyDefinition m10Definition;
 
     // AI는 차례가 오면 즉시 판단해서 바로 CompleteTurn을 불러야 하는 게 정상 동작이라(Player와
     // 반대), 이 호출을 깜빡하는 버그가 생기면 TickManager 워치독이 곧바로 잡아내야 한다.
@@ -91,11 +92,13 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
     }
 #endif
 
-    public void ConfigureM10Identity(bool elite, float scrollDropChance)
+    public void ConfigureM10Identity(M10EnemyDefinition definition)
     {
-        isElite = elite;
-        eliteScrollDropChance = Mathf.Clamp01(scrollDropChance);
-        if (elite)
+        m10Definition = definition;
+        isElite = definition?.IsElite ?? false;
+        eliteScrollDropChance = Mathf.Clamp01(definition?.ScrollDropChance ?? 0f);
+        bossAoeFinalDamage = M10DungeonConfig.BossAoeFinalDamage;
+        if (isElite)
         {
             SpriteRenderer body = spriteRenderer != null ? spriteRenderer : GetComponentInChildren<SpriteRenderer>();
             if (body != null) body.color = M10DungeonConfig.EliteTint;
@@ -631,6 +634,7 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
 
         if (currentHP <= 0)
         {
+            M10RunProgression.RecordEnemyDefeated(m10Definition);
             if (isBoss)
             {
                 if (bossTelegraph != null) Destroy(bossTelegraph);
@@ -638,6 +642,7 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
                 DropBossLoot();
             }
             else if (isElite) DropEliteScroll();
+            DropPotion();
             M3MeasurementAutomation.RecordEnemyKill();
             if (TickManager.Instance != null)
             {
@@ -645,6 +650,20 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
             }
             Destroy(gameObject);
         }
+    }
+
+    private void DropPotion()
+    {
+        if (m10Definition == null || m10Definition.PotionDropChance <= 0f) return;
+        int seed = currentCell.x * 92837111 ^ currentCell.y * 689287499 ^ ExpeditionSession.CurrentFloor * 19349663;
+        var rng = new System.Random(seed);
+        if (rng.NextDouble() >= m10Definition.PotionDropChance) return;
+        string itemId = m10Definition.IsElite || string.Equals(m10Definition.Tier, "boss", System.StringComparison.OrdinalIgnoreCase)
+            ? (ExpeditionSession.CurrentFloor >= 8 ? "potion_large" : "potion_medium") : "potion_small";
+        LootItemData definition = LootItemDatabase.FindById(itemId);
+        if (definition == null) return;
+        GroundLootPile.TryAddOrCreate(floorTilemap, currentCell,
+            new LootItemInstance(definition, foundInRaid: true), out _, "포션 전리품");
     }
 
     private void DropEliteScroll()
