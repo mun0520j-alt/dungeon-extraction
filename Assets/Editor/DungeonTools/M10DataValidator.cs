@@ -56,8 +56,23 @@ public static class M10DataValidator
             int expected = floor >= 3 ? 1 : 0;
             ok &= spawn != null && spawn.EliteMin == expected && spawn.EliteMax == expected;
         }
+        M10EnemyVisualCatalog enemyVisuals = Resources.Load<M10EnemyVisualCatalog>("Data/M10EnemyVisualCatalog");
+        foreach (M10EnemyDefinition enemy in M10EnemyDatabase.All)
+        {
+            M10EnemyVisualCatalog.Entry visual = enemyVisuals != null ? enemyVisuals.Find(enemy.SpriteKey) : null;
+            ok &= visual?.idleFrames != null && visual.idleFrames.Length >= 1;
+            ok &= visual?.runFrames != null && visual.runFrames.Length >= 1;
+            if (visual == null) continue;
+            foreach (Sprite frame in visual.idleFrames) ok &= FrameBelongsTo(frame, enemy.SpriteKey);
+            foreach (Sprite frame in visual.runFrames) ok &= FrameBelongsTo(frame, enemy.SpriteKey);
+        }
         if (!ok) throw new InvalidOperationException("M10 data validation failed. CSV/clock/floor configuration을 확인하세요.");
         Debug.Log("[M10 Validation] PASS — 10층, 보스 5/10층, MIA 2880, 몬스터·드롭·장식·스크롤 상점·Legendary 5종 확인.");
+    }
+
+    private static bool FrameBelongsTo(Sprite frame, string key)
+    {
+        return frame != null && frame.name.StartsWith(key + "_", StringComparison.Ordinal);
     }
 }
 #endif

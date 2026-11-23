@@ -1303,3 +1303,16 @@ DungeonRunManager.CreateRuntimeEnemy () (at Assets/Scripts/MapGen/DungeonRunMana
 - **실제:** 직속 가방만 검색해 일반 스크롤을 소모한다.
 - **수정:** E 입력 처리를 기존 상태 갱신 `Update()`에 통합하고, 출격 가방 전체 트리를 재귀 검색·소모하도록 상태 API를 확장했다.
 - **회귀 범위:** 탈출 구역 E, 하위 가방 소모품, 문·상자·바닥 더미·계단 E 우선순위, 일시정지·인벤토리·루팅창 입력 차단.
+## BUG-051 — 몬스터 애니메이션에 다른 몬스터 프레임 혼입 및 run 미사용
+
+| 항목 | 내용 |
+|---|---|
+| 상태 | Fixed — Play 검증 대기 |
+| Jira | 미등록 |
+| 우선순위 | Major / P1 |
+| 재현 | zombie·slug 및 단일 `_anim` 몬스터를 생성해 대기·이동 관찰 |
+| 실제 | 부분 이름 검색으로 tiny/big 변형 프레임이 섞이고, 런타임은 catalog `runFrames`를 사용하지 않음 |
+| 기대 | 각 `sprite_key`의 정확한 idle/run만 숫자 순서로 재생. 액션 없는 몹은 공용 프레임 사용 |
+| 원인 | `AssetDatabase.FindAssets` 부분 일치와 idle 전용 `M10SpriteAnimation.Configure` |
+| 수정 | 정규식 전체 이름 매칭·정수 정렬, idle/run 상태 전환, 미믹 예외, Validate Data 프레임 소유권 검사 |
+| 관련 TC | TC-M10-50~53 |

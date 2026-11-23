@@ -49,6 +49,7 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
     // 피격 플래시와 애니메이션 제어에 사용한다.
     private SpriteRenderer spriteRenderer;
     private Animator spriteAnimator;
+    private M10SpriteAnimation catalogAnimation;
     private M10EnemyDefinition m10Definition;
 
     // AI는 차례가 오면 즉시 판단해서 바로 CompleteTurn을 불러야 하는 게 정상 동작이라(Player와
@@ -183,6 +184,7 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
 
         spriteRenderer = GetComponentInChildren<SpriteRenderer>();
         spriteAnimator = GetComponentInChildren<Animator>();
+        catalogAnimation = GetComponentInChildren<M10SpriteAnimation>();
         if (spriteRenderer == null)
         {
             Debug.LogWarning("[EnemyTurnActor] SpriteRenderer를 못 찾아서 발 위치 보정(Y) 없이 셀 바닥에 그대로 배치됩니다.");
@@ -568,6 +570,7 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
     {
         isAnimating = true;
         if (spriteAnimator != null) spriteAnimator.Play("run", 0, 0f);
+        catalogAnimation?.PlayRun();
 
         Vector3 startPos = transform.position;
         Vector3 endPos = GetCellCenterWorldPosition(targetCell);
@@ -589,6 +592,7 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
 
         transform.position = endPos; // 부동소수점 오차 정리 — 정확히 목표 위치에 스냅.
         if (spriteAnimator != null) spriteAnimator.Play("idle", 0, 0f);
+        catalogAnimation?.PlayIdle();
         isAnimating = false;
         if (turnPendingDuringAnimation)
         {

@@ -54,5 +54,9 @@
 | TC-M10-47 | Lv12 Unique 기준 오크 인파이트 | HP 1400/공격 210/방어 18 적용, 대형 포션 약 4개 목표 체감 기록 | Play 검증 대기 |
 | TC-M10-48 | F9에서 Lv1~12·XP+100·포션 3종 지급 | 레벨/XP/HUD/회복 상태 갱신, QA 원정 측정 제외 | Play 검증 대기 |
 | TC-M10-49 | Tools/Dungeon/M10/Validate Data | 레벨 12행·누적 XP 증가·포션 3종 일치·3층부터 엘리트 1마리 검증 PASS | 자동 검증 대기 |
+| TC-M10-50 | Enemy visual catalog 재생성 후 zombie·slug·tiny 변형 확인 | 각 `sprite_key`의 정확한 프레임만 포함, `f` 뒤 숫자 순서로 재생 | 자동 검증 대기 |
+| TC-M10-51 | 액션 없는 몹(ice_zombie·muddy·necromancer·swampy·tiny_slug) 이동 | `_anim` 프레임을 idle/run 양쪽에서 사용해 정지·깜빡임 없음 | Play 검증 대기 |
+| TC-M10-52 | 5층 chest_mimic 대기 후 이동 | 대기 중 닫힌 f0 정지, 이동 중에만 open f0~f2 재생 | Play 검증 대기 |
+| TC-M10-53 | ogre·big_zombie·orc_warrior·big_demon 생성·이동 | 타일 중심/pivot 정상, 크기 차이에도 발 위치가 타일에서 벗어나지 않음 | Play 검증 대기 |
 
 우선순위는 기존과 동일하게 `Dead > MIA > Escape/Loot`를 유지한다.

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEngine;
 
@@ -14,7 +15,21 @@ public static class M10EnemyVisualCatalogBuilder
     private static void BuildWhenMissing()
     {
         var catalog = AssetDatabase.LoadAssetAtPath<M10EnemyVisualCatalog>(AssetPath);
-        if (catalog == null || catalog.EntryCount == 0) Build();
+        if (CatalogNeedsRebuild(catalog)) Build();
+    }
+
+    private static bool CatalogNeedsRebuild(M10EnemyVisualCatalog catalog)
+    {
+        if (catalog == null || catalog.EntryCount == 0) return true;
+        foreach (string key in EnemyKeys())
+        {
+            M10EnemyVisualCatalog.Entry entry = catalog.Find(key);
+            if (entry?.idleFrames == null || entry.idleFrames.Length == 0
+                || entry.runFrames == null || entry.runFrames.Length == 0) return true;
+            if (entry.idleFrames.Any(frame => frame == null || !frame.name.StartsWith(key + "_", System.StringComparison.Ordinal))
+                || entry.runFrames.Any(frame => frame == null || !frame.name.StartsWith(key + "_", System.StringComparison.Ordinal))) return true;
+        }
+        return false;
     }
 
     [MenuItem("Tools/Dungeon/M10/Rebuild Enemy Visual Catalog")]
@@ -43,11 +58,28 @@ public static class M10EnemyVisualCatalogBuilder
 
     private static Sprite[] LoadFrames(string key, string action)
     {
-        string[] guids = AssetDatabase.FindAssets($"{key}_{action}_anim", new[] { Frames });
-        if (guids.Length == 0 && action == "idle") guids = AssetDatabase.FindAssets($"{key}_anim", new[] { Frames });
-        if (guids.Length == 0 && key == "chest_mimic") guids = AssetDatabase.FindAssets("chest_mimic_open_anim", new[] { Frames });
-        return guids.Select(AssetDatabase.GUIDToAssetPath).OrderBy(path => path)
-            .SelectMany(path => AssetDatabase.LoadAllAssetsAtPath(path).OfType<Sprite>()).ToArray();
+        if (key == "chest_mimic")
+        {
+            Sprite[] open = LoadExact(@"^chest_mimic_open_anim_f(\d+)$");
+            return action == "idle" ? open.Take(1).ToArray() : open;
+        }
+
+        Sprite[] exact = LoadExact($@"^{Regex.Escape(key)}_{Regex.Escape(action)}_anim_f(\d+)$");
+        if (exact.Length > 0) return exact;
+        // 액션 분리 파일이 없는 몬스터는 같은 프레임을 idle/run 양쪽에서 사용한다.
+        return LoadExact($@"^{Regex.Escape(key)}_anim_f(\d+)$");
+    }
+
+    private static Sprite[] LoadExact(string pattern)
+    {
+        var regex = new Regex(pattern, RegexOptions.CultureInvariant);
+        return Directory.GetFiles(Frames, "*.png", SearchOption.TopDirectoryOnly)
+            .Select(path => path.Replace('\\', '/'))
+            .Select(path => new { path, match = regex.Match(Path.GetFileNameWithoutExtension(path)) })
+            .Where(value => value.match.Success)
+            .OrderBy(value => int.Parse(value.match.Groups[1].Value))
+            .SelectMany(value => AssetDatabase.LoadAllAssetsAtPath(value.path).OfType<Sprite>())
+            .ToArray();
     }
 
     private static IEnumerable<string> EnemyKeys()
