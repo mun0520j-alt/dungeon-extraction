@@ -54,9 +54,11 @@ public class PlayerTurnActor : MonoBehaviour, ITurnActor
     public PlayerEquipment Equipment => equipment;
 
     // 실제 전투 계산(공격/피격)에 쓰는 값 — 기본 스탯 + 장비 보너스 합계.
-    private int EffectiveAttackPower => attackPower + (equipment != null ? equipment.TotalAttackBonus : 0);
-    private int EffectiveDefensePower => defensePower + (equipment != null ? equipment.TotalDefenseBonus : 0);
+    private int EffectiveAttackPower => attackPower + M10RunProgression.AttackBonus + (equipment != null ? equipment.TotalAttackBonus : 0);
+    private int EffectiveDefensePower => defensePower + M10RunProgression.DefenseBonus + (equipment != null ? equipment.TotalDefenseBonus : 0);
     public int EffectiveDefense => EffectiveDefensePower;
+    public int CurrentMaxHP => maxHP + M10RunProgression.HPBonus;
+    public int CurrentHP => currentHP;
 
     // HP가 0 이하가 된 다음 프레임에 영지(BaseCamp)로 씬 전환한다 — TakeDamage 호출 시점에서
     // 바로 SceneManager.LoadScene을 부르지 않는 이유는 아래 Update() 주석 참고.
@@ -90,11 +92,11 @@ public class PlayerTurnActor : MonoBehaviour, ITurnActor
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
     public void DebugSetCurrentHP(int hp)
     {
-        currentHP = Mathf.Clamp(hp, 1, maxHP);
+        currentHP = Mathf.Clamp(hp, 1, CurrentMaxHP);
         isDead = false;
-        healthBar?.SetFill((float)currentHP / maxHP);
+        healthBar?.SetFill((float)currentHP / CurrentMaxHP);
         ExpeditionSession.RecordPlayerHealth(currentHP);
-        Debug.Log($"[QA] 플레이어 HP를 {currentHP}/{maxHP}(으)로 설정했습니다.");
+        Debug.Log($"[QA] 플레이어 HP를 {currentHP}/{CurrentMaxHP}(으)로 설정했습니다.");
     }
 #endif
 
@@ -104,17 +106,17 @@ public class PlayerTurnActor : MonoBehaviour, ITurnActor
 
         if (ExpeditionSession.HasPlayerHealth)
         {
-            currentHP = Mathf.Clamp(ExpeditionSession.PlayerCurrentHP, 0, maxHP);
+            currentHP = Mathf.Clamp(ExpeditionSession.PlayerCurrentHP, 0, CurrentMaxHP);
             isDead = currentHP <= 0;
         }
         else
         {
-            currentHP = maxHP;
+            currentHP = CurrentMaxHP;
             isDead = false;
             ExpeditionSession.RecordPlayerHealth(currentHP);
         }
 
-        healthBar?.SetFill((float)currentHP / maxHP);
+        healthBar?.SetFill((float)currentHP / CurrentMaxHP);
     }
 
     public void LockInputForResultResolution()
@@ -214,7 +216,7 @@ public class PlayerTurnActor : MonoBehaviour, ITurnActor
         // 붙여서 씬에 배치만 하면 자동으로 준비되게 한다.
         healthBar = GetComponent<ProceduralHealthBar>();
         if (healthBar == null) healthBar = gameObject.AddComponent<ProceduralHealthBar>();
-        healthBar.SetFill((float)currentHP / maxHP);
+        healthBar.SetFill((float)currentHP / CurrentMaxHP);
 
         // [2026-09-04 신규] 장비 컴포넌트 부착 — PlayerEquipment.Awake()가 자체적으로 테스트용
         // 기본 장비를 자동 장착해준다(에셋 없이도 바로 확인 가능, PlayerEquipment.cs 참고).
@@ -316,7 +318,7 @@ public class PlayerTurnActor : MonoBehaviour, ITurnActor
 
         if (!isMyTurn || isAnimating) return;
 
-        if (autoRestActive && (currentHP >= maxHP || EnemyTurnActor.AnyEnemyHuntingPlayer())) CancelAutoRest(true);
+        if (autoRestActive && (currentHP >= CurrentMaxHP || EnemyTurnActor.AnyEnemyHuntingPlayer())) CancelAutoRest(true);
         if (queuedWaitInput || autoRestActive)
         {
             queuedWaitInput = false;
@@ -358,7 +360,7 @@ public class PlayerTurnActor : MonoBehaviour, ITurnActor
     {
         if (!healthViewDirty || healthBar == null) return;
         healthViewDirty = false;
-        healthBar.SetFill((float)currentHP / maxHP);
+        healthBar.SetFill((float)currentHP / CurrentMaxHP);
     }
 
     private void HandleSpaceInput(bool blocked)
@@ -374,7 +376,7 @@ public class PlayerTurnActor : MonoBehaviour, ITurnActor
             spacePressedAt = Time.unscaledTime;
             spaceHoldActivated = false;
         }
-        if (Input.GetKey(KeyCode.Space) && !spaceHoldActivated && currentHP < maxHP
+        if (Input.GetKey(KeyCode.Space) && !spaceHoldActivated && currentHP < CurrentMaxHP
             && !EnemyTurnActor.AnyEnemyHuntingPlayer()
             && Time.unscaledTime - spacePressedAt >= HoldToRestSeconds)
         {
@@ -592,14 +594,14 @@ public class PlayerTurnActor : MonoBehaviour, ITurnActor
         int before = currentHP;
         bool bossDefeatedOnFloorFive = ExpeditionSession.CurrentFloor == 5 && GameObject.Find("Boss_F5") == null;
         int healAmount = bossDefeatedOnFloorFive ? 20 : 10;
-        currentHP = Mathf.Min(maxHP, currentHP + healAmount);
+        currentHP = Mathf.Min(CurrentMaxHP, currentHP + healAmount);
         M3MeasurementAutomation.RecordPlayerHealing(currentHP - before);
         ExpeditionSession.RecordPlayerHealth(currentHP);
-        healthBar?.SetFill((float)currentHP / maxHP);
+        healthBar?.SetFill((float)currentHP / CurrentMaxHP);
         healthViewDirty = true;
         string context = bossDefeatedOnFloorFive ? " (보스 처치 후 정비)" : string.Empty;
-        Debug.Log($"[Rest] 연속 대기 10 Tick{context} — HP {before} → {currentHP}/{maxHP}");
-        if (currentHP >= maxHP) autoRestActive = false;
+        Debug.Log($"[Rest] 연속 대기 10 Tick{context} — HP {before} → {currentHP}/{CurrentMaxHP}");
+        if (currentHP >= CurrentMaxHP) autoRestActive = false;
     }
 
     // Enemy.TryTraceTowards()가 인접해서 공격할 때 호출한다. 데미지 공식은 "공격력 - 방어력"
@@ -615,7 +617,7 @@ public class PlayerTurnActor : MonoBehaviour, ITurnActor
         M3MeasurementAutomation.RecordPlayerDamage(before - currentHP);
         CancelAutoRest(true);
         ExpeditionSession.RecordPlayerHealth(currentHP);
-        healthBar?.SetFill((float)currentHP / maxHP);
+        healthBar?.SetFill((float)currentHP / CurrentMaxHP);
         healthViewDirty = true;
 
         // [2026-09-04 신규] 맞는 순간 시각 피드백 — EnemyTurnActor.TakeDamage와 동일한 방식
@@ -634,6 +636,29 @@ public class PlayerTurnActor : MonoBehaviour, ITurnActor
             Debug.Log($"[DeathFlow] Player HP 0 — 사망 결과 처리 예약, 가방 {LootRuntimeState.RunBag.Count}/{LootRuntimeState.BagCapacity}");
             ExpeditionManager.Instance?.RequestDeathResolution();
         }
+    }
+
+    public void ApplyM10LevelUp(int gainedLevels)
+    {
+        if (gainedLevels <= 0) return;
+        int heal = gainedLevels * 30;
+        currentHP = Mathf.Min(CurrentMaxHP, currentHP + heal);
+        ExpeditionSession.RecordPlayerHealth(currentHP);
+        healthBar?.SetFill((float)currentHP / CurrentMaxHP);
+        healthViewDirty = true;
+    }
+
+    public void HealFromM10Potion(int amount)
+    {
+        if (amount <= 0 || isDead || !ExpeditionSession.IsActive) return;
+        int before = currentHP;
+        currentHP = Mathf.Min(CurrentMaxHP, currentHP + amount);
+        int healed = currentHP - before;
+        if (healed <= 0) return;
+        M3MeasurementAutomation.RecordPlayerHealing(healed);
+        ExpeditionSession.RecordPlayerHealth(currentHP);
+        healthBar?.SetFill((float)currentHP / CurrentMaxHP);
+        healthViewDirty = true;
     }
 
     // 예약된 경로를 한 칸 진행한다. 몹을 발견하면(지금은 항상 false — 몹 시스템 붙기 전까지의

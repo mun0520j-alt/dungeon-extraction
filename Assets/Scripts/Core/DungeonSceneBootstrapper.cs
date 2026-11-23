@@ -62,6 +62,7 @@ public class DungeonSceneBootstrapper : MonoBehaviour
         if (legacyBagPanel != null) Destroy(legacyBagPanel);
         if (FindFirstObjectByType<MinimapController>() == null) gameObject.AddComponent<MinimapController>();
         if (FindFirstObjectByType<DungeonInteractionMenu>() == null) gameObject.AddComponent<DungeonInteractionMenu>();
+        if (FindAnyObjectByType<M10ProgressionHUD>() == null) gameObject.AddComponent<M10ProgressionHUD>();
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         if (FindFirstObjectByType<ExpeditionDebugCommands>() == null) gameObject.AddComponent<ExpeditionDebugCommands>();

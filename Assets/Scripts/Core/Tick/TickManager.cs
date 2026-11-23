@@ -255,6 +255,7 @@ public class TickManager : MonoBehaviour
         // 예약 지연은 액터의 다음 실행 가능 시각만 늦춘다. 아직 실제로 소비하지 않은 미래
         // Tick을 전역 시계에 선반영하지 않도록 자연 행동 완료 시각만 보고한다.
         OnTimeAdvanced?.Invoke(actor, naturalNextActionTime);
+        M10RunProgression.AdvanceTo(naturalNextActionTime);
         DungeonClock dungeonClock = GetComponent<DungeonClock>();
         float globalTime = dungeonClock != null ? dungeonClock.ElapsedTicks : currentTurnActor.NextActionTime;
         M3MeasurementAutomation.RecordAction(actor, action, tickCost);

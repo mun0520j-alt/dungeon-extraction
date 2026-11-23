@@ -33,6 +33,7 @@ public static class ExpeditionSession
         M3MeasurementAutomation.PrepareNewSession();
         LootRuntimeState.BeginNewRun();
         ExpeditionRunRecord.BeginRun();
+        M10RunProgression.BeginRun();
         IsActive = true;
         CurrentFloor = FirstFloor;
         ElapsedTicks = 0f;
@@ -70,6 +71,7 @@ public static class ExpeditionSession
     {
         if (!IsActive || CurrentFloor >= FinalFloor) return false;
         CurrentFloor++;
+        M10RunProgression.RecordFloorArrival(CurrentFloor, ElapsedTicks);
         return true;
     }
 
@@ -93,6 +95,7 @@ public static class ExpeditionSession
         QuestRuntimeState.RecordExpeditionCompleted(run, carriedItems);
         LootRuntimeState.RecordExpeditionTicksForEscapeScrollShop(ElapsedTicks, scrollShopWasUnlocked);
         LootRuntimeState.ResolveRun(result);
+        M10RunProgression.EndRun();
         IsActive = false;
         M5SaveService.CompleteExpedition();
     }

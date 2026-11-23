@@ -10,3 +10,9 @@ elite_tint_b,72
 escape_scroll_restock_ticks,10000
 escape_scroll_restock_amount,3
 escape_scroll_stock_cap,3
+floor_arrival_xp_shallow,20
+floor_arrival_xp_deep,60
+fast_arrival_ticks_per_floor,200
+fast_arrival_bonus_pct,50
+boss_aoe_final_damage,35
+night_floor_multiplier_pct,100
