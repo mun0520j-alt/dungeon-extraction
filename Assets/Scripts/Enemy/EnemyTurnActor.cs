@@ -376,16 +376,16 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
             bossAoePending = true;
             bossAoeCell = player.CurrentCell;
             CreateBossTelegraph();
-            Debug.Log($"[Boss] 광역 예고 — 중심 {bossAoeCell}, 5 Tick 뒤 발동");
+            Debug.Log($"[Boss] 광역 예고 — 중심 {bossAoeCell}, {M10DungeonConfig.BossAoeTelegraphTicks} Tick 뒤 발동");
         }
         float? minimumNextActionTime = null;
         if (bossAoePending)
         {
             // 추격 중 보스의 개인 시간축이 전역 시계보다 뒤처졌더라도 예고 직후 밀린 턴을
-            // 따라잡으며 즉시 발동하지 않게 한다. 다음 행동 시각을 현재 전역 Tick+5 이상으로 맞춘다.
+            // 따라잡으며 즉시 발동하지 않게 한다. 다음 행동 시각을 현재 전역 Tick+CSV 예고값 이상으로 맞춘다.
             float actorTime = TickManager.Instance.GetActorNextActionTime(this);
             float globalTime = ExpeditionManager.Instance?.ElapsedTicks ?? actorTime;
-            minimumNextActionTime = globalTime + 5f;
+            minimumNextActionTime = globalTime + M10DungeonConfig.BossAoeTelegraphTicks;
         }
         TickManager.Instance.CompleteTurn(this, TickCost.Attack,
             bossAoePending ? "BossSingle+Telegraph" : "BossSingle", minimumNextActionTime);
@@ -401,6 +401,19 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
         renderer.color = new Color(1f, 0.1f, 0.05f, 0.28f);
         renderer.sortingOrder = 4;
         bossTelegraph.transform.localScale = new Vector3(5f, 5f, 1f);
+
+        var labelObject = new GameObject("TelegraphTickLabel");
+        labelObject.transform.SetParent(bossTelegraph.transform, false);
+        labelObject.transform.localPosition = new Vector3(0f, 0f, -0.02f);
+        labelObject.transform.localScale = new Vector3(0.2f, 0.2f, 1f);
+        var label = labelObject.AddComponent<TextMesh>();
+        label.text = $"{M10DungeonConfig.BossAoeTelegraphTicks} Tick";
+        label.anchor = TextAnchor.MiddleCenter;
+        label.alignment = TextAlignment.Center;
+        label.characterSize = 0.16f;
+        label.fontSize = 48;
+        label.color = Color.white;
+        labelObject.GetComponent<MeshRenderer>().sortingOrder = 5;
     }
 
     private void AlertSameRoom(Vector3Int playerCell)

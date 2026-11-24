@@ -22,6 +22,7 @@ public static class M10DungeonConfig
     public static int FastArrivalTicksPerFloor => Mathf.Max(1, Get("fast_arrival_ticks_per_floor", 200));
     public static int FastArrivalBonusPercent => Mathf.Max(0, Get("fast_arrival_bonus_pct", 50));
     public static int BossAoeFinalDamage => Mathf.Max(1, Get("boss_aoe_final_damage", 35));
+    public static int BossAoeTelegraphTicks => Mathf.Max(1, Get("boss_aoe_telegraph_ticks", 20));
     public static Color BossAoeFlashColor
     {
         get

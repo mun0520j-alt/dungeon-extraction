@@ -971,6 +971,7 @@ DungeonRunManager.CreateRuntimeEnemy () (at Assets/Scripts/MapGen/DungeonRunMana
 - **수정:** 예고 행동 완료 시 보스의 다음 행동 시각을 `현재 전역 Tick + 5` 이상으로 보정한다.
 - **회귀 범위:** 추격 거리별 예고 후 1~4Tick 미발동, 5Tick 발동, 보스 사망 시 예약 광역 취소.
 - **검증:** 거리와 행동 비용을 달리해도 예고 후 정확히 전역 5Tick에 발동하며, 보스 사망 시 예약 광역이 취소됨을 확인했다.
+- **2026-11-24 기준 변경:** M10 결정 14·45에 따라 예고값을 CSV `boss_aoe_telegraph_ticks=20`으로 이동했다. 현재 회귀 기대값은 1~19Tick 미발동, 20Tick 발동이며 보스 사망 시 예약 취소는 그대로다(TC-M10-77~78).
 
 ## BUG-032 — 보스에게 사망하면 결과 처리 전에 스케줄러가 멈춤
 

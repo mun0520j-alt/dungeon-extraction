@@ -118,11 +118,12 @@ public static class M10DataValidator
         ok &= mimic?.idleFrames?.Length == 1 && mimic?.runFrames?.Length == 1
             && mimic?.attackFrames?.Length == 3;
         ok &= M10DungeonConfig.FastArrivalBonusPercent == 100
+            && M10DungeonConfig.BossAoeTelegraphTicks >= TickCost.Attack
             && Mathf.Approximately(M10DungeonConfig.BossAoeVfxSeconds, 0.4f)
             && Mathf.Approximately(M10DungeonConfig.BossAoeShakeStrength, 0.18f)
             && Mathf.Approximately(M10DungeonConfig.BossAoeShakeSeconds, 0.25f);
         if (!ok) throw new InvalidOperationException("M10 data validation failed. CSV/clock/floor configuration을 확인하세요.");
-        Debug.Log("[M10 Validation] PASS — Lv당 HP+40/공방+2, 빠른 도착 100%, 포션 즉시 50%, 미믹 공격 3프레임, 보스 광역 VFX, 중간 탈출구 3·5·7층, 엘리트 외곽선, 장식 0, Legendary 5종 확인.");
+        Debug.Log($"[M10 Validation] PASS — Lv당 HP+40/공방+2, 빠른 도착 100%, 포션 즉시 50%, 미믹 공격 3프레임, 보스 광역 예고 {M10DungeonConfig.BossAoeTelegraphTicks}Tick·VFX, 중간 탈출구 3·5·7층, 엘리트 외곽선, 장식 0, Legendary 5종 확인.");
     }
 
     private static bool FrameBelongsTo(Sprite frame, string key)

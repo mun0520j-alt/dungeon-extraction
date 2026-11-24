@@ -258,3 +258,15 @@
 - 계단과 탈출구가 동일한 BFS 최장 경로 기준을 유지하면서 실제 상자 셀을 피하므로, 예전 맨해튼 예약 칸과 새 BFS 칸이 달라지는 원인을 제거한다.
 - 탈출구 중심 셀만 배치 금지 대상으로 삼았다. 3×3 체류 구역 안에 상자를 허용할지는 사용자 결정 전까지 현행을 유지한다.
 
+# 2026-11-24 — M10 보스 광역 예고 20Tick
+
+- `EnemyTurnActor.RunBossTurn`의 `globalTime + 5f`와 로그 5Tick 하드코딩을 제거하고 `m10_dungeon.csv`의 `boss_aoe_telegraph_ticks=20`을 단일 원본으로 사용한다.
+- 예고 오브젝트 표시 문구·로그·스케줄 최소 행동 시각이 같은 CSV 값을 읽는다. 피해·범위·발동 VFX는 변경하지 않았다.
+- `M10DataValidator`가 예고값이 `TickCost.Attack` 이상인지 검사한다.
+- 결정 14의 Tick 2배 대상 전수 조사에서 다음 잔여 항목을 확인했으며 이번 범위에서는 수정하지 않았다.
+  - `PlayerTurnActor`: 휴식 회복이 여전히 연속 대기 10Tick마다 +10(5층 보스 처치 후 +20). 사용자 재설계 대기.
+  - `M7EconomyConfig`: 탈출 스크롤 사용/체류/수명 fallback이 1/20/50, 보험 대기/수령 fallback이 1500/3000으로 이전 값이다. 실제 CSV는 2/40/100, 3000/6000이라 정상이나 CSV 키 누락 시 이전 시간축으로 돌아간다.
+  - `ExpeditionDebugCommands.insuranceAdvanceTicks`: QA 기본값 1500으로 실제 보험 대기 3000의 절반만 진행한다.
+  - `DungeonStairs`: 5층 보스 처치 후 생환 체류 10Tick은 기존 5Tick의 2배, 일반 탈출 20Tick도 기존 10Tick의 2배라 정상이다.
+  - `TickCost`, MIA 2880, 탈출 스크롤·보험 CSV는 결정 14의 2배 환산 상태다. 포션 2/10Tick과 빠른 도착 200Tick은 M10에서 새로 정한 값이라 누락 대상이 아니다.
+
