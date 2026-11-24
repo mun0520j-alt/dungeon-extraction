@@ -26,7 +26,7 @@ public sealed class DungeonStairs : MonoBehaviour
 
         var renderer = gameObject.AddComponent<SpriteRenderer>();
         renderer.sprite = ProceduralSprite.GetWhiteSpriteCenterPivot();
-        renderer.color = finalExit ? new Color(0.2f, 1f, 0.75f, 0.25f) : new Color(1f, 0.75f, 0.15f);
+        renderer.color = finalExit ? M10DungeonConfig.ExitZoneColor : new Color(1f, 0.75f, 0.15f);
         renderer.sortingOrder = finalExit ? 1 : 5;
         transform.localScale = finalExit ? new Vector3(3f, 3f, 1f) : new Vector3(0.7f, 0.7f, 1f);
     }

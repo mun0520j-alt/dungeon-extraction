@@ -237,3 +237,10 @@
 - `LateUpdate`에서 sprite·flipX/flipY·sorting layer/order·mask·enabled를 본체와 동기화한다. 자식 오브젝트라 엘리트 크기와 사망 Destroy도 함께 따른다.
 - 셰이더가 Resources에서 직접 참조되므로 Always Included Shaders와 씬·프리팹은 변경하지 않았다.
 
+# 2026-11-24 — M10 중간 탈출구 3·5·7층
+
+- 중간 탈출구 층·색·투명도를 `m10_dungeon.csv`로 옮기고 Validate Data가 범위·첫 보스층 예외·정확한 임시값을 검사한다.
+- `TilePathfinder.FindReachableDistances`의 단일 BFS 결과를 재사용해 계단과 탈출구의 최장 경로를 고른다. 후보마다 경로 탐색을 반복하지 않는다.
+- 3·7층 탈출구는 시작점→계단 벡터와 내적이 음수인 반대쪽 절반에서 고른다. 후보가 없을 때만 계단 기준 최장 경로로 대체하고 Seed·좌표·Room ID·누적 횟수를 로그로 남긴다.
+- 5층은 기존 보스 아레나 배치와 잠금 규칙을 유지한다. 씬·프리팹·Canvas·세이브 구조는 변경하지 않았다.
+

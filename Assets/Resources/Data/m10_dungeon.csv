@@ -9,6 +9,9 @@ elite_tint_g,100
 elite_tint_b,100
 elite_outline_hex,FF3030
 elite_outline_px,1
+mid_exit_floors,3;5;7
+exit_zone_hex,20FFC0
+exit_zone_alpha_pct,60
 escape_scroll_restock_ticks,10000
 escape_scroll_restock_amount,3
 escape_scroll_stock_cap,3

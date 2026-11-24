@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
@@ -12,6 +13,8 @@ using UnityEngine.Tilemaps;
 // 여기서는 그 등록이 끝난 뒤 스케줄만 시작해주면 된다.
 public class DungeonSceneBootstrapper : MonoBehaviour
 {
+    private static int oppositeExitFallbackCount;
+
     private void Start()
     {
         // Unity 초기화 순서상 모든 오브젝트의 Awake/OnEnable이 어떤 Start()보다도 먼저 끝나기
@@ -85,39 +88,46 @@ public class DungeonSceneBootstrapper : MonoBehaviour
         }
 
         Vector3Int playerCell = player.CurrentCell;
-        Vector3Int exitCell = playerCell;
-        int farthestDistance = -1;
-        foreach (var position in floor.cellBounds.allPositionsWithin)
-        {
-            if (!floor.HasTile(position) || (walls != null && walls.HasTile(position))) continue;
-            if (TickManager.Instance != null && TickManager.Instance.IsCellOccupied(position)) continue;
-            int distance = Mathf.Abs(position.x - playerCell.x) + Mathf.Abs(position.y - playerCell.y);
-            if (distance <= farthestDistance) continue;
-            farthestDistance = distance;
-            exitCell = position;
-        }
+        Dictionary<Vector3Int, int> distanceFromSpawn = TilePathfinder.FindReachableDistances(playerCell, walls, floor);
+        Vector3Int exitCell = FindFarthestAvailable(distanceFromSpawn, playerCell, default, false);
 
         bool finalExit = ExpeditionSession.CurrentFloor >= ExpeditionSession.FinalFloor;
         var exitObject = new GameObject(finalExit ? "EscapeExit(AutoCreated)" : "DownStairs(AutoCreated)");
         exitObject.AddComponent<DungeonStairs>().Initialize(floor, exitCell, finalExit);
 
-        // 중간 생환 지점은 3층에 유지한다. M4의 최종 진행 목표는 5층이지만,
-        // Player는 3층에서 조기 생환하거나 4층으로 계속 내려갈 수 있다.
-        if (ExpeditionSession.CurrentFloor == 3 || ExpeditionSession.CurrentFloor == M10DungeonConfig.FirstBossFloor)
+        if (M10DungeonConfig.HasMidExit(ExpeditionSession.CurrentFloor))
         {
-            Vector3Int escapeCell = playerCell;
-            int distanceFromStairs = -1;
-            foreach (var position in floor.cellBounds.allPositionsWithin)
+            bool fallbackUsed = false;
+            Vector3Int escapeCell;
+            if (M10DungeonConfig.IsBossFloor(ExpeditionSession.CurrentFloor))
             {
-                if (position == exitCell || !floor.HasTile(position) || (walls != null && walls.HasTile(position))) continue;
-                if (TickManager.Instance != null && TickManager.Instance.IsCellOccupied(position)) continue;
-                int distance = Mathf.Abs(position.x - exitCell.x) + Mathf.Abs(position.y - exitCell.y);
-                if (distance <= distanceFromStairs) continue;
-                if (TilePathfinder.FindPath(playerCell, position, walls, floor).Count == 0) continue;
-                distanceFromStairs = distance;
-                escapeCell = position;
+                // 보스 아레나는 기존 규칙을 유지한다: 계단에서 가장 먼 도달 가능 칸.
+                Dictionary<Vector3Int, int> distanceFromStairs = TilePathfinder.FindReachableDistances(exitCell, walls, floor);
+                escapeCell = FindFarthestAvailable(distanceFromStairs, playerCell, exitCell, true);
             }
-            new GameObject("EscapeExit_F3(AutoCreated)").AddComponent<DungeonStairs>().Initialize(floor, escapeCell, true);
+            else
+            {
+                Vector3Int stairsDirection = exitCell - playerCell;
+                escapeCell = FindFarthestOpposite(distanceFromSpawn, playerCell, exitCell, stairsDirection, out bool foundOpposite);
+                if (!foundOpposite)
+                {
+                    fallbackUsed = true;
+                    oppositeExitFallbackCount++;
+                    Dictionary<Vector3Int, int> distanceFromStairs = TilePathfinder.FindReachableDistances(exitCell, walls, floor);
+                    escapeCell = FindFarthestAvailable(distanceFromStairs, playerCell, exitCell, true);
+                    Debug.LogWarning($"[M10Exit] Seed {M3MeasurementAutomation.CurrentRunSeed} F{ExpeditionSession.CurrentFloor} 반대쪽 후보 없음 — 계단에서 가장 먼 칸으로 대체 (누적 {oppositeExitFallbackCount}회).");
+                }
+            }
+
+            new GameObject($"EscapeExit_F{ExpeditionSession.CurrentFloor}(AutoCreated)")
+                .AddComponent<DungeonStairs>().Initialize(floor, escapeCell, true);
+
+            int spawnRoom = DungeonRoomRegistry.GetRoomId(floor, playerCell);
+            int stairsRoom = DungeonRoomRegistry.GetRoomId(floor, exitCell);
+            int escapeRoom = DungeonRoomRegistry.GetRoomId(floor, escapeCell);
+            Debug.Log($"[M10Exit] Seed {M3MeasurementAutomation.CurrentRunSeed} F{ExpeditionSession.CurrentFloor} " +
+                      $"Spawn {playerCell}/R{spawnRoom}, Stairs {exitCell}/R{stairsRoom}, " +
+                      $"Exit {escapeCell}/R{escapeRoom}, fallback={fallbackUsed}.");
         }
 
         int exitRoomId = DungeonRoomRegistry.GetRoomId(floor, exitCell);
@@ -130,5 +140,52 @@ public class DungeonSceneBootstrapper : MonoBehaviour
         }
         int shortestPathTiles = TilePathfinder.FindPath(playerCell, exitCell, walls, floor).Count;
         M3MeasurementAutomation.RecordFloorExitMetrics(shortestPathTiles, enemiesInExitRoom);
+    }
+
+    private static Vector3Int FindFarthestOpposite(Dictionary<Vector3Int, int> distances, Vector3Int spawn,
+        Vector3Int stairs, Vector3Int stairsDirection, out bool found)
+    {
+        found = false;
+        Vector3Int best = spawn;
+        int bestDistance = -1;
+        foreach (var pair in distances)
+        {
+            Vector3Int candidate = pair.Key;
+            if (candidate == spawn || candidate == stairs || IsOccupied(candidate)) continue;
+            Vector3Int direction = candidate - spawn;
+            if (direction.x * stairsDirection.x + direction.y * stairsDirection.y >= 0) continue;
+            if (!IsBetter(pair.Value, candidate, bestDistance, best)) continue;
+            found = true;
+            best = candidate;
+            bestDistance = pair.Value;
+        }
+        return best;
+    }
+
+    private static Vector3Int FindFarthestAvailable(Dictionary<Vector3Int, int> distances, Vector3Int spawn,
+        Vector3Int excluded, bool hasExcluded)
+    {
+        Vector3Int best = spawn;
+        int bestDistance = -1;
+        foreach (var pair in distances)
+        {
+            Vector3Int candidate = pair.Key;
+            if (candidate == spawn || (hasExcluded && candidate == excluded) || IsOccupied(candidate)) continue;
+            if (!IsBetter(pair.Value, candidate, bestDistance, best)) continue;
+            best = candidate;
+            bestDistance = pair.Value;
+        }
+        return best;
+    }
+
+    private static bool IsBetter(int distance, Vector3Int candidate, int bestDistance, Vector3Int best)
+    {
+        return distance > bestDistance
+            || (distance == bestDistance && (candidate.y < best.y || (candidate.y == best.y && candidate.x < best.x)));
+    }
+
+    private static bool IsOccupied(Vector3Int cell)
+    {
+        return TickManager.Instance != null && TickManager.Instance.IsCellOccupied(cell);
     }
 }

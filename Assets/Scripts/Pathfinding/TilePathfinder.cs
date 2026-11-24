@@ -138,6 +138,35 @@ public static class TilePathfinder
         return result;
     }
 
+    // 한 출발점에서 도달 가능한 모든 바닥까지의 최단 거리 맵을 한 번의 BFS로 만든다.
+    // 계단·탈출구처럼 "가장 먼 도달 가능 칸"을 고를 때 후보마다 FindPath를 반복하지 않기 위한 API다.
+    public static Dictionary<Vector3Int, int> FindReachableDistances(Vector3Int start, Tilemap wallsTilemap,
+        Tilemap floorTilemap, Func<Vector3Int, bool> isBlockedExtra = null)
+    {
+        var distances = new Dictionary<Vector3Int, int>();
+        if (!IsWalkableTerrain(start, wallsTilemap, floorTilemap)) return distances;
+
+        var frontier = new Queue<Vector3Int>();
+        frontier.Enqueue(start);
+        distances[start] = 0;
+        int safety = 20000;
+
+        while (frontier.Count > 0 && safety-- > 0)
+        {
+            Vector3Int current = frontier.Dequeue();
+            int nextDistance = distances[current] + 1;
+            foreach (Vector3Int direction in Directions)
+            {
+                Vector3Int next = current + direction;
+                if (distances.ContainsKey(next) || !IsWalkable(next, wallsTilemap, floorTilemap, isBlockedExtra)) continue;
+                distances[next] = nextDistance;
+                frontier.Enqueue(next);
+            }
+        }
+
+        return distances;
+    }
+
     // 지형만 확인(벽/맵 바깥) — 점유 여부는 안 봄. goal 판정 전용(위 FindPath 주석 참고).
     private static bool IsWalkableTerrain(Vector3Int cell, Tilemap wallsTilemap, Tilemap floorTilemap)
     {

@@ -24,6 +24,17 @@ public static class M10DataValidator
         ok &= M10DungeonConfig.EscapeScrollRestockTicks == 10000
             && M10DungeonConfig.EscapeScrollRestockAmount == 3
             && M10DungeonConfig.EscapeScrollStockCap == 3;
+        var expectedMidExits = new System.Collections.Generic.HashSet<int> { 3, 5, 7 };
+        var configuredMidExits = new System.Collections.Generic.HashSet<int>(M10DungeonConfig.MidExitFloors);
+        ok &= configuredMidExits.SetEquals(expectedMidExits);
+        foreach (int floor in configuredMidExits)
+            ok &= floor >= 1 && floor < M10DungeonConfig.FinalFloor
+                && (!M10DungeonConfig.IsBossFloor(floor) || floor == M10DungeonConfig.FirstBossFloor);
+        Color exitZone = M10DungeonConfig.ExitZoneColor;
+        ok &= Mathf.Approximately(exitZone.r, 32f / 255f)
+            && Mathf.Approximately(exitZone.g, 1f)
+            && Mathf.Approximately(exitZone.b, 192f / 255f)
+            && Mathf.Approximately(exitZone.a, 0.6f);
         string[] legendaryIds =
         {
             "weapon_legendary", "shield_legendary", "armor_legendary", "bag_legendary", "junk_orc_seal"
@@ -98,7 +109,7 @@ public static class M10DataValidator
             foreach (Sprite frame in visual.runFrames) ok &= FrameBelongsTo(frame, enemy.SpriteKey);
         }
         if (!ok) throw new InvalidOperationException("M10 data validation failed. CSV/clock/floor configuration을 확인하세요.");
-        Debug.Log("[M10 Validation] PASS — 10층, goblin 구간 스폰, 엘리트 100/40/40, 장식 0, 대형 포션 70%, 보스·드롭·스크롤 상점·Legendary 5종 확인.");
+        Debug.Log("[M10 Validation] PASS — 10층, 중간 탈출구 3·5·7층, 탈출구 #20FFC0/60%, goblin 구간 스폰, 엘리트 외곽선, 장식 0, 대형 포션 70%, 보스·드롭·스크롤 상점·Legendary 5종 확인.");
     }
 
     private static bool FrameBelongsTo(Sprite frame, string key)
