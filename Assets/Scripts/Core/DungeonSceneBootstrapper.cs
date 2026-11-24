@@ -89,7 +89,7 @@ public class DungeonSceneBootstrapper : MonoBehaviour
 
         Vector3Int playerCell = player.CurrentCell;
         Dictionary<Vector3Int, int> distanceFromSpawn = TilePathfinder.FindReachableDistances(playerCell, walls, floor);
-        Vector3Int exitCell = FindFarthestAvailable(distanceFromSpawn, playerCell, default, false);
+        Vector3Int exitCell = FindFarthestAvailable(distanceFromSpawn, playerCell, default, false, floor);
 
         bool finalExit = ExpeditionSession.CurrentFloor >= ExpeditionSession.FinalFloor;
         var exitObject = new GameObject(finalExit ? "EscapeExit(AutoCreated)" : "DownStairs(AutoCreated)");
@@ -103,18 +103,18 @@ public class DungeonSceneBootstrapper : MonoBehaviour
             {
                 // 보스 아레나는 기존 규칙을 유지한다: 계단에서 가장 먼 도달 가능 칸.
                 Dictionary<Vector3Int, int> distanceFromStairs = TilePathfinder.FindReachableDistances(exitCell, walls, floor);
-                escapeCell = FindFarthestAvailable(distanceFromStairs, playerCell, exitCell, true);
+                escapeCell = FindFarthestAvailable(distanceFromStairs, playerCell, exitCell, true, floor);
             }
             else
             {
                 Vector3Int stairsDirection = exitCell - playerCell;
-                escapeCell = FindFarthestOpposite(distanceFromSpawn, playerCell, exitCell, stairsDirection, out bool foundOpposite);
+                escapeCell = FindFarthestOpposite(distanceFromSpawn, playerCell, exitCell, stairsDirection, floor, out bool foundOpposite);
                 if (!foundOpposite)
                 {
                     fallbackUsed = true;
                     oppositeExitFallbackCount++;
                     Dictionary<Vector3Int, int> distanceFromStairs = TilePathfinder.FindReachableDistances(exitCell, walls, floor);
-                    escapeCell = FindFarthestAvailable(distanceFromStairs, playerCell, exitCell, true);
+                    escapeCell = FindFarthestAvailable(distanceFromStairs, playerCell, exitCell, true, floor);
                     Debug.LogWarning($"[M10Exit] Seed {M3MeasurementAutomation.CurrentRunSeed} F{ExpeditionSession.CurrentFloor} 반대쪽 후보 없음 — 계단에서 가장 먼 칸으로 대체 (누적 {oppositeExitFallbackCount}회).");
                 }
             }
@@ -143,7 +143,7 @@ public class DungeonSceneBootstrapper : MonoBehaviour
     }
 
     private static Vector3Int FindFarthestOpposite(Dictionary<Vector3Int, int> distances, Vector3Int spawn,
-        Vector3Int stairs, Vector3Int stairsDirection, out bool found)
+        Vector3Int stairs, Vector3Int stairsDirection, Tilemap floor, out bool found)
     {
         found = false;
         Vector3Int best = spawn;
@@ -151,7 +151,7 @@ public class DungeonSceneBootstrapper : MonoBehaviour
         foreach (var pair in distances)
         {
             Vector3Int candidate = pair.Key;
-            if (candidate == spawn || candidate == stairs || IsOccupied(candidate)) continue;
+            if (candidate == spawn || candidate == stairs || IsPlacementBlocked(floor, candidate)) continue;
             Vector3Int direction = candidate - spawn;
             if (direction.x * stairsDirection.x + direction.y * stairsDirection.y >= 0) continue;
             if (!IsBetter(pair.Value, candidate, bestDistance, best)) continue;
@@ -163,14 +163,14 @@ public class DungeonSceneBootstrapper : MonoBehaviour
     }
 
     private static Vector3Int FindFarthestAvailable(Dictionary<Vector3Int, int> distances, Vector3Int spawn,
-        Vector3Int excluded, bool hasExcluded)
+        Vector3Int excluded, bool hasExcluded, Tilemap floor)
     {
         Vector3Int best = spawn;
         int bestDistance = -1;
         foreach (var pair in distances)
         {
             Vector3Int candidate = pair.Key;
-            if (candidate == spawn || (hasExcluded && candidate == excluded) || IsOccupied(candidate)) continue;
+            if (candidate == spawn || (hasExcluded && candidate == excluded) || IsPlacementBlocked(floor, candidate)) continue;
             if (!IsBetter(pair.Value, candidate, bestDistance, best)) continue;
             best = candidate;
             bestDistance = pair.Value;
@@ -184,8 +184,11 @@ public class DungeonSceneBootstrapper : MonoBehaviour
             || (distance == bestDistance && (candidate.y < best.y || (candidate.y == best.y && candidate.x < best.x)));
     }
 
-    private static bool IsOccupied(Vector3Int cell)
+    private static bool IsPlacementBlocked(Tilemap floor, Vector3Int cell)
     {
-        return TickManager.Instance != null && TickManager.Instance.IsCellOccupied(cell);
+        return (TickManager.Instance != null && TickManager.Instance.IsCellOccupied(cell))
+            || DungeonChest.IsCellBlocked(cell)
+            || DungeonDoor.IsDoorCell(floor, cell)
+            || GroundLootPile.IsCellBlocked(floor, cell);
     }
 }
