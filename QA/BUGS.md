@@ -1333,3 +1333,15 @@ DungeonRunManager.CreateRuntimeEnemy () (at Assets/Scripts/MapGen/DungeonRunMana
 | 로그 근거 | 같은 전역 시각 `[870]`에서 Boss_F5 행동이 반복되며 `actorTime`이 1,394,375 이상까지 증가 |
 | 수정 | 각 동기 행동 전후에 활성 원정·Player 사망을 검사해 반복문 밖에서 `CompleteDeath()` 호출. 호출당 10,000회 안전 상한 추가 |
 | 관련 TC | TC-M10-54~58 |
+
+## BUG-053 — 경험치 HUD가 Tick 시계와 겹치고 진행 기준이 불명확
+
+| 항목 | 내용 |
+|---|---|
+| 상태 | Fixed — Play 검증 대기 |
+| Jira | 미등록 |
+| 우선순위 | Minor / P2 |
+| 발견 단계 | M10 Play (사용자, 2026-11-24) |
+| 실제 | 경험치 패널이 Tick 시계의 남은 시간과 겹치며 누적 XP/누적 기준값만 보여 현재 레벨 진행도를 바로 알기 어려움 |
+| 수정 | 패널을 시계 아래로 이동하고 현재 레벨 구간 XP, 필요 XP, 남은 XP와 파란 진행도 바로 표시 |
+| 관련 TC | TC-M10-59 |
