@@ -251,6 +251,8 @@ MonoBehaviour:
     - {fileID: 4668941331992515992, guid: a634b526d6433654fba13d5b439eefe3, type: 3}
     runFrames:
     - {fileID: 4668941331992515992, guid: a634b526d6433654fba13d5b439eefe3, type: 3}
+    attackFrames:
+    - {fileID: 4668941331992515992, guid: a634b526d6433654fba13d5b439eefe3, type: 3}
     - {fileID: 9211585275346177994, guid: 1832e0691b0a8a545bcd4acaf5e8739c, type: 3}
     - {fileID: -9034780308025407883, guid: e622e2a1ebc05ce4689d19c7b2e9a697, type: 3}
   - key: orc_warrior

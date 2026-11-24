@@ -350,6 +350,8 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
         {
             bossAoePending = false;
             if (bossTelegraph != null) Destroy(bossTelegraph);
+            catalogAnimation?.PlayAttackOnce();
+            BossAoeImpactVfx.Spawn(floorTilemap.GetCellCenterWorld(bossAoeCell));
             var delta = player.CurrentCell - bossAoeCell;
             if (Mathf.Abs(delta.x) <= 2 && Mathf.Abs(delta.y) <= 2)
                 player.TakeDamage(player.EffectiveDefense + bossAoeFinalDamage);
@@ -366,6 +368,7 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
             return;
         }
 
+        catalogAnimation?.PlayAttackOnce();
         player.TakeDamage(attackPower);
         bossPatternStep++;
         if (bossPatternStep >= 2)
@@ -489,6 +492,7 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
             // 비용은 CompleteMyTurn()(이동/대기용 PerTileMove)이 아니라 TickCost.Attack — 공격은
             // Player.AttackEnemy()와 동일하게 항상 고정 비용(TickCost.cs 주석 참고, 속도 배율 영향 없음).
             UpdateFacingDirection(nextCell - currentCell);
+            catalogAnimation?.PlayAttackOnce();
             player.TakeDamage(attackPower);
             TickManager.Instance.CompleteTurn(this, TickCost.Attack);
             return;

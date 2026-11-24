@@ -11,7 +11,7 @@ public sealed class M10LevelDefinition
 public sealed class M10PotionDefinition
 {
     public string ItemId;
-    public int HealPercent;
+    public int HealPercent, InstantPercent;
     public float DurationTicks, UseTicks;
 }
 
@@ -62,8 +62,12 @@ public static class M10ProgressionDatabase
         string[] lines = csv.text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
         for (int i = 1; i < lines.Length; i++)
         {
-            string[] f = lines[i].Split(','); if (f.Length < 4) continue;
-            var value = new M10PotionDefinition { ItemId=f[0], HealPercent=I(f[1]), DurationTicks=F(f[2]), UseTicks=F(f[3]) };
+            string[] f = lines[i].Split(','); if (f.Length < 5) continue;
+            var value = new M10PotionDefinition
+            {
+                ItemId=f[0], HealPercent=I(f[1]), DurationTicks=F(f[2]), UseTicks=F(f[3]),
+                InstantPercent=Mathf.Clamp(I(f[4]), 0, 100)
+            };
             potions[value.ItemId] = value;
         }
     }

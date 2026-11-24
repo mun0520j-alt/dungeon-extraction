@@ -641,7 +641,10 @@ public class PlayerTurnActor : MonoBehaviour, ITurnActor
     public void ApplyM10LevelUp(int gainedLevels)
     {
         if (gainedLevels <= 0) return;
-        int heal = gainedLevels * 30;
+        int currentLevel = M10RunProgression.Level;
+        int previousLevel = Mathf.Max(1, currentLevel - gainedLevels);
+        int heal = Mathf.Max(0, M10ProgressionDatabase.Level(currentLevel).HPBonus
+            - M10ProgressionDatabase.Level(previousLevel).HPBonus);
         currentHP = Mathf.Min(CurrentMaxHP, currentHP + heal);
         ExpeditionSession.RecordPlayerHealth(currentHP);
         healthBar?.SetFill((float)currentHP / CurrentMaxHP);

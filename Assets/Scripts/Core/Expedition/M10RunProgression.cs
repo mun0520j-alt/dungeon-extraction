@@ -96,17 +96,21 @@ public static class M10RunProgression
         if (!player.TryPerformTimedAction(potion.UseTicks, "UsePotion", () =>
         {
             if (!LootRuntimeState.TryConsumeRunBagItemByItemId(itemId)) return false;
-            healRemaining = player.CurrentMaxHP * potion.HealPercent / 100f;
-            healTicksRemaining = potion.DurationTicks;
+            int totalHeal = Mathf.RoundToInt(player.CurrentMaxHP * potion.HealPercent / 100f);
+            int instantHeal = Mathf.RoundToInt(totalHeal * potion.InstantPercent / 100f);
+            healRemaining = Mathf.Max(0, totalHeal - instantHeal);
+            healTicksRemaining = healRemaining > 0f ? potion.DurationTicks : 0f;
             healFraction = 0f;
-            activePotionId = itemId;
+            activePotionId = healRemaining > 0f ? itemId : null;
+            player.HealFromM10Potion(instantHeal);
+            Debug.Log($"[M10Potion] {itemId} 즉시 회복 {instantHeal}, 지속 회복 예약 {healRemaining:0.#}/{potion.DurationTicks:0.#} Tick");
             return true;
         }))
         {
             failure = "포션 사용에 실패했습니다.";
             return false;
         }
-        Debug.Log($"[M10Potion] {itemId} 사용 — {potion.UseTicks:0} Tick, {potion.DurationTicks:0} Tick 동안 최대 HP의 {potion.HealPercent}% 회복");
+        Debug.Log($"[M10Potion] {itemId} 사용 — {potion.UseTicks:0} Tick, 총 {potion.HealPercent}% 중 {potion.InstantPercent}% 즉시/나머지 {potion.DurationTicks:0} Tick 지속");
         return true;
     }
 

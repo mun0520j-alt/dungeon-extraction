@@ -26,6 +26,8 @@ public static class M10EnemyVisualCatalogBuilder
             M10EnemyVisualCatalog.Entry entry = catalog.Find(key);
             if (entry?.idleFrames == null || entry.idleFrames.Length == 0
                 || entry.runFrames == null || entry.runFrames.Length == 0) return true;
+            if (key == "chest_mimic" && (entry.attackFrames == null || entry.attackFrames.Length < 3
+                || entry.runFrames.Length != 1)) return true;
             if (entry.idleFrames.Any(frame => frame == null || !frame.name.StartsWith(key + "_", System.StringComparison.Ordinal))
                 || entry.runFrames.Any(frame => frame == null || !frame.name.StartsWith(key + "_", System.StringComparison.Ordinal))) return true;
         }
@@ -47,8 +49,9 @@ public static class M10EnemyVisualCatalogBuilder
         {
             Sprite[] idle = LoadFrames(key, "idle");
             Sprite[] run = LoadFrames(key, "run");
+            Sprite[] attack = LoadAttackFrames(key);
             if (idle.Length == 0 && run.Length == 0) continue;
-            entries.Add(new M10EnemyVisualCatalog.Entry { key = key, idleFrames = idle, runFrames = run });
+            entries.Add(new M10EnemyVisualCatalog.Entry { key = key, idleFrames = idle, runFrames = run, attackFrames = attack });
         }
         catalog.EditorSetEntries(entries);
         EditorUtility.SetDirty(catalog);
@@ -61,13 +64,19 @@ public static class M10EnemyVisualCatalogBuilder
         if (key == "chest_mimic")
         {
             Sprite[] open = LoadExact(@"^chest_mimic_open_anim_f(\d+)$");
-            return action == "idle" ? open.Take(1).ToArray() : open;
+            return open.Take(1).ToArray();
         }
 
         Sprite[] exact = LoadExact($@"^{Regex.Escape(key)}_{Regex.Escape(action)}_anim_f(\d+)$");
         if (exact.Length > 0) return exact;
         // 액션 분리 파일이 없는 몬스터는 같은 프레임을 idle/run 양쪽에서 사용한다.
         return LoadExact($@"^{Regex.Escape(key)}_anim_f(\d+)$");
+    }
+
+    private static Sprite[] LoadAttackFrames(string key)
+    {
+        if (key == "chest_mimic") return LoadExact(@"^chest_mimic_open_anim_f(\d+)$");
+        return LoadExact($@"^{Regex.Escape(key)}_attack_anim_f(\d+)$");
     }
 
     private static Sprite[] LoadExact(string pattern)

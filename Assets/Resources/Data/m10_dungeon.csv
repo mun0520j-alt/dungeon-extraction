@@ -18,6 +18,11 @@ escape_scroll_stock_cap,3
 floor_arrival_xp_shallow,20
 floor_arrival_xp_deep,60
 fast_arrival_ticks_per_floor,200
-fast_arrival_bonus_pct,50
+fast_arrival_bonus_pct,100
 boss_aoe_final_damage,35
+boss_aoe_flash_hex,FF3030
+boss_aoe_flash_alpha_pct,75
+boss_aoe_vfx_ms,400
+boss_aoe_shake_strength_pct,18
+boss_aoe_shake_ms,250
 night_floor_multiplier_pct,100

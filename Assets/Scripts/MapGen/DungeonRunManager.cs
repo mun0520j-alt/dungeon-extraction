@@ -505,7 +505,7 @@ public class DungeonRunManager : MonoBehaviour
             visual.transform.localScale = new Vector3(visualScale, visualScale, 1f);
         }
         if (visualEntry?.idleFrames != null && visualEntry.idleFrames.Length > 0)
-            visual.AddComponent<M10SpriteAnimation>().Configure(renderer, visualEntry.idleFrames, visualEntry.runFrames);
+            visual.AddComponent<M10SpriteAnimation>().Configure(renderer, visualEntry.idleFrames, visualEntry.runFrames, visualEntry.attackFrames);
         // 카탈로그 비주얼은 자체 프레임 애니메이션/스프라이트가 소유한다. 공용 Animator를
         // 함께 붙이면 첫 프레임에 기존 클립의 스프라이트로 덮여 모든 몬스터가 같아진다.
         if (visualEntry == null && enemyAnimatorController != null)

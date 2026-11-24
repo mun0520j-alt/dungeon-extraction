@@ -22,6 +22,18 @@ public static class M10DungeonConfig
     public static int FastArrivalTicksPerFloor => Mathf.Max(1, Get("fast_arrival_ticks_per_floor", 200));
     public static int FastArrivalBonusPercent => Mathf.Max(0, Get("fast_arrival_bonus_pct", 50));
     public static int BossAoeFinalDamage => Mathf.Max(1, Get("boss_aoe_final_damage", 35));
+    public static Color BossAoeFlashColor
+    {
+        get
+        {
+            Color color = GetHtmlColor("boss_aoe_flash_hex", "FF3030", new Color(1f, 48f / 255f, 48f / 255f));
+            color.a = Mathf.Clamp01(Get("boss_aoe_flash_alpha_pct", 75) / 100f);
+            return color;
+        }
+    }
+    public static float BossAoeVfxSeconds => Mathf.Max(0.05f, Get("boss_aoe_vfx_ms", 400) / 1000f);
+    public static float BossAoeShakeStrength => Mathf.Max(0f, Get("boss_aoe_shake_strength_pct", 18) / 100f);
+    public static float BossAoeShakeSeconds => Mathf.Max(0f, Get("boss_aoe_shake_ms", 250) / 1000f);
     public static int NightFloorMultiplierPercent => Mathf.Max(100, Get("night_floor_multiplier_pct", 100));
     // 결정 34: 본체 원색은 유지하고, 알파 실루엣 외곽선으로 어두운 맵에서도 엘리트를 구분한다.
     public static Color EliteTint => new Color(Get("elite_tint_r", 100) / 100f, Get("elite_tint_g", 100) / 100f, Get("elite_tint_b", 100) / 100f, 1f);

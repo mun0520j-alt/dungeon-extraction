@@ -53,6 +53,9 @@ public static class M10DataValidator
         foreach (M10LevelDefinition level in M10ProgressionDatabase.Levels)
         {
             ok &= level.CumulativeXP > previousXP;
+            ok &= level.HPBonus == (level.Level - 1) * 40
+                && level.AttackBonus == (level.Level - 1) * 2
+                && level.DefenseBonus == (level.Level - 1) * 2;
             previousXP = level.CumulativeXP;
         }
         foreach (string potionId in new[] { "potion_small", "potion_medium", "potion_large" })
@@ -60,7 +63,8 @@ public static class M10DataValidator
             LootItemData item = LootItemDatabase.FindById(potionId);
             M10PotionDefinition potion = M10ProgressionDatabase.Potion(potionId);
             ok &= item != null && item.Type == LootItemType.Consumable && potion != null
-                && Mathf.Approximately(potion.DurationTicks, 10f) && Mathf.Approximately(potion.UseTicks, 2f);
+                && Mathf.Approximately(potion.DurationTicks, 10f) && Mathf.Approximately(potion.UseTicks, 2f)
+                && potion.InstantPercent == 50;
         }
         ok &= M10ProgressionDatabase.Potion("potion_large")?.HealPercent == 70;
 
@@ -107,9 +111,18 @@ public static class M10DataValidator
             if (visual == null) continue;
             foreach (Sprite frame in visual.idleFrames) ok &= FrameBelongsTo(frame, enemy.SpriteKey);
             foreach (Sprite frame in visual.runFrames) ok &= FrameBelongsTo(frame, enemy.SpriteKey);
+            if (visual.attackFrames != null)
+                foreach (Sprite frame in visual.attackFrames) ok &= FrameBelongsTo(frame, enemy.SpriteKey);
         }
+        M10EnemyVisualCatalog.Entry mimic = enemyVisuals?.Find("chest_mimic");
+        ok &= mimic?.idleFrames?.Length == 1 && mimic?.runFrames?.Length == 1
+            && mimic?.attackFrames?.Length == 3;
+        ok &= M10DungeonConfig.FastArrivalBonusPercent == 100
+            && Mathf.Approximately(M10DungeonConfig.BossAoeVfxSeconds, 0.4f)
+            && Mathf.Approximately(M10DungeonConfig.BossAoeShakeStrength, 0.18f)
+            && Mathf.Approximately(M10DungeonConfig.BossAoeShakeSeconds, 0.25f);
         if (!ok) throw new InvalidOperationException("M10 data validation failed. CSV/clock/floor configuration을 확인하세요.");
-        Debug.Log("[M10 Validation] PASS — 10층, 중간 탈출구 3·5·7층, 탈출구 #20FFC0/60%, goblin 구간 스폰, 엘리트 외곽선, 장식 0, 대형 포션 70%, 보스·드롭·스크롤 상점·Legendary 5종 확인.");
+        Debug.Log("[M10 Validation] PASS — Lv당 HP+40/공방+2, 빠른 도착 100%, 포션 즉시 50%, 미믹 공격 3프레임, 보스 광역 VFX, 중간 탈출구 3·5·7층, 엘리트 외곽선, 장식 0, Legendary 5종 확인.");
     }
 
     private static bool FrameBelongsTo(Sprite frame, string key)

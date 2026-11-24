@@ -15,6 +15,9 @@ public class CameraFollow : MonoBehaviour
     [Tooltip("2D 스프라이트(Z=0)와 카메라가 너무 가까우면 Near Clip에 걸려서 아무것도 안 보이니 " +
               "카메라 Z는 이 값으로 고정한다(FloorTilemapPreviewWindow.CenterMainCameraOn의 -10 관례와 동일).")]
     [SerializeField] private float cameraZ = -10f;
+    private float shakeRemaining;
+    private float shakeDuration;
+    private float shakeStrength;
 
     private void Start()
     {
@@ -36,8 +39,24 @@ public class CameraFollow : MonoBehaviour
         cameraZ = z;
     }
 
+    public void PlayShake(float strength, float duration)
+    {
+        if (strength <= 0f || duration <= 0f) return;
+        shakeStrength = Mathf.Max(shakeStrength, strength);
+        shakeDuration = shakeRemaining = Mathf.Max(shakeRemaining, duration);
+    }
+
     private void LateUpdate()
     {
-        transform.position = new Vector3(target.position.x, target.position.y, cameraZ);
+        Vector2 offset = Vector2.zero;
+        if (shakeRemaining > 0f)
+        {
+            shakeRemaining = Mathf.Max(0f, shakeRemaining - Time.unscaledDeltaTime);
+            float fade = shakeDuration > 0f ? shakeRemaining / shakeDuration : 0f;
+            float phase = Time.unscaledTime * 79f;
+            offset = new Vector2(Mathf.Sin(phase), Mathf.Cos(phase * 1.37f)) * shakeStrength * fade;
+            if (shakeRemaining <= 0f) shakeStrength = shakeDuration = 0f;
+        }
+        transform.position = new Vector3(target.position.x + offset.x, target.position.y + offset.y, cameraZ);
     }
 }
