@@ -73,8 +73,13 @@ public static class M10DataValidator
         foreach (string enemyId in new[] { "goblin", "goblin_f3", "goblin_f6", "goblin_f8", "goblin_elite_f3", "goblin_elite_f6" })
             ok &= M10EnemyDatabase.Find(enemyId)?.SpriteKey == "goblin";
         Color eliteTint = M10DungeonConfig.EliteTint;
-        ok &= Mathf.Approximately(eliteTint.r, 1f) && Mathf.Approximately(eliteTint.g, 0.4f)
-            && Mathf.Approximately(eliteTint.b, 0.4f);
+        ok &= Mathf.Approximately(eliteTint.r, 1f) && Mathf.Approximately(eliteTint.g, 1f)
+            && Mathf.Approximately(eliteTint.b, 1f);
+        Color eliteOutline = M10DungeonConfig.EliteOutlineColor;
+        ok &= M10DungeonConfig.EliteOutlinePixels == 1
+            && Mathf.Approximately(eliteOutline.r, 1f)
+            && Mathf.Approximately(eliteOutline.g, 48f / 255f)
+            && Mathf.Approximately(eliteOutline.b, 48f / 255f);
         for (int floor = 1; floor <= 9; floor++)
         {
             if (M10DungeonConfig.IsBossFloor(floor)) continue;

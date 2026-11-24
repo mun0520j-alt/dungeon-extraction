@@ -102,7 +102,11 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
         if (isElite)
         {
             SpriteRenderer body = spriteRenderer != null ? spriteRenderer : GetComponentInChildren<SpriteRenderer>();
-            if (body != null) body.color = M10DungeonConfig.EliteTint;
+            if (body != null)
+            {
+                body.color = M10DungeonConfig.EliteTint;
+                EliteSpriteOutline.Attach(body, M10DungeonConfig.EliteOutlineColor, M10DungeonConfig.EliteOutlinePixels);
+            }
         }
     }
 

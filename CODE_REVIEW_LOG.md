@@ -230,3 +230,10 @@
 - F9 직접 층 이동은 `DebugSetCurrentFloor` 경로라 `TryAdvanceFloor`의 첫 도착 XP를 호출하지 않는다. 현행 QA 동작으로 문서화하고 임의 수정하지 않았다.
 - 10층 보스도 `RecordBossDefeated`와 `DropBossLoot`를 동일하게 호출한다. 누락처럼 보인 것은 Console Collapse/필터 가능성이 있으며, 고정된 5층 문구는 실제 현재 층으로 수정했다.
 
+# 2026-11-24 — M10 엘리트 단색 외곽선
+
+- 곱하기 색조(100/40/40)가 초록 goblin을 어둡게 만드는 문제를 제거하고 본체 색을 100/100/100으로 복원했다.
+- 본체 SpriteRenderer의 알파만 쓰는 Resources 셰이더와 상·하·좌·우 4개 복제 렌더러로 FF3030 1px 실루엣 외곽선을 만든다.
+- `LateUpdate`에서 sprite·flipX/flipY·sorting layer/order·mask·enabled를 본체와 동기화한다. 자식 오브젝트라 엘리트 크기와 사망 Destroy도 함께 따른다.
+- 셰이더가 Resources에서 직접 참조되므로 Always Included Shaders와 씬·프리팹은 변경하지 않았다.
+
