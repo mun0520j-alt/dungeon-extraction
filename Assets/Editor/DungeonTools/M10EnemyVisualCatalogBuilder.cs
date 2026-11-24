@@ -86,11 +86,12 @@ public static class M10EnemyVisualCatalogBuilder
     {
         TextAsset csv = AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/Resources/Data/m10_enemies.csv");
         if (csv == null) yield break;
+        var seen = new HashSet<string>(System.StringComparer.Ordinal);
         string[] lines = csv.text.Split(new[] { '\r', '\n' }, System.StringSplitOptions.RemoveEmptyEntries);
         for (int i = 1; i < lines.Length; i++)
         {
             string[] fields = lines[i].Split(',');
-            if (fields.Length > 1 && !string.IsNullOrWhiteSpace(fields[1])) yield return fields[1];
+            if (fields.Length > 1 && !string.IsNullOrWhiteSpace(fields[1]) && seen.Add(fields[1])) yield return fields[1];
         }
     }
 }

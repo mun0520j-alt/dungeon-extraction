@@ -66,6 +66,11 @@ public sealed partial class ExpeditionDebugCommands
             GUILayout.EndHorizontal();
             DrawElapsedTickControls();
             GUILayout.Label($"레벨 Lv.{M10RunProgression.Level} · XP {M10RunProgression.Experience}/{M10RunProgression.NextLevelXP}");
+            GUILayout.Label("최근 경험치");
+            if (M10RunProgression.RecentExperienceEvents.Count == 0) GUILayout.Label("  기록 없음");
+            else
+                foreach (string entry in M10RunProgression.RecentExperienceEvents)
+                    GUILayout.Label($"  {entry}");
             GUILayout.BeginHorizontal();
             for (int level = 1; level <= M10RunProgression.MaxLevel; level++)
             {

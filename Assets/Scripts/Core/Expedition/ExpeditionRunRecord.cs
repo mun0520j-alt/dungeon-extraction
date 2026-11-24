@@ -23,7 +23,7 @@ public static class ExpeditionRunRecord
     {
         if (!ExpeditionSession.IsActive) return;
         BossDefeated = true;
-        Debug.Log("[RunRecord] 5층 보스 처치 기록");
+        Debug.Log($"[RunRecord] {ExpeditionSession.CurrentFloor}층 보스 처치 기록");
     }
 
     public static ExpeditionRunSnapshot Complete(ExpeditionResult result, int reachedFloor, float elapsedTicks)

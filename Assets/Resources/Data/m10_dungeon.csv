@@ -5,8 +5,8 @@ boss_floor_2,10
 deep_min_rooms,9
 deep_max_rooms,12
 elite_tint_r,100
-elite_tint_g,72
-elite_tint_b,72
+elite_tint_g,40
+elite_tint_b,40
 escape_scroll_restock_ticks,10000
 escape_scroll_restock_amount,3
 escape_scroll_stock_cap,3

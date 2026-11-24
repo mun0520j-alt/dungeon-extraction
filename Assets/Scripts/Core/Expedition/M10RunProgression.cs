@@ -12,6 +12,10 @@ public static class M10RunProgression
     private static float healTicksRemaining;
     private static float healFraction;
     private static string activePotionId;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+    private static readonly List<string> recentExperienceEvents = new List<string>();
+    public static IReadOnlyList<string> RecentExperienceEvents => recentExperienceEvents;
+#endif
 
     public static int Level => level;
     public static int Experience => experience;
@@ -45,6 +49,9 @@ public static class M10RunProgression
         healFraction = 0f;
         activePotionId = null;
         visitedFloors.Clear();
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        recentExperienceEvents.Clear();
+#endif
     }
 
     public static void AddExperience(int amount, string source)
@@ -53,6 +60,12 @@ public static class M10RunProgression
         experience = Mathf.Min(experience + amount, M10ProgressionDatabase.Level(MaxLevel).CumulativeXP);
         int before = level;
         while (level < MaxLevel && experience >= M10ProgressionDatabase.Level(level + 1).CumulativeXP) level++;
+        string experienceLog = $"+{amount} XP · {source} · Lv.{level} · {experience}/{NextLevelXP}";
+        Debug.Log($"[M10XP] {experienceLog}");
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        recentExperienceEvents.Insert(0, experienceLog);
+        if (recentExperienceEvents.Count > 3) recentExperienceEvents.RemoveAt(recentExperienceEvents.Count - 1);
+#endif
         if (level > before)
         {
             PlayerTurnActor.Instance?.ApplyM10LevelUp(level - before);

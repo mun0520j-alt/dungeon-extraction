@@ -223,3 +223,10 @@
 - 각 액터 행동 전후에 사망·원정 종료를 확인하고, `OnTurnStart` 호출 스택을 빠져나온 뒤 `CompleteDeath()`를 호출하도록 수정했다.
 - 재발 시 Editor 전체가 멈추지 않도록 한 번의 스케줄 진행에 동기 행동 10,000회 상한을 추가했다.
 
+# 2026-11-24 — M10 통합검증 피드백
+
+- 일반·엘리트 스폰 ID를 층 구간별 goblin 파생 행으로 교체하고 기존 스탯·수량은 유지했다. 사용하지 않는 기존 몹과 M11 심야몹 데이터는 보존했다.
+- `FloorTilemapPainter`는 원래 단일 `PlaceholderFloor`·`PlaceholderWall`만 사용하고 있었으며, 혼용처럼 보인 원인은 장식 오버레이였다. 모든 장식 밀도를 0으로 바꾸고 자동 검증에 고정했다.
+- F9 직접 층 이동은 `DebugSetCurrentFloor` 경로라 `TryAdvanceFloor`의 첫 도착 XP를 호출하지 않는다. 현행 QA 동작으로 문서화하고 임의 수정하지 않았다.
+- 10층 보스도 `RecordBossDefeated`와 `DropBossLoot`를 동일하게 호출한다. 누락처럼 보인 것은 Console Collapse/필터 가능성이 있으며, 고정된 5층 문구는 실제 현재 층으로 수정했다.
+

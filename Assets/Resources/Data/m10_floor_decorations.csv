@@ -1,5 +1,5 @@
 set_id,floor_density_per_1000,wall_density_per_1000,floor_keys,wall_keys
 classic,0,0,,
-swamp,18,32,floor_spikes,wall_goo|wall_goo_base|wall_banner_green
-frost,12,26,floor_spikes,wall_banner_blue|wall_fountain_blue
-orc_keep,20,42,floor_spikes,wall_banner_red|wall_fountain_red
+swamp,0,0,floor_spikes,wall_goo|wall_goo_base|wall_banner_green
+frost,0,0,floor_spikes,wall_banner_blue|wall_fountain_blue
+orc_keep,0,0,floor_spikes,wall_banner_red|wall_fountain_red

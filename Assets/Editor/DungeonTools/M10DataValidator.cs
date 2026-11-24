@@ -13,10 +13,12 @@ public static class M10DataValidator
             if (!M10DungeonConfig.IsBossFloor(floor) && M10EnemyDatabase.Floor(floor) == null) ok = false;
         ok &= Resources.Load<TextAsset>("Data/m10_loot_rarity") != null;
         ok &= M10EnemyDatabase.Boss(5) != null && M10EnemyDatabase.Boss(10) != null;
-        ok &= M10FloorDecorationDatabase.Find("classic")?.FloorDensityPerThousand == 0;
-        ok &= M10FloorDecorationDatabase.Find("swamp") != null
-            && M10FloorDecorationDatabase.Find("frost") != null
-            && M10FloorDecorationDatabase.Find("orc_keep") != null;
+        foreach (string decorationSet in new[] { "classic", "swamp", "frost", "orc_keep" })
+        {
+            M10FloorDecorationDefinition decoration = M10FloorDecorationDatabase.Find(decorationSet);
+            ok &= decoration != null && decoration.FloorDensityPerThousand == 0
+                && decoration.WallDensityPerThousand == 0;
+        }
         M10DecorationVisualCatalog decorations = Resources.Load<M10DecorationVisualCatalog>("Data/M10DecorationVisualCatalog");
         ok &= decorations != null && decorations.EntryCount >= 8;
         ok &= M10DungeonConfig.EscapeScrollRestockTicks == 10000
@@ -49,6 +51,30 @@ public static class M10DataValidator
             ok &= item != null && item.Type == LootItemType.Consumable && potion != null
                 && Mathf.Approximately(potion.DurationTicks, 10f) && Mathf.Approximately(potion.UseTicks, 2f);
         }
+        ok &= M10ProgressionDatabase.Potion("potion_large")?.HealPercent == 70;
+
+        var expectedSpawns = new System.Collections.Generic.Dictionary<int, (string normal, string elite)>
+        {
+            { 1, ("goblin", "goblin_elite_f3") },
+            { 2, ("goblin", "goblin_elite_f3") },
+            { 3, ("goblin_f3", "goblin_elite_f3") },
+            { 4, ("goblin_f3", "goblin_elite_f3") },
+            { 6, ("goblin_f6", "goblin_elite_f6") },
+            { 7, ("goblin_f6", "goblin_elite_f6") },
+            { 8, ("goblin_f8", "goblin_elite_f6") },
+            { 9, ("goblin_f8", "goblin_elite_f6") }
+        };
+        foreach (var pair in expectedSpawns)
+        {
+            M10FloorSpawnDefinition spawn = M10EnemyDatabase.Floor(pair.Key);
+            ok &= spawn != null && spawn.NormalIds.Length == 1 && spawn.NormalIds[0] == pair.Value.normal
+                && spawn.EliteIds.Length == 1 && spawn.EliteIds[0] == pair.Value.elite;
+        }
+        foreach (string enemyId in new[] { "goblin", "goblin_f3", "goblin_f6", "goblin_f8", "goblin_elite_f3", "goblin_elite_f6" })
+            ok &= M10EnemyDatabase.Find(enemyId)?.SpriteKey == "goblin";
+        Color eliteTint = M10DungeonConfig.EliteTint;
+        ok &= Mathf.Approximately(eliteTint.r, 1f) && Mathf.Approximately(eliteTint.g, 0.4f)
+            && Mathf.Approximately(eliteTint.b, 0.4f);
         for (int floor = 1; floor <= 9; floor++)
         {
             if (M10DungeonConfig.IsBossFloor(floor)) continue;
@@ -67,7 +93,7 @@ public static class M10DataValidator
             foreach (Sprite frame in visual.runFrames) ok &= FrameBelongsTo(frame, enemy.SpriteKey);
         }
         if (!ok) throw new InvalidOperationException("M10 data validation failed. CSV/clock/floor configuration을 확인하세요.");
-        Debug.Log("[M10 Validation] PASS — 10층, 보스 5/10층, MIA 2880, 몬스터·드롭·장식·스크롤 상점·Legendary 5종 확인.");
+        Debug.Log("[M10 Validation] PASS — 10층, goblin 구간 스폰, 엘리트 100/40/40, 장식 0, 대형 포션 70%, 보스·드롭·스크롤 상점·Legendary 5종 확인.");
     }
 
     private static bool FrameBelongsTo(Sprite frame, string key)
