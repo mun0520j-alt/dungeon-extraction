@@ -146,7 +146,7 @@ public sealed class EscapeScrollZone : MonoBehaviour
         float now = ExpeditionManager.Instance?.ElapsedTicks ?? 0f;
         if (now - activationTick >= M7EconomyConfig.EscapeScrollLifetimeTicks)
         {
-            Deactivate("50 Tick 만료");
+            Deactivate($"{M7EconomyConfig.EscapeScrollLifetimeTicks:0} Tick 만료");
             return;
         }
         if (!Contains(player.CurrentCell)) progressStartTick = -1f;

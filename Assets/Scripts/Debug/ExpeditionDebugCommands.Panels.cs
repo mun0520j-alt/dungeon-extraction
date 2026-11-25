@@ -6,9 +6,11 @@ public sealed partial class ExpeditionDebugCommands
 {
     private void DrawM6ItemPanel()
     {
-        float height = Mathf.Min(620f, Screen.height - 32f);
+        float height = Mathf.Max(240f, Screen.height - 32f);
         GUILayout.BeginArea(new Rect(Screen.width * 0.5f - 210f, 16f, 420f, height),
             "M6 아이템 지급 (F9)", GUI.skin.window);
+        itemPanelOuterScroll = GUILayout.BeginScrollView(itemPanelOuterScroll,
+            GUILayout.Height(Mathf.Max(140f, height - 54f)));
         bool inDungeon = ExpeditionSession.IsActive && PlayerTurnActor.Instance != null;
         GUILayout.Label(inDungeon
             ? "버튼 클릭: 플레이어 발밑 바닥 더미에 생성 · 측정 원정 제외"
@@ -24,7 +26,9 @@ public sealed partial class ExpeditionDebugCommands
             Debug.Log($"[QA] 보험 대기 시간을 {insuranceAdvanceTicks:0} Tick 진행했습니다.");
         }
         DrawM10QaControls(inDungeon);
-        itemPanelScroll = GUILayout.BeginScrollView(itemPanelScroll);
+        GUILayout.Label("아이템 생성");
+        itemPanelScroll = GUILayout.BeginScrollView(itemPanelScroll,
+            GUILayout.MinHeight(200f), GUILayout.ExpandHeight(false));
         foreach (LootItemData item in LootItemDatabase.Items)
         {
             if (item == null) continue;
@@ -34,6 +38,7 @@ public sealed partial class ExpeditionDebugCommands
             if (GUILayout.Button($"[{item.Rarity}] {item.Name} ({item.Id}) · {size}", GUILayout.Height(30f)))
                 GiveDebugItem(item);
         }
+        GUILayout.EndScrollView();
         GUILayout.EndScrollView();
         if (GUILayout.Button("닫기 (F9)", GUILayout.Height(32f))) showM6ItemPanel = false;
         GUILayout.EndArea();
