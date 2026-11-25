@@ -613,10 +613,13 @@ public class PlayerTurnActor : MonoBehaviour, ITurnActor
             : M10DungeonConfig.RestHealPercent;
         int healAmount = Mathf.Max(1, Mathf.RoundToInt(CurrentMaxHP * healPercent / 100f));
         currentHP = Mathf.Min(CurrentMaxHP, currentHP + healAmount);
-        M3MeasurementAutomation.RecordPlayerHealing(currentHP - before);
+        int healed = currentHP - before;
+        M3MeasurementAutomation.RecordPlayerHealing(healed);
         ExpeditionSession.RecordPlayerHealth(currentHP);
         healthBar?.SetFill((float)currentHP / CurrentMaxHP);
         healthViewDirty = true;
+        CombatFeedback.ShowHealing(transform.position, healed);
+        if (healed > 0) CombatFeedback.AddLine($"휴식 회복 +{healed}");
         string context = bossDefeatedOnFloorFive ? " (보스 처치 후 정비)" : string.Empty;
         Debug.Log($"[Rest] 연속 대기 10 Tick{context} — HP {before} → {currentHP}/{CurrentMaxHP}");
         if (currentHP >= CurrentMaxHP) autoRestActive = false;
@@ -624,29 +627,33 @@ public class PlayerTurnActor : MonoBehaviour, ITurnActor
 
     // Enemy.TryTraceTowards()가 인접해서 공격할 때 호출한다. HP가 0 이하가 되면 즉시 죽이지 않고 isDead만 세팅 —
     // 실제 씬 전환은 Update()에서 한 프레임 늦게 처리한다(위 Update() 주석 참고, 호출 스택 분리 목적).
-    public void TakeDamage(int incomingAttackPower)
+    public void TakeDamage(int incomingAttackPower, string attackerName = "적")
     {
         if (isDead) return;
 
         int damage = CombatDamage.Calculate(incomingAttackPower, EffectiveDefensePower);
-        ApplyDamage(damage);
+        ApplyDamage(damage, attackerName, false);
     }
 
-    public void TakeFixedDamage(int damage)
+    public void TakeFixedDamage(int damage, bool bossAoe = false)
     {
         if (isDead) return;
-        ApplyDamage(Mathf.Max(1, damage));
+        ApplyDamage(Mathf.Max(1, damage), bossAoe ? "광역 공격" : "고정 피해", bossAoe);
     }
 
-    private void ApplyDamage(int damage)
+    private void ApplyDamage(int damage, string source, bool bossAoe)
     {
         int before = currentHP;
         currentHP = Mathf.Max(0, currentHP - damage);
-        M3MeasurementAutomation.RecordPlayerDamage(before - currentHP);
+        int appliedDamage = before - currentHP;
+        M3MeasurementAutomation.RecordPlayerDamage(appliedDamage);
         CancelAutoRest(true);
         ExpeditionSession.RecordPlayerHealth(currentHP);
         healthBar?.SetFill((float)currentHP / CurrentMaxHP);
         healthViewDirty = true;
+        CombatFeedback.ShowDamage(transform.position, appliedDamage, true, bossAoe);
+        if (appliedDamage > 0)
+            CombatFeedback.AddLine(bossAoe ? $"광역 공격! {appliedDamage} 피해" : $"{source}에게 {appliedDamage} 피해를 받음");
 
         // [2026-09-04 신규] 맞는 순간 시각 피드백 — EnemyTurnActor.TakeDamage와 동일한 방식
         // (HitImpactVfx.cs 참고). Player는 죽어도 Update()에서 한 프레임 뒤에 씬 전환이라 이
@@ -669,17 +676,21 @@ public class PlayerTurnActor : MonoBehaviour, ITurnActor
     public void ApplyM10LevelUp(int gainedLevels)
     {
         if (gainedLevels <= 0) return;
+        int beforeHealth = currentHP;
         int currentLevel = M10RunProgression.Level;
         int previousLevel = Mathf.Max(1, currentLevel - gainedLevels);
         int heal = Mathf.Max(0, M10ProgressionDatabase.Level(currentLevel).HPBonus
             - M10ProgressionDatabase.Level(previousLevel).HPBonus);
         currentHP = Mathf.Min(CurrentMaxHP, currentHP + heal);
+        int healed = currentHP - beforeHealth;
         ExpeditionSession.RecordPlayerHealth(currentHP);
         healthBar?.SetFill((float)currentHP / CurrentMaxHP);
         healthViewDirty = true;
+        CombatFeedback.ShowHealing(transform.position, healed);
+        if (healed > 0) CombatFeedback.AddLine($"레벨업 회복 +{healed}");
     }
 
-    public void HealFromM10Potion(int amount)
+    public void HealFromM10Potion(int amount, string source = "포션")
     {
         if (amount <= 0 || isDead || !ExpeditionSession.IsActive) return;
         int before = currentHP;
@@ -690,6 +701,8 @@ public class PlayerTurnActor : MonoBehaviour, ITurnActor
         ExpeditionSession.RecordPlayerHealth(currentHP);
         healthBar?.SetFill((float)currentHP / CurrentMaxHP);
         healthViewDirty = true;
+        CombatFeedback.ShowHealing(transform.position, healed);
+        CombatFeedback.AddLine($"{source} +{healed}");
     }
 
     public void ClampHealthToM10Max()

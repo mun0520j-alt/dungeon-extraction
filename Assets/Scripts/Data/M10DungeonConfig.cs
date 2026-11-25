@@ -38,6 +38,9 @@ public static class M10DungeonConfig
     public static float BossAoeVfxSeconds => Mathf.Max(0.05f, Get("boss_aoe_vfx_ms", 400) / 1000f);
     public static float BossAoeShakeStrength => Mathf.Max(0f, Get("boss_aoe_shake_strength_pct", 18) / 100f);
     public static float BossAoeShakeSeconds => Mathf.Max(0f, Get("boss_aoe_shake_ms", 250) / 1000f);
+    public static float DamagePopupSeconds => Mathf.Max(0.1f, Get("damage_popup_ms", 650) / 1000f);
+    public static float DamagePopupRiseWorld => Mathf.Max(0.1f, Get("damage_popup_rise_px", 60) / 100f);
+    public static int CombatLogLines => Mathf.Clamp(Get("combat_log_lines", 5), 1, 10);
     public static int NightFloorMultiplierPercent => Mathf.Max(100, Get("night_floor_multiplier_pct", 100));
     // 결정 34: 본체 원색은 유지하고, 알파 실루엣 외곽선으로 어두운 맵에서도 엘리트를 구분한다.
     public static Color EliteTint => new Color(Get("elite_tint_r", 100) / 100f, Get("elite_tint_g", 100) / 100f, Get("elite_tint_b", 100) / 100f, 1f);

@@ -34,6 +34,7 @@ public static class M10RunProgression
     public static void BeginRun()
     {
         ResetRun();
+        CombatFeedback.Clear();
         RecordFloorArrival(1, 0f);
     }
 
@@ -84,7 +85,11 @@ public static class M10RunProgression
 
     public static void RecordEnemyDefeated(M10EnemyDefinition definition)
     {
-        if (definition != null) AddExperience(definition.XP, $"{definition.Id} 처치");
+        if (definition != null)
+        {
+            AddExperience(definition.XP, $"{definition.Id} 처치");
+            CombatFeedback.AddLine($"{definition.Id} 처치 +{definition.XP} XP");
+        }
     }
 
     public static bool TryUsePotion(string itemId, PlayerTurnActor player, out string failure)
@@ -102,7 +107,8 @@ public static class M10RunProgression
             healTicksRemaining = healRemaining > 0f ? potion.DurationTicks : 0f;
             healFraction = 0f;
             activePotionId = healRemaining > 0f ? itemId : null;
-            player.HealFromM10Potion(instantHeal);
+            string potionName = LootItemDatabase.FindById(itemId)?.Name ?? itemId;
+            player.HealFromM10Potion(instantHeal, $"{potionName}: 즉시");
             Debug.Log($"[M10Potion] {itemId} 즉시 회복 {instantHeal}, 지속 회복 예약 {healRemaining:0.#}/{potion.DurationTicks:0.#} Tick");
             return true;
         }))
@@ -128,12 +134,17 @@ public static class M10RunProgression
         if (whole > 0)
         {
             healFraction -= whole;
-            PlayerTurnActor.Instance?.HealFromM10Potion(whole);
+            string potionName = LootItemDatabase.FindById(activePotionId)?.Name ?? activePotionId;
+            PlayerTurnActor.Instance?.HealFromM10Potion(whole, potionName);
         }
         if (healTicksRemaining <= 0.001f || healRemaining <= 0.001f)
         {
             int tail = Mathf.RoundToInt(healFraction + healRemaining);
-            if (tail > 0) PlayerTurnActor.Instance?.HealFromM10Potion(tail);
+            if (tail > 0)
+            {
+                string potionName = LootItemDatabase.FindById(activePotionId)?.Name ?? activePotionId;
+                PlayerTurnActor.Instance?.HealFromM10Potion(tail, potionName);
+            }
             healRemaining = healTicksRemaining = healFraction = 0f;
             activePotionId = null;
         }

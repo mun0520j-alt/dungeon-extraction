@@ -354,7 +354,7 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
             BossAoeImpactVfx.Spawn(floorTilemap.GetCellCenterWorld(bossAoeCell));
             var delta = player.CurrentCell - bossAoeCell;
             if (Mathf.Abs(delta.x) <= 2 && Mathf.Abs(delta.y) <= 2)
-                player.TakeFixedDamage(bossAoeFinalDamage);
+                player.TakeFixedDamage(bossAoeFinalDamage, true);
             Debug.Log($"[Boss] 광역 발동 — 중심 {bossAoeCell}");
             bossPatternStep = 0;
             TickManager.Instance.CompleteTurn(this, TickCost.Attack, "BossAoE");
@@ -369,7 +369,7 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
         }
 
         catalogAnimation?.PlayAttackOnce();
-        player.TakeDamage(attackPower);
+        player.TakeDamage(attackPower, m10Definition?.Id ?? name);
         bossPatternStep++;
         if (bossPatternStep >= 2)
         {
@@ -506,7 +506,7 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
             // Player.AttackEnemy()와 동일하게 항상 고정 비용(TickCost.cs 주석 참고, 속도 배율 영향 없음).
             UpdateFacingDirection(nextCell - currentCell);
             catalogAnimation?.PlayAttackOnce();
-            player.TakeDamage(attackPower);
+            player.TakeDamage(attackPower, m10Definition?.Id ?? name);
             TickManager.Instance.CompleteTurn(this, TickCost.Attack);
             return;
         }
@@ -645,8 +645,11 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
         int damage = CombatDamage.Calculate(incomingAttackPower, defensePower);
         int before = currentHP;
         currentHP = Mathf.Max(0, currentHP - damage);
-        M3MeasurementAutomation.RecordEnemyDamage(before - currentHP);
+        int appliedDamage = before - currentHP;
+        M3MeasurementAutomation.RecordEnemyDamage(appliedDamage);
         healthBar?.SetFill((float)currentHP / maxHP);
+        CombatFeedback.ShowDamage(transform.position, appliedDamage, false);
+        if (appliedDamage > 0) CombatFeedback.AddLine($"{(m10Definition?.Id ?? name)}에게 {appliedDamage} 피해");
 
         // [2026-09-04 신규] 맞는 순간 시각 피드백 — HitImpactVfx.cs 참고. 죽어서 바로
         // Destroy되더라도 충격 이펙트 자체는 독립 오브젝트라 문제없이 재생된다(스프라이트 색

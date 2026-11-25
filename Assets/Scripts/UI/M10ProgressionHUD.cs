@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 // 새 Canvas를 만들지 않는 표시 전용 HUD.
@@ -12,6 +13,7 @@ public sealed class M10ProgressionHUD : MonoBehaviour
     private float levelUpUntil;
     private GUIStyle titleStyle;
     private GUIStyle barTextStyle;
+    private GUIStyle combatLogStyle;
 
     private void Awake() => observedLevel = M10RunProgression.Level;
 
@@ -57,6 +59,18 @@ public sealed class M10ProgressionHUD : MonoBehaviour
                 $"회복 중 · {M10RunProgression.HealingTicksRemaining:0.#} Tick");
         if (Time.unscaledTime < levelUpUntil)
             GUI.Label(new Rect(Screen.width * 0.5f - 100f, Screen.height * 0.3f, 200f, 40f), $"LEVEL UP!  Lv.{level}");
+
+        IReadOnlyList<string> lines = CombatFeedback.RecentLines;
+        if (lines.Count > 0)
+        {
+            float lineHeight = 22f;
+            float logHeight = lines.Count * lineHeight + 12f;
+            Rect logPanel = new Rect(18f, Screen.height - logHeight - 18f, 360f, logHeight);
+            GUI.Box(logPanel, GUIContent.none);
+            for (int i = 0; i < lines.Count; i++)
+                GUI.Label(new Rect(logPanel.x + 8f, logPanel.y + 6f + i * lineHeight,
+                    logPanel.width - 16f, lineHeight), lines[i], combatLogStyle);
+        }
     }
 
     private void EnsureStyles()
@@ -80,6 +94,17 @@ public sealed class M10ProgressionHUD : MonoBehaviour
                 alignment = TextAnchor.MiddleCenter
             };
             barTextStyle.normal.textColor = Color.white;
+        }
+
+        if (combatLogStyle == null)
+        {
+            combatLogStyle = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = 14,
+                alignment = TextAnchor.MiddleLeft,
+                clipping = TextClipping.Clip
+            };
+            combatLogStyle.normal.textColor = Color.white;
         }
     }
 }

@@ -29,4 +29,7 @@ boss_aoe_flash_alpha_pct,75
 boss_aoe_vfx_ms,400
 boss_aoe_shake_strength_pct,18
 boss_aoe_shake_ms,250
+damage_popup_ms,650
+damage_popup_rise_px,60
+combat_log_lines,5
 night_floor_multiplier_pct,100

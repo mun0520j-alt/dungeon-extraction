@@ -285,3 +285,11 @@
 - `M7EconomyConfig` fallback을 실제 CSV의 스크롤 2/40/100·보험 3000/6000과 동기화했다. 만료 로그도 하드코딩 50 대신 설정값을 표시한다.
 - 새 Canvas·Singleton·씬·프리팹 변경은 없다. 1920×1080·1280×720 실제 스크린샷은 Play 검증에서 남긴다.
 
+## 2026-11-25 — M10 전투 피드백
+
+- `CombatFeedback`은 상태를 저장하는 새 MonoBehaviour/Singleton이 아니라 정적 로그 버퍼와 수명 제한 월드 팝업만 제공한다. 화면 로그는 기존 `M10ProgressionHUD.OnGUI`가 읽는다.
+- 피해는 Player/Enemy HP를 실제로 감소시킨 뒤의 값, 회복은 최대 HP 클램프 후 실제 증가량만 표시한다.
+- 보스 고정 광역 피해는 전용 플래그를 전달해 일반 피격과 색·로그를 구분한다.
+- 런타임·Editor 전체 컴파일 오류 0. 기존 obsolete API 경고만 존재한다.
+- 씬·프리팹·`ProjectSettings/PackageManagerSettings.asset` 변경 없음. 상황별 Play 스크린샷과 동시 팝업 성능은 대기.
+
