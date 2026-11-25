@@ -1,10 +1,10 @@
 enemy_id,sprite_key,tier,hp,attack,defense,move_cost_mult,behavior,visual_scale,scroll_drop_chance,xp,potion_drop_chance
-goblin,goblin,normal,200,50,10,1,Wander,1,0,10,0.05
-goblin_f3,goblin,normal,215,63,11,1,Wander,1,0,10,0.06
-goblin_f6,goblin,normal,265,80,13,1,Wander,1,0,25,0.08
-goblin_f8,goblin,normal,320,94,13,1,Wander,1,0,25,0.1
-goblin_elite_f3,goblin,elite,400,73,12,1,Wander,1.15,0.15,40,0.18
-goblin_elite_f6,goblin,elite,590,104,15,1,Wander,1.2,0.2,90,0.25
+goblin,goblin,normal,126,25,8,1,Wander,1,0,10,0.10
+goblin_f3,goblin,normal,196,38,10,1,Wander,1,0,10,0.10
+goblin_f6,goblin,normal,264,64,13,1,Wander,1,0,25,0.10
+goblin_f8,goblin,normal,344,91,15,1,Wander,1,0,25,0.10
+goblin_elite_f3,goblin,elite,441,61,12,1,Wander,1.15,0.15,40,0.18
+goblin_elite_f6,goblin,elite,595,106,16,1,Wander,1.2,0.2,90,0.25
 tiny_zombie,tiny_zombie,normal,210,50,10,1,Wander,1,0,10,0.05
 tiny_slug,tiny_slug,normal,190,48,8,1,Wander,1,0,10,0.05
 skelet,skelet,normal,215,63,11,1,Wander,1,0,10,0.06
@@ -25,5 +25,5 @@ necromancer,necromancer,elite,530,98,15,1,Wander,1.15,0.2,90,0.25
 chort,chort,night,560,101,15,1,Wander,1.1,0,90,0.2
 imp,imp,night,560,101,15,1,Wander,1.1,0,90,0.2
 big_demon,big_demon,night,560,101,15,1,Wander,1.2,0,90,0.2
-chest_mimic,chest_mimic,boss,800,90,14,1,Wander,0.9,0,100,0.5
-orc_warrior,orc_warrior,boss,1400,210,18,1,Wander,1.35,0,150,0.75
+chest_mimic,chest_mimic,boss,640,81,14,1,Wander,0.9,0,100,0.5
+orc_warrior,orc_warrior,boss,1344,243,18,1,Wander,1.35,0,150,0.75

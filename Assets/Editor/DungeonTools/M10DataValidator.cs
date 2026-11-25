@@ -5,6 +5,16 @@ using UnityEngine;
 
 public static class M10DataValidator
 {
+    [MenuItem("Tools/Dungeon/M10/Print Combat Matchups")]
+    public static void PrintCombatMatchups()
+    {
+        LogMatchup("Goblin — Lv1 기본", 1, "basic_weapon", "basic_shield", "basic_armor", "goblin");
+        LogMatchup("Mimic — Lv5 Rare", 5, "weapon_rare", "shield_rare", "armor_rare", "chest_mimic");
+        LogMatchup("Orc — Lv12 Unique", 12, "weapon_unique", "shield_unique", "armor_unique", "orc_warrior");
+        LogMatchup("Orc — Lv1 Legendary", 1, "weapon_legendary", "shield_legendary", "armor_legendary", "orc_warrior");
+        LogMatchup("Orc — Lv12 기본", 12, "basic_weapon", "basic_shield", "basic_armor", "orc_warrior");
+    }
+
     [MenuItem("Tools/Dungeon/M10/Validate Data")]
     public static void Validate()
     {
@@ -48,14 +58,29 @@ public static class M10DataValidator
         LootItemData legendaryBag = LootItemDatabase.FindById("bag_legendary");
         ok &= legendaryBag != null && legendaryBag.GridWidth == 5 && legendaryBag.GridHeight == 6
             && legendaryBag.BagGridWidth == 5 && legendaryBag.BagGridHeight == 6;
+        var expectedEquipment = new System.Collections.Generic.Dictionary<string, (int attack, int defense, int hp)>
+        {
+            { "basic_weapon", (15, 0, 0) }, { "basic_shield", (0, 4, 10) }, { "basic_armor", (0, 5, 20) },
+            { "weapon_normal", (20, 0, 0) }, { "shield_normal", (0, 5, 15) }, { "armor_normal", (0, 6, 25) },
+            { "weapon_rare", (35, 0, 0) }, { "shield_rare", (0, 8, 30) }, { "armor_rare", (0, 10, 45) },
+            { "weapon_epic", (55, 0, 0) }, { "shield_epic", (0, 12, 50) }, { "armor_epic", (0, 15, 75) },
+            { "weapon_unique", (80, 0, 0) }, { "shield_unique", (0, 16, 75) }, { "armor_unique", (0, 21, 110) },
+            { "weapon_legendary", (110, 0, 0) }, { "shield_legendary", (0, 22, 110) }, { "armor_legendary", (0, 28, 160) }
+        };
+        foreach (var pair in expectedEquipment)
+        {
+            LootItemData item = LootItemDatabase.FindById(pair.Key);
+            ok &= item != null && item.AttackBonus == pair.Value.attack
+                && item.DefenseBonus == pair.Value.defense && item.HPBonus == pair.Value.hp;
+        }
         ok &= M10ProgressionDatabase.Levels.Count == 12;
         int previousXP = -1;
         foreach (M10LevelDefinition level in M10ProgressionDatabase.Levels)
         {
             ok &= level.CumulativeXP > previousXP;
-            ok &= level.HPBonus == (level.Level - 1) * 40
+            ok &= level.HPBonus == (level.Level - 1) * 25
                 && level.AttackBonus == (level.Level - 1) * 2
-                && level.DefenseBonus == (level.Level - 1) * 2;
+                && level.DefenseBonus == (level.Level - 1);
             previousXP = level.CumulativeXP;
         }
         foreach (string potionId in new[] { "potion_small", "potion_medium", "potion_large" })
@@ -67,6 +92,27 @@ public static class M10DataValidator
                 && potion.InstantPercent == 50;
         }
         ok &= M10ProgressionDatabase.Potion("potion_large")?.HealPercent == 70;
+        var expectedCombat = new System.Collections.Generic.Dictionary<string, (int hp, int attack, int defense)>
+        {
+            { "goblin", (126, 25, 8) }, { "goblin_f3", (196, 38, 10) },
+            { "goblin_elite_f3", (441, 61, 12) }, { "chest_mimic", (640, 81, 14) },
+            { "goblin_f6", (264, 64, 13) }, { "goblin_f8", (344, 91, 15) },
+            { "goblin_elite_f6", (595, 106, 16) }, { "orc_warrior", (1344, 243, 18) }
+        };
+        foreach (var pair in expectedCombat)
+        {
+            M10EnemyDefinition enemy = M10EnemyDatabase.Find(pair.Key);
+            ok &= enemy != null && enemy.HP == pair.Value.hp && enemy.Attack == pair.Value.attack
+                && enemy.Defense == pair.Value.defense;
+        }
+        foreach (string enemyId in new[] { "goblin", "goblin_f3", "goblin_f6", "goblin_f8" })
+            ok &= Mathf.Approximately(M10EnemyDatabase.Find(enemyId).PotionDropChance, 0.10f);
+        ok &= Matchup(1, "basic_weapon", "basic_shield", "basic_armor", "goblin") == (3, 7);
+        ok &= Matchup(5, "weapon_rare", "shield_rare", "armor_rare", "chest_mimic") == (10, 5);
+        ok &= Matchup(12, "weapon_unique", "shield_unique", "armor_unique", "orc_warrior") == (12, 4);
+        var legendaryOrc = Matchup(1, "weapon_legendary", "shield_legendary", "armor_legendary", "orc_warrior");
+        var basicOrc = Matchup(12, "basic_weapon", "basic_shield", "basic_armor", "orc_warrior");
+        ok &= legendaryOrc.hitsToKill < basicOrc.hitsToKill;
 
         var expectedSpawns = new System.Collections.Generic.Dictionary<int, (string normal, string elite)>
         {
@@ -118,12 +164,49 @@ public static class M10DataValidator
         ok &= mimic?.idleFrames?.Length == 1 && mimic?.runFrames?.Length == 1
             && mimic?.attackFrames?.Length == 3;
         ok &= M10DungeonConfig.FastArrivalBonusPercent == 100
+            && M10DungeonConfig.DamageFormulaK > 0
+            && M10DungeonConfig.RestHealPercent > 0 && M10DungeonConfig.RestHealPercent <= 100
+            && M10DungeonConfig.RestHealPercentAfterBoss > 0 && M10DungeonConfig.RestHealPercentAfterBoss <= 100
             && M10DungeonConfig.BossAoeTelegraphTicks >= TickCost.Attack
             && Mathf.Approximately(M10DungeonConfig.BossAoeVfxSeconds, 0.4f)
             && Mathf.Approximately(M10DungeonConfig.BossAoeShakeStrength, 0.18f)
             && Mathf.Approximately(M10DungeonConfig.BossAoeShakeSeconds, 0.25f);
         if (!ok) throw new InvalidOperationException("M10 data validation failed. CSV/clock/floor configuration을 확인하세요.");
-        Debug.Log($"[M10 Validation] PASS — Lv당 HP+40/공방+2, 빠른 도착 100%, 포션 즉시 50%, 미믹 공격 3프레임, 보스 광역 예고 {M10DungeonConfig.BossAoeTelegraphTicks}Tick·VFX, 중간 탈출구 3·5·7층, 엘리트 외곽선, 장식 0, Legendary 5종 확인.");
+        PrintCombatMatchups();
+        Debug.Log($"[M10 Validation] PASS — % 피해 K={M10DungeonConfig.DamageFormulaK}, 장비 HP, Lv당 HP+25/공+2/방+1, 휴식 {M10DungeonConfig.RestHealPercent}%·보스 후 {M10DungeonConfig.RestHealPercentAfterBoss}%, 일반몹 포션 10%, 보스 광역 예고 {M10DungeonConfig.BossAoeTelegraphTicks}Tick 확인.");
+    }
+
+    private static void LogMatchup(string label, int level, string weaponId, string shieldId, string armorId, string enemyId)
+    {
+        M10LevelDefinition growth = M10ProgressionDatabase.Level(level);
+        LootItemData weapon = LootItemDatabase.FindById(weaponId);
+        LootItemData shield = LootItemDatabase.FindById(shieldId);
+        LootItemData armor = LootItemDatabase.FindById(armorId);
+        M10EnemyDefinition enemy = M10EnemyDatabase.Find(enemyId);
+        int playerAttack = 30 + growth.AttackBonus + weapon.AttackBonus;
+        int playerDefense = 25 + growth.DefenseBonus + shield.DefenseBonus + armor.DefenseBonus;
+        int playerHP = 100 + growth.HPBonus + shield.HPBonus + armor.HPBonus;
+        int dealt = CombatDamage.Calculate(playerAttack, enemy.Defense);
+        int taken = CombatDamage.Calculate(enemy.Attack, playerDefense);
+        int hitsToKill = Mathf.CeilToInt(enemy.HP / (float)dealt);
+        int hitsToDie = Mathf.CeilToInt(playerHP / (float)taken);
+        Debug.Log($"[M10 Matchup] {label}: Player HP/공/방 {playerHP}/{playerAttack}/{playerDefense}, "
+            + $"Enemy HP/공/방 {enemy.HP}/{enemy.Attack}/{enemy.Defense}, 피해 {dealt}/{taken}, 처치/생존 {hitsToKill}/{hitsToDie}대");
+    }
+
+    private static (int hitsToKill, int hitsToDie) Matchup(
+        int level, string weaponId, string shieldId, string armorId, string enemyId)
+    {
+        M10LevelDefinition growth = M10ProgressionDatabase.Level(level);
+        LootItemData weapon = LootItemDatabase.FindById(weaponId);
+        LootItemData shield = LootItemDatabase.FindById(shieldId);
+        LootItemData armor = LootItemDatabase.FindById(armorId);
+        M10EnemyDefinition enemy = M10EnemyDatabase.Find(enemyId);
+        int playerAttack = 30 + growth.AttackBonus + weapon.AttackBonus;
+        int playerDefense = 25 + growth.DefenseBonus + shield.DefenseBonus + armor.DefenseBonus;
+        int playerHP = 100 + growth.HPBonus + shield.HPBonus + armor.HPBonus;
+        return (Mathf.CeilToInt(enemy.HP / (float)CombatDamage.Calculate(playerAttack, enemy.Defense)),
+            Mathf.CeilToInt(playerHP / (float)CombatDamage.Calculate(enemy.Attack, playerDefense)));
     }
 
     private static bool FrameBelongsTo(Sprite frame, string key)

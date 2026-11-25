@@ -7,7 +7,7 @@ using UnityEngine;
 public static class LootItemDatabase
 {
     private const string ResourcePath = "Data/items";
-    private const int MinimumFieldCount = 14;
+    private const int MinimumFieldCount = 15;
     private static List<LootItemData> items;
 
     public static IReadOnlyList<LootItemData> Items
@@ -117,14 +117,15 @@ public static class LootItemDatabase
                 Rarity = rarity,
                 AttackBonus = ParseInt(fields[4]),
                 DefenseBonus = ParseInt(fields[5]),
-                CapacityBonus = ParseInt(fields[6]),
-                IconKey = fields[7].Trim(),
-                DropWeight = ParseInt(fields[8]),
-                SellPrice = ParseInt(fields[9]),
-                GridWidth = ParseInt(fields[10]),
-                GridHeight = ParseInt(fields[11]),
-                BagGridWidth = ParseInt(fields[12]),
-                BagGridHeight = ParseInt(fields[13])
+                HPBonus = ParseInt(fields[6]),
+                CapacityBonus = ParseInt(fields[7]),
+                IconKey = fields[8].Trim(),
+                DropWeight = ParseInt(fields[9]),
+                SellPrice = ParseInt(fields[10]),
+                GridWidth = ParseInt(fields[11]),
+                GridHeight = ParseInt(fields[12]),
+                BagGridWidth = ParseInt(fields[13]),
+                BagGridHeight = ParseInt(fields[14])
             });
         }
         Debug.Log($"[LootItemDatabase] CSV 아이템 {items.Count}개 로드 완료.");

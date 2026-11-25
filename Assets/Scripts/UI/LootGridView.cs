@@ -352,7 +352,7 @@ public sealed class LootGridView : MonoBehaviour
         if (dragged != null || tooltip == null || item?.Item?.Definition == null) return;
         LootItemData data = item.Item.Definition;
         tooltip.text = $"{data.Name} [{data.Rarity}]\n크기 {data.GridWidth}×{data.GridHeight}"
-            + $"\n공격 +{data.AttackBonus} / 방어 +{data.DefenseBonus}"
+            + $"\n공격 +{data.AttackBonus} / 방어 +{data.DefenseBonus} / HP +{data.HPBonus}"
             + (item.Item.IsFoundInRaid ? "\n인레이드" : string.Empty)
             + (item.Item.IsExpeditionBound ? "\n원정 종료 시 사라짐" : string.Empty)
             + (LootRuntimeState.IsInsured(item.Item.InstanceId) ? "\n보험됨" : string.Empty);

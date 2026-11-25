@@ -354,7 +354,7 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
             BossAoeImpactVfx.Spawn(floorTilemap.GetCellCenterWorld(bossAoeCell));
             var delta = player.CurrentCell - bossAoeCell;
             if (Mathf.Abs(delta.x) <= 2 && Mathf.Abs(delta.y) <= 2)
-                player.TakeDamage(player.EffectiveDefense + bossAoeFinalDamage);
+                player.TakeFixedDamage(bossAoeFinalDamage);
             Debug.Log($"[Boss] 광역 발동 — 중심 {bossAoeCell}");
             bossPatternStep = 0;
             TickManager.Instance.CompleteTurn(this, TickCost.Attack, "BossAoE");
@@ -632,7 +632,7 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
     }
 
     // [2026-09-03 신규] Player.AttackEnemy()가 호출한다. 데미지 공식은 PlayerTurnActor와 동일하게
-    // "공격력 - 방어력"(0 밑으로는 안 내려감). HP가 0 이하가 되면 즉시 제거한다 — Player 쪽처럼
+    // CombatDamage 공용 비율 감소 공식을 적용한다. HP가 0 이하가 되면 즉시 제거한다 — Player 쪽처럼
     // 한 프레임 미룰 필요가 없는 이유: 이 호출은 Player.Update()(수동 입력 처리) 안에서 오는
     // 거라 TickManager.AdvanceSchedule 반복문 도중이 아니고, 여기서 죽어도 이어서 실행되는 건
     // "내 턴을 넘긴다"가 아니라 Player 쪽 로직뿐이라 안전하다.
@@ -642,7 +642,7 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
     // 하면(등록이 아직 안 풀렸으니) 죽은 채로 OnTurnStart가 불릴 위험이 있다 — 즉시 해제해서 막는다.
     public void TakeDamage(int incomingAttackPower)
     {
-        int damage = Mathf.Max(1, incomingAttackPower - defensePower);
+        int damage = CombatDamage.Calculate(incomingAttackPower, defensePower);
         int before = currentHP;
         currentHP = Mathf.Max(0, currentHP - damage);
         M3MeasurementAutomation.RecordEnemyDamage(before - currentHP);

@@ -40,7 +40,7 @@ public class PlayerTurnActor : MonoBehaviour, ITurnActor
     // 필드들. [2026-09-04] 3단계(아이템 데이터) 착수로 PlayerEquipment가 추가되면서, 이 값들은
     // 이제 "장비 보너스를 더하기 전의 기본 스탯"이라는 의미로 바뀌었다 — 실제 전투 계산에는
     // 아래 EffectiveAttackPower/EffectiveDefensePower(기본값 + 장비 보너스 합)를 쓴다. 데미지
-    // 공식은 여전히 "공격력 - 방어력"(0 밑으로는 안 내려감)으로 동일.
+    // 공식은 M10부터 CombatDamage의 비율 감소 공식을 공통 사용한다.
     [Header("전투 (기본 스탯 — 장비 보너스는 EffectiveAttackPower/EffectiveDefensePower에서 합산됨)")]
     [SerializeField] private int maxHP = 100;
     [SerializeField] private int currentHP = 100;
@@ -57,7 +57,7 @@ public class PlayerTurnActor : MonoBehaviour, ITurnActor
     private int EffectiveAttackPower => attackPower + M10RunProgression.AttackBonus + (equipment != null ? equipment.TotalAttackBonus : 0);
     private int EffectiveDefensePower => defensePower + M10RunProgression.DefenseBonus + (equipment != null ? equipment.TotalDefenseBonus : 0);
     public int EffectiveDefense => EffectiveDefensePower;
-    public int CurrentMaxHP => maxHP + M10RunProgression.HPBonus;
+    public int CurrentMaxHP => maxHP + M10RunProgression.HPBonus + (equipment != null ? equipment.TotalHPBonus : 0);
     public int CurrentHP => currentHP;
 
     // HP가 0 이하가 된 다음 프레임에 영지(BaseCamp)로 씬 전환한다 — TakeDamage 호출 시점에서
@@ -222,11 +222,26 @@ public class PlayerTurnActor : MonoBehaviour, ITurnActor
         // 기본 장비를 자동 장착해준다(에셋 없이도 바로 확인 가능, PlayerEquipment.cs 참고).
         equipment = GetComponent<PlayerEquipment>();
         if (equipment == null) equipment = gameObject.AddComponent<PlayerEquipment>();
+        equipment.OnEquipmentChanged += HandleEquipmentChanged;
+        HandleEquipmentChanged();
     }
 
     private void OnDestroy()
     {
+        if (equipment != null) equipment.OnEquipmentChanged -= HandleEquipmentChanged;
         if (Instance == this) Instance = null;
+    }
+
+    private void HandleEquipmentChanged()
+    {
+        // 최대 HP가 늘 때는 현재 HP를 유지한다. 새 원정 Awake에서 세션 체력을 성급히 기록하면
+        // RestoreHealthForActiveExpedition의 첫 완전 회복을 막으므로, 실제 감소 클램프 때만 기록한다.
+        if (currentHP > CurrentMaxHP) ClampHealthToM10Max();
+        else
+        {
+            healthBar?.SetFill((float)currentHP / CurrentMaxHP);
+            healthViewDirty = true;
+        }
     }
 
     // Awake가 아니라 Start에서 첫 안개 갱신을 호출한다 — Unity는 씬 안의 모든 컴포넌트 Awake가
@@ -593,7 +608,10 @@ public class PlayerTurnActor : MonoBehaviour, ITurnActor
 
         int before = currentHP;
         bool bossDefeatedOnFloorFive = ExpeditionSession.CurrentFloor == 5 && GameObject.Find("Boss_F5") == null;
-        int healAmount = bossDefeatedOnFloorFive ? 20 : 10;
+        int healPercent = bossDefeatedOnFloorFive
+            ? M10DungeonConfig.RestHealPercentAfterBoss
+            : M10DungeonConfig.RestHealPercent;
+        int healAmount = Mathf.Max(1, Mathf.RoundToInt(CurrentMaxHP * healPercent / 100f));
         currentHP = Mathf.Min(CurrentMaxHP, currentHP + healAmount);
         M3MeasurementAutomation.RecordPlayerHealing(currentHP - before);
         ExpeditionSession.RecordPlayerHealth(currentHP);
@@ -604,14 +622,24 @@ public class PlayerTurnActor : MonoBehaviour, ITurnActor
         if (currentHP >= CurrentMaxHP) autoRestActive = false;
     }
 
-    // Enemy.TryTraceTowards()가 인접해서 공격할 때 호출한다. 데미지 공식은 "공격력 - 방어력"
-    // (0 밑으로는 안 내려감, 사용자 확정). HP가 0 이하가 되면 즉시 죽이지 않고 isDead만 세팅 —
+    // Enemy.TryTraceTowards()가 인접해서 공격할 때 호출한다. HP가 0 이하가 되면 즉시 죽이지 않고 isDead만 세팅 —
     // 실제 씬 전환은 Update()에서 한 프레임 늦게 처리한다(위 Update() 주석 참고, 호출 스택 분리 목적).
     public void TakeDamage(int incomingAttackPower)
     {
         if (isDead) return;
 
-        int damage = Mathf.Max(1, incomingAttackPower - EffectiveDefensePower);
+        int damage = CombatDamage.Calculate(incomingAttackPower, EffectiveDefensePower);
+        ApplyDamage(damage);
+    }
+
+    public void TakeFixedDamage(int damage)
+    {
+        if (isDead) return;
+        ApplyDamage(Mathf.Max(1, damage));
+    }
+
+    private void ApplyDamage(int damage)
+    {
         int before = currentHP;
         currentHP = Mathf.Max(0, currentHP - damage);
         M3MeasurementAutomation.RecordPlayerDamage(before - currentHP);

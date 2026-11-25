@@ -402,19 +402,19 @@ public static class M5SaveService
         if (csvItem != null) return csvItem;
         switch (itemId)
         {
-            case "basic_weapon": return Basic("basic_weapon", "기본 검", LootItemType.Weapon, 20, 0);
-            case "basic_shield": return Basic("basic_shield", "낡은 방패", LootItemType.Shield, 0, 6);
-            case "basic_armor": return Basic("basic_armor", "가죽 갑옷", LootItemType.Armor, 0, 6);
+            case "basic_weapon": return Basic("basic_weapon", "기본 검", LootItemType.Weapon, 15, 0, 0);
+            case "basic_shield": return Basic("basic_shield", "낡은 방패", LootItemType.Shield, 0, 4, 10);
+            case "basic_armor": return Basic("basic_armor", "가죽 갑옷", LootItemType.Armor, 0, 5, 20);
             default: return null;
         }
     }
 
-    private static LootItemData Basic(string id, string name, LootItemType type, int attack, int defense)
+    private static LootItemData Basic(string id, string name, LootItemType type, int attack, int defense, int hp)
     {
         return new LootItemData
         {
             Id = id, Name = name, Type = type, Rarity = LootRarity.Normal,
-            AttackBonus = attack, DefenseBonus = defense, CapacityBonus = 0,
+            AttackBonus = attack, DefenseBonus = defense, HPBonus = hp, CapacityBonus = 0,
             IconKey = string.Empty, DropWeight = 0,
             GridWidth = type == LootItemType.Weapon ? 1 : 2,
             GridHeight = type == LootItemType.Shield ? 2 : 3

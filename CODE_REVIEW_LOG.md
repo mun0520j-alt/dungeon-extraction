@@ -270,3 +270,11 @@
   - `DungeonStairs`: 5층 보스 처치 후 생환 체류 10Tick은 기존 5Tick의 2배, 일반 탈출 20Tick도 기존 10Tick의 2배라 정상이다.
   - `TickCost`, MIA 2880, 탈출 스크롤·보험 CSV는 결정 14의 2배 환산 상태다. 포션 2/10Tick과 빠른 도착 200Tick은 M10에서 새로 정한 값이라 누락 대상이 아니다.
 
+# 2026-11-25 — M10 전투·성장 재정비
+
+- Player와 Enemy에 중복돼 있던 `공격-방어` 계산을 `CombatDamage.Calculate` 한 곳으로 합치고 CSV `damage_formula_k=100`을 사용한다.
+- 보스 광역은 `TakeFixedDamage`로 공식과 명시적으로 분리해 방어와 무관한 최종 피해 35를 유지한다.
+- `items.csv`에 `hp_bonus`를 추가하고 `PlayerEquipment.TotalHPBonus`를 최대 HP에 합산한다. 장비 변경 이벤트에서 현재 HP를 새 최대치로 클램프한다.
+- 자동 검증이 18개 기본·등급 장비 수치, 레벨 곡선, 몬스터 8종, 일반몹 포션 10%, 휴식 %, 주요 매치업 타수를 검사한다.
+- 뺄셈 가정 검색 결과 런타임 피해 계산 잔여는 없다. `EquipmentItemDefinition`·`PlayerEquipment`의 과거 설명도 공용 전투 계산 표현으로 갱신했다. `MILESTONES.md`와 과거 CHANGELOG의 뺄셈 공식은 당시 이력으로 보존한다.
+

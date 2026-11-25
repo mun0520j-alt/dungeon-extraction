@@ -19,6 +19,9 @@ floor_arrival_xp_shallow,20
 floor_arrival_xp_deep,60
 fast_arrival_ticks_per_floor,200
 fast_arrival_bonus_pct,100
+damage_formula_k,100
+rest_heal_pct,5
+rest_heal_pct_after_boss,10
 boss_aoe_final_damage,35
 boss_aoe_telegraph_ticks,20
 boss_aoe_flash_hex,FF3030

@@ -28,6 +28,7 @@ public sealed class LootItemData
     public LootRarity Rarity;
     public int AttackBonus;
     public int DefenseBonus;
+    public int HPBonus;
     public int CapacityBonus;
     public string IconKey;
     public int DropWeight;

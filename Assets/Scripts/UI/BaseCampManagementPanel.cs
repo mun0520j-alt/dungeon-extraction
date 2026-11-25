@@ -477,6 +477,7 @@ public sealed class BaseCampManagementPanel : MonoBehaviour
             + (LootRuntimeState.IsInsured(item.InstanceId) ? "[보험] " : "");
         EnsureFoundInRaidStyle();
         string label = LootGridView.FormatFoundInRaidName(item, prefix);
+        if (item.Definition.HPBonus > 0) label += $" (HP +{item.Definition.HPBonus})";
         if (totalWidth > 0f) GUILayout.Label(label, itemRichTextStyle, GUILayout.Width(totalWidth));
         else GUILayout.Label(label, itemRichTextStyle);
     }
