@@ -75,6 +75,7 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
     private bool isBoss;
     private int bossPatternStep;
     private bool bossAoePending;
+    private bool bossCrossPending;
     private Vector3Int bossAoeCell;
     private int bossLootSeed;
     private bool isElite;
@@ -382,15 +383,20 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
         if (bossAoePending)
         {
             bossAoePending = false;
+            bool cross = bossCrossPending;
+            bossCrossPending = false;
             if (bossTelegraph != null) Destroy(bossTelegraph);
             catalogAnimation?.PlayAttackOnce();
             BossAoeImpactVfx.Spawn(floorTilemap.GetCellCenterWorld(bossAoeCell));
             var delta = player.CurrentCell - bossAoeCell;
-            if (Mathf.Abs(delta.x) <= 2 && Mathf.Abs(delta.y) <= 2)
-                player.TakeFixedDamage(bossAoeFinalDamage, true);
-            Debug.Log($"[Boss] 광역 발동 — 중심 {bossAoeCell}");
-            bossPatternStep = 0;
-            TickManager.Instance.CompleteTurn(this, TickCost.Attack, "BossAoE");
+            bool hit = cross
+                ? (delta.x == 0 && Mathf.Abs(delta.y) <= M11TimeConfig.OrcCrossRadius)
+                    || (delta.y == 0 && Mathf.Abs(delta.x) <= M11TimeConfig.OrcCrossRadius)
+                : Mathf.Abs(delta.x) <= 2 && Mathf.Abs(delta.y) <= 2;
+            if (hit) player.TakeFixedDamage(cross ? M11TimeConfig.OrcCrossDamage : bossAoeFinalDamage, true);
+            Debug.Log($"[Boss] {(cross ? "십자" : "광역")} 발동 — 중심 {bossAoeCell}");
+            if (cross || !IsOrcBoss) bossPatternStep = 0;
+            TickManager.Instance.CompleteTurn(this, TickCost.Attack, cross ? "BossCross" : "BossAoE");
             return;
         }
 
@@ -404,12 +410,15 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
         catalogAnimation?.PlayAttackOnce();
         player.TakeDamage(attackPower, m10Definition?.Id ?? name);
         bossPatternStep++;
-        if (bossPatternStep >= 2)
+        bool scheduleRadial = bossPatternStep == 2;
+        bool scheduleCross = IsOrcBoss && bossPatternStep >= 4;
+        if (scheduleRadial || scheduleCross)
         {
             bossAoePending = true;
-            bossAoeCell = player.CurrentCell;
-            CreateBossTelegraph();
-            Debug.Log($"[Boss] 광역 예고 — 중심 {bossAoeCell}, {M10DungeonConfig.BossAoeTelegraphTicks} Tick 뒤 발동");
+            bossCrossPending = scheduleCross;
+            bossAoeCell = scheduleCross ? currentCell : player.CurrentCell;
+            CreateBossTelegraph(scheduleCross);
+            Debug.Log($"[Boss] {(scheduleCross ? "십자" : "광역")} 예고 — 중심 {bossAoeCell}, {M10DungeonConfig.BossAoeTelegraphTicks} Tick 뒤 발동");
         }
         float? minimumNextActionTime = null;
         if (bossAoePending)
@@ -424,16 +433,19 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
             bossAoePending ? "BossSingle+Telegraph" : "BossSingle", minimumNextActionTime);
     }
 
-    private void CreateBossTelegraph()
+    private bool IsOrcBoss => isBoss && ExpeditionSession.CurrentFloor >= M10DungeonConfig.FinalBossFloor;
+
+    private void CreateBossTelegraph(bool cross)
     {
         if (bossTelegraph != null) Destroy(bossTelegraph);
         bossTelegraph = new GameObject("BossAoETelegraph");
         bossTelegraph.transform.position = floorTilemap.GetCellCenterWorld(bossAoeCell);
-        var renderer = bossTelegraph.AddComponent<SpriteRenderer>();
-        renderer.sprite = ProceduralSprite.GetWhiteSpriteCenterPivot();
-        renderer.color = new Color(1f, 0.1f, 0.05f, 0.28f);
-        renderer.sortingOrder = 4;
-        bossTelegraph.transform.localScale = new Vector3(5f, 5f, 1f);
+        if (cross)
+        {
+            CreateTelegraphBar("Horizontal", new Vector3(M11TimeConfig.OrcCrossRadius * 2 + 1, 1f, 1f));
+            CreateTelegraphBar("Vertical", new Vector3(1f, M11TimeConfig.OrcCrossRadius * 2 + 1, 1f));
+        }
+        else CreateTelegraphBar("Area", new Vector3(5f, 5f, 1f));
 
         var labelObject = new GameObject("TelegraphTickLabel");
         labelObject.transform.SetParent(bossTelegraph.transform, false);
@@ -447,6 +459,17 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
         label.fontSize = 48;
         label.color = Color.white;
         labelObject.GetComponent<MeshRenderer>().sortingOrder = 5;
+    }
+
+    private void CreateTelegraphBar(string nameSuffix, Vector3 scale)
+    {
+        var bar = new GameObject($"Telegraph_{nameSuffix}", typeof(SpriteRenderer));
+        bar.transform.SetParent(bossTelegraph.transform, false);
+        bar.transform.localScale = scale;
+        SpriteRenderer renderer = bar.GetComponent<SpriteRenderer>();
+        renderer.sprite = ProceduralSprite.GetWhiteSpriteCenterPivot();
+        renderer.color = bossCrossPending ? new Color(1f, 0.48f, 0.05f, 0.34f) : new Color(1f, 0.1f, 0.05f, 0.28f);
+        renderer.sortingOrder = 4;
     }
 
     private void AlertSameRoom(Vector3Int playerCell)
