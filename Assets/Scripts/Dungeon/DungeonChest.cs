@@ -121,17 +121,16 @@ public sealed class DungeonChest : MonoBehaviour, ILootContainer
         M3MeasurementAutomation.RecordChestOpened();
         if (chestRenderer != null) chestRenderer.color = new Color(0.24f, 0.15f, 0.08f);
 
-        LootItemData definition = LootItemDatabase.Roll(floorNumber, new System.Random(lootSeed));
-        if (definition == null)
+        var rng = new System.Random(lootSeed);
+        int count = M11TimeConfig.RollChestItemCount(rng, DungeonClock.IsNightNow);
+        for (int i = 0; i < count; i++)
         {
-            Debug.LogError("[Chest] 드롭 가능한 아이템이 없습니다.");
-            yield break;
+            LootItemData definition = LootItemDatabase.Roll(floorNumber, rng);
+            if (definition == null) continue;
+            var item = new LootItemInstance(definition, foundInRaid: true);
+            if (!TryAdd(item)) Debug.LogError($"[Chest] 5x5 상자에 {definition.Name}을 배치하지 못했습니다.");
+            else M3MeasurementAutomation.RecordChestItemGenerated();
         }
-
-        // 던전에서 생성된 순간부터 인레이드 아이템이다. 생환 시점에 사후 부여하지 않는다.
-        var item = new LootItemInstance(definition, foundInRaid: true);
-        if (!TryAdd(item)) Debug.LogError($"[Chest] 5x5 상자에 {definition.Name}을 배치하지 못했습니다.");
-        else M3MeasurementAutomation.RecordChestItemGenerated();
         LootingPanel.Open(this, player);
     }
 
