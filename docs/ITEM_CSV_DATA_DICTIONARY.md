@@ -9,9 +9,10 @@
 | `item_id` | string | Y | 저장·참조용 고유 ID | 중복 금지, 표시명으로 사용 금지 |
 | `item_name` | string | Y | UI 표시명 | 빈 값 금지 |
 | `item_type` | enum | Y | Weapon, Shield, Armor, Bag, Junk, Consumable | 지원하지 않는 값은 로드 실패 처리. Junk·Consumable은 장착 불가 |
-| `rarity` | enum | Y | Normal, Rare, Epic, Unique | 1~4층 Legendary 데이터 금지 |
+| `rarity` | enum | Y | Normal, Rare, Epic, Unique, Legendary | 1~4층 Legendary 드롭 금지 |
 | `attack_bonus` | int | Y | 장착 공격력 보너스 | 0 이상 |
 | `defense_bonus` | int | Y | 장착 방어력 보너스 | 0 이상 |
+| `hp_bonus` | int | Y | 장착 최대 HP 보너스 | 방패·갑옷만 양수, 그 외 0 |
 | `capacity_bonus` | int | Y | M5 목록 가방과 v2 세이브 해석용 용량 보너스 | M6 배치 판정에는 사용하지 않음. 마이그레이션 호환용 유지 |
 | `icon_key` | string | N | 아이콘 리소스 키 | 빈 값이면 대체 표시 사용 |
 | `drop_weight` | int | Y | 같은 등급·풀 안의 상대 가중치 | 0은 일반 드롭 제외 |
@@ -23,26 +24,25 @@
 
 ## 현재 데이터 요약
 
-| 타입 | Normal | Rare | Epic | Unique | 합계 |
+| 타입 | Normal | Rare | Epic | Unique | Legendary | 합계 |
+|---|---:|---:|---:|---:|---:|---:|
+| Weapon | 2 | 1 | 1 | 1 | 1 | 6 |
+| Shield | 2 | 1 | 1 | 1 | 1 | 6 |
+| Armor | 2 | 1 | 1 | 1 | 1 | 6 |
+| Bag | 1 | 1 | 1 | 1 | 1 | 5 |
+| Junk | 2 | 1 | 1 | 1 | 1 | 6 |
+| Consumable | 2 | 1 | 1 | 0 | 0 | 4 |
+| 합계 | 11 | 6 | 6 | 5 | 5 | 33 |
+
+## M10 전투 수치
+
+| 타입 | Normal | Rare | Epic | Unique | Legendary |
 |---|---:|---:|---:|---:|---:|
-| Weapon | 1 | 1 | 1 | 1 | 4 |
-| Shield | 1 | 1 | 1 | 1 | 4 |
-| Armor | 1 | 1 | 1 | 1 | 4 |
-| Bag | 1 | 1 | 1 | 1 | 4 |
-| Junk | 2 | 1 | 1 | 1 | 5 |
-| Consumable | 1 | 0 | 0 | 0 | 1 |
-| 기본 지급(드롭 제외) | 3 | 0 | 0 | 0 | 3 |
-| 합계 | 10 | 5 | 5 | 5 | 25 |
+| Weapon 공격 보너스 | 20 | 35 | 55 | 80 | 110 |
+| Shield 방어 / HP | 5 / 15 | 8 / 30 | 12 / 50 | 16 / 75 | 22 / 110 |
+| Armor 방어 / HP | 6 / 25 | 10 / 45 | 15 / 75 | 21 / 110 | 28 / 160 |
 
-## M4 전투 수치
-
-| 타입 | Normal | Rare | Epic | Unique |
-|---|---:|---:|---:|---:|
-| Weapon 공격 보너스 | 30 | 40 | 50 | 80 |
-| Shield 방어 보너스 | 7 | 8 | 9 | 10 |
-| Armor 방어 보너스 | 7 | 8 | 9 | 10 |
-
-- 기본 지급 장비는 CSV 드롭 장비와 별도로 기본 검 +20, 기본 방패 +6, 기본 갑옷 +6이다.
+- 기본 지급 장비는 기본 검 공격 +15, 기본 방패 방어 +4/HP +10, 기본 갑옷 방어 +5/HP +20이다.
 - 아이템 크기는 무기 1×3, 방패 2×2, 갑옷 2×3이다. 가방은 외부 크기와 내부 수납 크기를 동일하게 사용한다(Normal 4×2, Rare 3×3, Epic 5×3, Unique 4×5).
 - 출격 가방 격자는 기본 3×2, Normal 4×2, Rare 3×3, Epic 5×3, Unique 4×5다.
 - 하위 가방은 부모 격자에서 내부 수납량과 같은 면적을 차지하므로 순수 용량 이득이 없고 분류·정리 용도로만 사용한다.
@@ -108,3 +108,18 @@
 - 현재 `items.csv`는 M6 장비·가방 최소 데이터이며 장신구·소모품·수집품 전체 설계를 포함하지 않는다.
 - `ITEM_SYSTEM_DESIGN.md`는 장기 설계 근거이고 CSV는 현재 런타임 데이터다.
 - 가방 이름과 드롭 가중치는 M5 통합 Play 전 임시값이다.
+## M10 추가 CSV (2026-11-20)
+
+- `m10_dungeon.csv`: 최종 층, 보스 층, 깊은 층 방 개수, 탈출 스크롤 충전 Tick·수량·재고 상한.
+- `m10_enemies.csv`: 몬스터 ID·스프라이트 키·등급·HP·공격·방어·행동·크기·스크롤 확률.
+- `m10_floor_spawns.csv`: 층별 일반/엘리트 후보와 생성 수.
+- `m10_levels.csv`: 원정 레벨 1~12의 누적 XP와 HP·공격·방어 보너스. 영구 세이브하지 않는다.
+- `m10_potions.csv`: 힐 포션 `item_id`, 최대 HP 비율(`heal_pct`), 지속 Tick, 사용 Tick.
+- `m10_enemies.csv` 추가 열: `xp`, `potion_drop_chance`. 수치는 M10 임시 밸런스다.
+- `m10_dungeon.csv` 추가 키: 얕은/깊은 층 도착 XP, 층당 빠른 도착 Tick, 보너스 %, 피해 공식 K, 휴식 회복 %, 보스 광역 고정 피해, 심야 층 배율 설계값.
+- `m10_floor_themes.csv`: 층 구간별 바닥·벽 색조와 장식 세트 키.
+- `m10_floor_decorations.csv`: 장식 세트별 바닥·벽 1,000칸당 밀도와 0x72 장식 키 목록.
+- `m10_loot_rarity.csv`: 층별 Normal~Legendary 및 보스 수량·등급 확률. 각 확률 묶음은 100이어야 한다.
+- `items.csv` Legendary 5종: 고대 왕의 대검(1×3), 심연 수호자의 방패(2×2), 고대 왕의 판금갑옷(2×3), 심연 원정 배낭(외부·내부 5×6), 오크 왕의 인장(1×1).
+- Legendary 아이템은 상점 판매 대상이 아니며 6~10층 드롭 풀에서만 사용한다. 뽑힌 등급에 후보가 없으면 바로 Normal로 가지 않고 한 단계씩 낮은 등급을 탐색한다.
+

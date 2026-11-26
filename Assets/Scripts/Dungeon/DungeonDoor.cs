@@ -10,7 +10,7 @@ public sealed class DungeonDoor : MonoBehaviour
     private Tilemap walls;
     private SpriteRenderer view;
     public bool IsOpen { get; private set; }
-    public string InteractionLabel => IsOpen ? $"문 닫기 ({TickCost.PerTileMove:0} Tick)" : $"문 열기 ({TickCost.PerTileMove:0} Tick)";
+    public string InteractionLabel => IsOpen ? $"문 닫기 ({TickCost.Door:0} Tick)" : $"문 열기 ({TickCost.Door:0} Tick)";
 
     public void Initialize(Tilemap floorTilemap, Tilemap wallsTilemap, IEnumerable<Vector3Int> occupiedCells, bool horizontal)
     {
@@ -89,7 +89,7 @@ public sealed class DungeonDoor : MonoBehaviour
         if (!IsOpen) SetOpen(true);
         else if (!ContainsActor() && !HasAdjacentEnemy()) SetOpen(false);
         else return false;
-        TickManager.Instance.CompleteTurn(player, TickCost.PerTileMove, IsOpen ? "OpenDoor" : "CloseDoor");
+        TickManager.Instance.CompleteTurn(player, TickCost.Door, IsOpen ? "OpenDoor" : "CloseDoor");
         return true;
     }
 

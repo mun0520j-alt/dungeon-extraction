@@ -91,6 +91,12 @@ public sealed class GroundLootPile : MonoBehaviour, ILootContainer
             && Manhattan(playerCell, value.cell) <= 1);
     }
 
+    public static bool IsCellBlocked(Tilemap floorTilemap, Vector3Int targetCell)
+    {
+        GroundLootPile pile = Find(floorTilemap, targetCell);
+        return pile != null && pile.lootGrid.Placements.Count > 0;
+    }
+
     public static bool TryInteractAt(Vector3Int targetCell, PlayerTurnActor player)
     {
         if (player == null || Manhattan(player.CurrentCell, targetCell) > 1) return false;

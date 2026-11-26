@@ -25,7 +25,7 @@ public class DungeonRunManager : MonoBehaviour
     [SerializeField] private int runSeed = 20261106;
 
     [Header("M1 Temporary Balance")]
-    [SerializeField, Min(1)] private int escapeProcedureTickCost = 10;
+    [SerializeField, Min(1)] private int escapeProcedureTickCost = 20;
 
     [Header("Test Scene Visual Settings")]
     [SerializeField] private float playerCellOffsetX = 0.5f;
@@ -95,6 +95,30 @@ public class DungeonRunManager : MonoBehaviour
     }
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
+    public bool DebugSpawnEnemy(string enemyId)
+    {
+        M10EnemyDefinition definition = M10EnemyDatabase.Find(enemyId);
+        PlayerTurnActor actor = PlayerTurnActor.Instance;
+        int floorIndex = ExpeditionSession.CurrentFloor - 1;
+        if (definition == null || actor == null || floorIndex < 0 || floorIndex >= floorTileTilemaps.Count) return false;
+        Tilemap floor = floorTileTilemaps[floorIndex];
+        Tilemap walls = floorWallTilemaps[floorIndex];
+        Vector3Int best = default;
+        int bestDistance = int.MaxValue;
+        foreach (Vector3Int cell in floor.cellBounds.allPositionsWithin)
+        {
+            int distance = Mathf.Abs(cell.x - actor.CurrentCell.x) + Mathf.Abs(cell.y - actor.CurrentCell.y);
+            if (distance < 2 || distance >= bestDistance || !floor.HasTile(cell) || walls.HasTile(cell)) continue;
+            if (TickManager.Instance != null && TickManager.Instance.IsCellOccupied(cell)) continue;
+            best = cell;
+            bestDistance = distance;
+        }
+        if (bestDistance == int.MaxValue) return false;
+        CreateRuntimeEnemy(floorIndex, 9000, best, floor, walls, definition);
+        Debug.Log($"[QA] {enemyId} 생성 — {ExpeditionSession.CurrentFloor}층 {best}");
+        return true;
+    }
+
     [ContextMenu("QA/Validate Generated Run")]
     public bool ValidateGeneratedRun()
     {
@@ -102,7 +126,7 @@ public class DungeonRunManager : MonoBehaviour
         for (int i = 0; i < floors.Count; i++)
         {
             FloorLayout actual = floors[i];
-            FloorLayout replay = i + 1 == 5
+            FloorLayout replay = M10DungeonConfig.IsBossFloor(i + 1)
                 ? CreateBossArenaLayout()
                 : FloorLayoutGenerator.Generate(gridWidth, gridHeight, minRooms, maxRooms, floorSeeds[i]);
             string actualSignature = BuildLayoutSignature(actual);
@@ -197,9 +221,11 @@ public class DungeonRunManager : MonoBehaviour
         {
             int seed = rng.Next();
             floorSeeds.Add(seed);
-            bool bossFloor = i + 1 == 5;
+            bool bossFloor = M10DungeonConfig.IsBossFloor(i + 1);
             int paintChunkSize = bossFloor ? bossArenaSize : chunkSize;
-            var layout = bossFloor ? CreateBossArenaLayout() : FloorLayoutGenerator.Generate(gridWidth, gridHeight, minRooms, maxRooms, seed);
+            int floorMinRooms = i + 1 >= 6 ? M10DungeonConfig.DeepMinRooms : minRooms;
+            int floorMaxRooms = i + 1 >= 6 ? M10DungeonConfig.DeepMaxRooms : maxRooms;
+            var layout = bossFloor ? CreateBossArenaLayout() : FloorLayoutGenerator.Generate(gridWidth, gridHeight, floorMinRooms, floorMaxRooms, seed);
             Debug.Log($"[DungeonRunManager] F{i + 1} 방 {layout.RoomCount}개 — Floor Seed {seed}");
 
             var floorRoot = new GameObject($"Floor_{i + 1}", typeof(Grid));
@@ -211,6 +237,9 @@ public class DungeonRunManager : MonoBehaviour
 
             var painter = new FloorTilemapPainter(floorTilemap, wallTilemap, floorTile, wallTile) { ChunkSize = paintChunkSize };
             painter.Paint(layout);
+            M10FloorThemeDatabase.Apply(i + 1, floorTilemap, wallTilemap);
+            int decorationCount = M10FloorDecorationPlacer.Place(i + 1, seed, floorTilemap, wallTilemap, floorRoot.transform);
+            if (decorationCount > 0) Debug.Log($"[M10] F{i + 1} 장식 {decorationCount}개 배치 — Seed {seed}");
             DungeonRoomRegistry.Register(floorTilemap, layout, paintChunkSize);
             if (!bossFloor) SpawnDoors(layout, floorTilemap, wallTilemap, floorRoot.transform);
 
@@ -291,10 +320,10 @@ public class DungeonRunManager : MonoBehaviour
         var floorTilemap = floorTileTilemaps[floorIndex];
         var wallTilemap = floorWallTilemaps[floorIndex];
 
-        int activeChunkSize = floorIndex + 1 == 5 ? bossArenaSize : chunkSize;
+        int activeChunkSize = M10DungeonConfig.IsBossFloor(floorIndex + 1) ? bossArenaSize : chunkSize;
         var startTilePos = new Vector3Int(
             layout.StartCell.x * activeChunkSize + activeChunkSize / 2,
-            layout.StartCell.y * activeChunkSize + (floorIndex + 1 == 5 ? 2 : activeChunkSize / 2),
+            layout.StartCell.y * activeChunkSize + (M10DungeonConfig.IsBossFloor(floorIndex + 1) ? 2 : activeChunkSize / 2),
             0);
         Vector3 worldPos = floorTilemap.CellToWorld(startTilePos) +
                            new Vector3(playerCellOffsetX, playerCellOffsetY, 0f);
@@ -358,7 +387,7 @@ public class DungeonRunManager : MonoBehaviour
     {
         if (floorIndex < 0 || floorIndex >= floors.Count || player == null) return;
 
-        if (floorIndex + 1 == 5)
+        if (M10DungeonConfig.IsBossFloor(floorIndex + 1))
         {
             SpawnBoss(floorIndex);
             return;
@@ -393,6 +422,10 @@ public class DungeonRunManager : MonoBehaviour
         var roomIds = new List<int>(candidatesByRoom.Keys);
         Shuffle(roomIds, rng);
 
+        M10FloorSpawnDefinition spawnDefinition = M10EnemyDatabase.Floor(floorIndex + 1);
+        int normalTarget = spawnDefinition != null ? spawnDefinition.NormalCount : enemiesPerFloor;
+        int eliteTarget = spawnDefinition != null ? rng.Next(spawnDefinition.EliteMin, spawnDefinition.EliteMax + 1) : 0;
+        int targetCount = normalTarget + eliteTarget;
         var occupied = new List<Vector3Int> { playerCell };
         int spawned = 0;
         foreach (int roomId in roomIds)
@@ -405,14 +438,17 @@ public class DungeonRunManager : MonoBehaviour
                 bool tooClose = occupied.Exists(other => Mathf.Abs(other.x - cell.x) + Mathf.Abs(other.y - cell.y) < 3);
                 if (tooClose) continue;
 
-                CreateRuntimeEnemy(floorIndex, spawned, cell, floorTilemap, wallTilemap);
+                bool elite = spawned >= normalTarget;
+                string[] ids = elite ? spawnDefinition?.EliteIds : spawnDefinition?.NormalIds;
+                string id = ids != null && ids.Length > 0 ? ids[rng.Next(ids.Length)] : null;
+                CreateRuntimeEnemy(floorIndex, spawned, cell, floorTilemap, wallTilemap, M10EnemyDatabase.Find(id));
                 occupied.Add(cell);
                 spawned++;
                 placed = true;
                 break;
             }
             if (!placed) continue;
-            if (spawned >= enemiesPerFloor) break;
+            if (spawned >= targetCount) break;
         }
 
         Debug.Log($"[DungeonRunManager] {floorIndex + 1}층 Enemy {spawned}개 배치 및 TickManager 등록 완료.");
@@ -423,15 +459,14 @@ public class DungeonRunManager : MonoBehaviour
         var floorTilemap = floorTileTilemaps[floorIndex];
         var wallTilemap = floorWallTilemaps[floorIndex];
         var bossCell = new Vector3Int(bossArenaSize / 2, bossArenaSize - 4, 0);
-        GameObject boss = CreateRuntimeEnemy(floorIndex, 0, bossCell, floorTilemap, wallTilemap);
-        boss.name = "Boss_F5";
-        boss.transform.localScale = new Vector3(1.35f, 1.35f, 1f);
-        var renderer = boss.GetComponent<SpriteRenderer>();
-        if (renderer != null) renderer.color = new Color(0.75f, 0.15f, 0.2f, 1f);
+        int floor = floorIndex + 1;
+        M10EnemyDefinition bossDefinition = M10EnemyDatabase.Boss(floor);
+        GameObject boss = CreateRuntimeEnemy(floorIndex, 0, bossCell, floorTilemap, wallTilemap, bossDefinition);
+        boss.name = $"Boss_F{floor}";
         var bossActor = boss.GetComponent<EnemyTurnActor>();
-        bossActor.ConfigureCombatStats(bossMaxHP, bossAttackPower, bossDefensePower);
+        if (bossDefinition == null) bossActor.ConfigureCombatStats(bossMaxHP, bossAttackPower, bossDefensePower);
         bossActor.ConfigureBoss(floorSeeds[floorIndex] ^ 0x4D345F42);
-        Debug.Log("[DungeonRunManager] 5층 단일 보스 아레나 생성 — 일반 Enemy 0, 일반 상자 0.");
+        Debug.Log($"[DungeonRunManager] {floor}층 단일 보스 아레나 생성 — 일반 Enemy 0, 일반 상자 0.");
     }
 
     private static void Shuffle<T>(IList<T> values, System.Random rng)
@@ -445,7 +480,7 @@ public class DungeonRunManager : MonoBehaviour
         }
     }
 
-    private GameObject CreateRuntimeEnemy(int floorIndex, int enemyIndex, Vector3Int cell, Tilemap floorTilemap, Tilemap wallTilemap)
+    private GameObject CreateRuntimeEnemy(int floorIndex, int enemyIndex, Vector3Int cell, Tilemap floorTilemap, Tilemap wallTilemap, M10EnemyDefinition definition = null)
     {
         var enemy = new GameObject($"Enemy_F{floorIndex + 1}_{enemyIndex + 1}");
         enemy.SetActive(false);
@@ -454,7 +489,10 @@ public class DungeonRunManager : MonoBehaviour
         var visual = new GameObject("Visual");
         visual.transform.SetParent(enemy.transform, false);
         var renderer = visual.AddComponent<SpriteRenderer>();
-        renderer.sprite = enemySprite != null ? enemySprite : ProceduralSprite.GetWhiteSpriteCenterPivot();
+        var catalog = Resources.Load<M10EnemyVisualCatalog>("Data/M10EnemyVisualCatalog");
+        M10EnemyVisualCatalog.Entry visualEntry = catalog != null ? catalog.Find(definition?.SpriteKey) : null;
+        renderer.sprite = visualEntry?.idleFrames != null && visualEntry.idleFrames.Length > 0
+            ? visualEntry.idleFrames[0] : (enemySprite != null ? enemySprite : ProceduralSprite.GetWhiteSpriteCenterPivot());
         renderer.color = enemySprite != null ? Color.white : new Color(0.35f, 0.85f, 0.3f, 1f);
         renderer.sortingOrder = 2;
         if (renderer.sprite != null)
@@ -463,9 +501,14 @@ public class DungeonRunManager : MonoBehaviour
             float scaleX = spriteSize.x > 0f ? floorTilemap.cellSize.x * 0.9f / spriteSize.x : 1f;
             float scaleY = spriteSize.y > 0f ? floorTilemap.cellSize.y * 0.9f / spriteSize.y : 1f;
             float visualScale = Mathf.Min(scaleX, scaleY);
+            visualScale *= definition?.VisualScale ?? 1f;
             visual.transform.localScale = new Vector3(visualScale, visualScale, 1f);
         }
-        if (enemyAnimatorController != null)
+        if (visualEntry?.idleFrames != null && visualEntry.idleFrames.Length > 0)
+            visual.AddComponent<M10SpriteAnimation>().Configure(renderer, visualEntry.idleFrames, visualEntry.runFrames, visualEntry.attackFrames);
+        // 카탈로그 비주얼은 자체 프레임 애니메이션/스프라이트가 소유한다. 공용 Animator를
+        // 함께 붙이면 첫 프레임에 기존 클립의 스프라이트로 덮여 모든 몬스터가 같아진다.
+        if (visualEntry == null && enemyAnimatorController != null)
         {
             var animator = visual.AddComponent<Animator>();
             animator.runtimeAnimatorController = enemyAnimatorController;
@@ -477,8 +520,9 @@ public class DungeonRunManager : MonoBehaviour
         enemy.transform.position = floorTilemap.GetCellCenterWorld(cell);
 
         var actor = enemy.AddComponent<EnemyTurnActor>();
-        actor.ConfigureCombatStats(enemyMaxHP, enemyAttackPower, enemyDefensePower);
-        actor.ConfigureRuntime(wallTilemap, floorTilemap, EnemyBehaviorType.Wander, enemyMoveDuration, enemyHopHeight);
+        actor.ConfigureCombatStats(definition?.HP ?? enemyMaxHP, definition?.Attack ?? enemyAttackPower, definition?.Defense ?? enemyDefensePower);
+        actor.ConfigureRuntime(wallTilemap, floorTilemap, definition?.Behavior ?? EnemyBehaviorType.Wander, enemyMoveDuration, enemyHopHeight);
+        actor.ConfigureM10Identity(definition);
         enemy.SetActive(true);
         return enemy;
     }
@@ -498,9 +542,9 @@ public class DungeonRunManager : MonoBehaviour
     private void SpawnChestsAtFloor(int floorIndex)
     {
         if (floorIndex < 0 || floorIndex >= floors.Count || player == null) return;
-        if (floorIndex + 1 == 5)
+        if (M10DungeonConfig.IsBossFloor(floorIndex + 1))
         {
-            Debug.Log("[DungeonRunManager] 5층은 보스 전용 층 — 일반 상자 0개.");
+            Debug.Log($"[DungeonRunManager] {floorIndex + 1}층은 보스 전용 층 — 일반 상자 0개.");
             return;
         }
 

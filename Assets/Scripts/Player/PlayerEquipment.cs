@@ -6,7 +6,7 @@ using UnityEngine;
 // [Summary] PlayerEquipment
 // Player가 지금 각 슬롯에 뭘 장착하고 있는지 들고 있는 컴포넌트(2026-09-04 신규, Dev Sequence
 // 3단계 착수 — 사용자 확정: "가벼운 ScriptableObject 장비 데이터"). PlayerTurnActor의 전투
-// 계산(공격력-방어력)에 필요한 "장비 보너스 합계"만 계산해서 내어주는 역할 — 실제 데미지 공식/
+// 계산에 필요한 "장비 보너스 합계"만 계산해서 내어주는 역할 — 실제 데미지 공식/
 // HP 처리는 여전히 PlayerTurnActor 책임이다(단일 책임 유지, HP바/알림표시와 같은 패턴으로
 // "붙이면 끝"인 컴포넌트).
 //
@@ -20,9 +20,11 @@ using UnityEngine;
 public class PlayerEquipment : MonoBehaviour
 {
     [Header("기본 지급 장비 수치")]
-    [SerializeField, Min(0)] private int basicWeaponAttackBonus = 20;
-    [SerializeField, Min(0)] private int basicShieldDefenseBonus = 6;
-    [SerializeField, Min(0)] private int basicArmorDefenseBonus = 6;
+    [SerializeField, Min(0)] private int basicWeaponAttackBonus = 15;
+    [SerializeField, Min(0)] private int basicShieldDefenseBonus = 4;
+    [SerializeField, Min(0)] private int basicShieldHPBonus = 10;
+    [SerializeField, Min(0)] private int basicArmorDefenseBonus = 5;
+    [SerializeField, Min(0)] private int basicArmorHPBonus = 20;
 
     [Header("시작 장비 (비워두면 테스트용 기본 장비를 자동 생성해서 장착)")]
     [SerializeField] private EquipmentItemDefinition startingMainWeapon1;
@@ -47,21 +49,22 @@ public class PlayerEquipment : MonoBehaviour
 
     public int TotalAttackBonus { get; private set; }
     public int TotalDefenseBonus { get; private set; }
+    public int TotalHPBonus { get; private set; }
 
     private void Awake()
     {
         var defaultWeapon = startingMainWeapon1 != null ? startingMainWeapon1 : CreateDefaultItem(
-            "기본 검", EquipmentSlotType.MainWeapon1, attackBonus: basicWeaponAttackBonus, defenseBonus: 0, new Color(0.85f, 0.35f, 0.25f));
+            "기본 검", EquipmentSlotType.MainWeapon1, attackBonus: basicWeaponAttackBonus, defenseBonus: 0, hpBonus: 0, new Color(0.85f, 0.35f, 0.25f));
         defaultItems[EquipmentSlotType.MainWeapon1] = defaultWeapon;
         Equip(defaultWeapon);
 
         var defaultShield = startingOffHandShield != null ? startingOffHandShield : CreateDefaultItem(
-            "낡은 방패", EquipmentSlotType.OffHandShield, attackBonus: 0, defenseBonus: basicShieldDefenseBonus, new Color(0.3f, 0.55f, 0.9f));
+            "낡은 방패", EquipmentSlotType.OffHandShield, attackBonus: 0, defenseBonus: basicShieldDefenseBonus, hpBonus: basicShieldHPBonus, new Color(0.3f, 0.55f, 0.9f));
         defaultItems[EquipmentSlotType.OffHandShield] = defaultShield;
         Equip(defaultShield);
 
         var defaultArmor = startingArmor != null ? startingArmor : CreateDefaultItem(
-            "가죽 갑옷", EquipmentSlotType.Armor, attackBonus: 0, defenseBonus: basicArmorDefenseBonus, new Color(0.4f, 0.75f, 0.35f));
+            "가죽 갑옷", EquipmentSlotType.Armor, attackBonus: 0, defenseBonus: basicArmorDefenseBonus, hpBonus: basicArmorHPBonus, new Color(0.4f, 0.75f, 0.35f));
         defaultItems[EquipmentSlotType.Armor] = defaultArmor;
         Equip(defaultArmor);
         LootRuntimeState.Changed += RefreshLootEquipment;
@@ -104,6 +107,7 @@ public class PlayerEquipment : MonoBehaviour
             adapter.slotType = slot;
             adapter.attackPowerBonus = loot.Definition.AttackBonus;
             adapter.defensePowerBonus = loot.Definition.DefenseBonus;
+            adapter.hpBonus = loot.Definition.HPBonus;
             lootAdapters[loot.InstanceId] = adapter;
             fallbackColors[adapter] = Color.white;
         }
@@ -172,23 +176,27 @@ public class PlayerEquipment : MonoBehaviour
     {
         int attack = 0;
         int defense = 0;
+        int hp = 0;
         foreach (var item in equippedItems.Values)
         {
             attack += item.attackPowerBonus;
             defense += item.defensePowerBonus;
+            hp += item.hpBonus;
         }
         TotalAttackBonus = attack;
         TotalDefenseBonus = defense;
+        TotalHPBonus = hp;
     }
 
     // 테스트용 기본 장비를 에셋 파일 없이 메모리에서만 만든다(ScriptableObject.CreateInstance).
-    private EquipmentItemDefinition CreateDefaultItem(string name, EquipmentSlotType slot, int attackBonus, int defenseBonus, Color placeholderColor)
+    private EquipmentItemDefinition CreateDefaultItem(string name, EquipmentSlotType slot, int attackBonus, int defenseBonus, int hpBonus, Color placeholderColor)
     {
         var item = ScriptableObject.CreateInstance<EquipmentItemDefinition>();
         item.itemName = name;
         item.slotType = slot;
         item.attackPowerBonus = attackBonus;
         item.defensePowerBonus = defenseBonus;
+        item.hpBonus = hpBonus;
         item.icon = null;
         fallbackColors[item] = placeholderColor;
         return item;

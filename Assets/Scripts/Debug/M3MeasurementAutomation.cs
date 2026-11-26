@@ -18,7 +18,7 @@ public static class M3MeasurementAutomation
     private const string SeedPreferenceKey = "M3.RunSeed";
     private const string SeedModePreferenceKey = "M3.SeedMode";
     private const int DefaultSeed = 20261106;
-    private const string SchemaVersion = "4";
+    private const string SchemaVersion = "6";
     private static readonly Dictionary<string, float> playerActionTicks = new Dictionary<string, float>();
     private static readonly HashSet<string> visitedRooms = new HashSet<string>();
     private static readonly HashSet<string> encounteredEnemies = new HashSet<string>();
@@ -63,8 +63,8 @@ public static class M3MeasurementAutomation
     public static M3SeedMode CurrentSeedMode => activeSeedMode;
     public static string OutputDirectory => Path.Combine(Application.persistentDataPath, "M3Measurements");
     // v1·v2는 기존 측정 표본으로 보존한다. Seed 모드가 포함된 스키마는 v3에서 새로 시작한다.
-    public static string OutputPath => Path.Combine(OutputDirectory, "expedition_runs_v4.csv");
-    public static string SeedSummaryPath => Path.Combine(OutputDirectory, "seed_summary.csv");
+    public static string OutputPath => Path.Combine(OutputDirectory, "expedition_runs_v6.csv");
+    public static string SeedSummaryPath => Path.Combine(OutputDirectory, "seed_summary_v5.csv");
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetRuntimeState()
@@ -261,11 +261,12 @@ public static class M3MeasurementAutomation
         {
             if (writeHeader)
             {
-                writer.WriteLine("schema_version,timestamp,seed,seed_mode,seed_attempt,result,total_ticks,reached_floor,player_actions,enemy_actions,enemy_action_ticks,move_ticks,wait_ticks,attack_ticks,door_ticks,loot_ticks,interact_ticks,other_ticks,visited_rooms,room_revisits,bag_items,hp,enemy_encounters,enemies_killed,damage_dealt,damage_taken,healing_received,chests_opened,items_acquired,items_grounded_legacy,items_dropped_to_container,chest_items_generated,boss_items_generated,exit_path_tiles,exit_room_enemies");
+                writer.WriteLine("schema_version,tick_seconds,timestamp,seed,seed_mode,seed_attempt,result,total_ticks,reached_floor,reached_level,player_actions,enemy_actions,enemy_action_ticks,move_ticks,wait_ticks,attack_ticks,door_ticks,loot_ticks,interact_ticks,other_ticks,visited_rooms,room_revisits,bag_items,hp,enemy_encounters,enemies_killed,damage_dealt,damage_taken,healing_received,chests_opened,items_acquired,items_grounded_legacy,items_dropped_to_container,chest_items_generated,boss_items_generated,exit_path_tiles,exit_room_enemies");
             }
             writer.WriteLine(string.Join(",", new[]
             {
                 SchemaVersion,
+                "30",
                 Csv(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)),
                 runSeed.ToString(CultureInfo.InvariantCulture),
                 activeSeedMode.ToString(),
@@ -273,6 +274,7 @@ public static class M3MeasurementAutomation
                 result.ToString(),
                 F(elapsedTicks),
                 reachedFloor.ToString(CultureInfo.InvariantCulture),
+                M10RunProgression.Level.ToString(CultureInfo.InvariantCulture),
                 playerActions.ToString(CultureInfo.InvariantCulture),
                 enemyActions.ToString(CultureInfo.InvariantCulture),
                 F(enemyActionTicks),

@@ -26,7 +26,7 @@ public sealed class DungeonStairs : MonoBehaviour
 
         var renderer = gameObject.AddComponent<SpriteRenderer>();
         renderer.sprite = ProceduralSprite.GetWhiteSpriteCenterPivot();
-        renderer.color = finalExit ? new Color(0.2f, 1f, 0.75f, 0.25f) : new Color(1f, 0.75f, 0.15f);
+        renderer.color = finalExit ? M10DungeonConfig.ExitZoneColor : new Color(1f, 0.75f, 0.15f);
         renderer.sortingOrder = finalExit ? 1 : 5;
         transform.localScale = finalExit ? new Vector3(3f, 3f, 1f) : new Vector3(0.7f, 0.7f, 1f);
     }
@@ -39,6 +39,7 @@ public sealed class DungeonStairs : MonoBehaviour
     public static bool TryUseAt(Vector3Int targetCell, PlayerTurnActor player)
     {
         if (!stairsByCell.TryGetValue(targetCell, out var stairs) || stairs == null || stairs.isFinalExit
+            || stairs.IsLockedByBoss()
             || player == null || player.CurrentCell != targetCell || stairs.requestSent) return false;
         stairs.requestSent = ExpeditionManager.Instance != null && ExpeditionManager.Instance.TryUseFloorExit(player);
         return stairs.requestSent;
@@ -133,6 +134,7 @@ public sealed class DungeonStairs : MonoBehaviour
         }
         else
         {
+            if (IsLockedByBoss()) return;
             if (player.CurrentCell != cell || !Input.GetKeyDown(KeyCode.E)) return;
         }
 
@@ -175,11 +177,13 @@ public sealed class DungeonStairs : MonoBehaviour
 
     private bool IsLockedByBoss()
     {
-        return ExpeditionSession.CurrentFloor == 5 && GameObject.Find("Boss_F5") != null;
+        return M10DungeonConfig.IsBossFloor(ExpeditionSession.CurrentFloor)
+            && GameObject.Find($"Boss_F{ExpeditionSession.CurrentFloor}") != null;
     }
 
     private float RequiredExtractionTicks(ExpeditionManager manager)
     {
-        return ExpeditionSession.CurrentFloor == 5 ? 5f : manager?.EscapeProcedureTickCost ?? 10f;
+        return ExpeditionSession.CurrentFloor == M10DungeonConfig.FirstBossFloor
+            ? 10f : manager?.EscapeProcedureTickCost ?? 20f;
     }
 }

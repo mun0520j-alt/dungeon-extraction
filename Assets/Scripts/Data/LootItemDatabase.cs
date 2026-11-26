@@ -7,7 +7,7 @@ using UnityEngine;
 public static class LootItemDatabase
 {
     private const string ResourcePath = "Data/items";
-    private const int MinimumFieldCount = 14;
+    private const int MinimumFieldCount = 15;
     private static List<LootItemData> items;
 
     public static IReadOnlyList<LootItemData> Items
@@ -23,8 +23,7 @@ public static class LootItemDatabase
     {
         EnsureLoaded();
         LootRarity rarity = RollRarity(floor, rng);
-        var candidates = items.Where(item => item.Rarity == rarity && item.DropWeight > 0).ToList();
-        if (candidates.Count == 0) candidates = items.Where(item => item.Rarity == LootRarity.Normal && item.DropWeight > 0).ToList();
+        var candidates = CandidatesAtOrBelow(rarity);
         if (candidates.Count == 0) return null;
 
         int totalWeight = candidates.Sum(item => Mathf.Max(1, item.DropWeight));
@@ -47,7 +46,7 @@ public static class LootItemDatabase
     public static LootItemData Roll(LootRarity rarity, System.Random rng)
     {
         EnsureLoaded();
-        var candidates = items.Where(item => item.Rarity == rarity && item.DropWeight > 0).ToList();
+        var candidates = CandidatesAtOrBelow(rarity);
         if (candidates.Count == 0) return null;
         int totalWeight = candidates.Sum(item => Mathf.Max(1, item.DropWeight));
         int roll = rng.Next(totalWeight);
@@ -59,26 +58,32 @@ public static class LootItemDatabase
         return candidates[candidates.Count - 1];
     }
 
+    // 뽑힌 등급에 아이템이 없으면 Normal이 아니라 한 단계 아래 등급
+    // (2026-11-23, Legendary 0개 문제 재발 방지).
+    private static List<LootItemData> CandidatesAtOrBelow(LootRarity rarity)
+    {
+        for (int value = (int)rarity; value >= (int)LootRarity.Normal; value--)
+        {
+            LootRarity fallback = (LootRarity)value;
+            var candidates = items.Where(item => item.Rarity == fallback && item.DropWeight > 0).ToList();
+            if (candidates.Count > 0) return candidates;
+        }
+        return new List<LootItemData>();
+    }
+
     public static LootRarity RollRarity(int floor, System.Random rng)
     {
-        int roll = rng.Next(100);
-        if (roll == 0) return floor <= 4 ? LootRarity.Unique : LootRarity.Legendary;
-
-        if (floor <= 1) return roll < 3 ? LootRarity.Epic : roll < 21 ? LootRarity.Rare : LootRarity.Normal;
-        if (floor == 2) return roll < 6 ? LootRarity.Epic : roll < 31 ? LootRarity.Rare : LootRarity.Normal;
-        return roll < 11 ? LootRarity.Epic : roll < 41 ? LootRarity.Rare : LootRarity.Normal;
+        return M10LootRarityTable.Rarity(floor, rng);
     }
 
-    public static int RollBossDropCount(System.Random rng)
+    public static int RollBossDropCount(System.Random rng, int floor = 5)
     {
-        int roll = rng.Next(100);
-        return roll < 10 ? 0 : roll < 80 ? 1 : 2;
+        return M10LootRarityTable.BossCount(floor, rng);
     }
 
-    public static LootRarity RollBossDropRarity(System.Random rng)
+    public static LootRarity RollBossDropRarity(System.Random rng, int floor = 5)
     {
-        int roll = rng.Next(100);
-        return roll < 50 ? LootRarity.Rare : roll < 90 ? LootRarity.Epic : LootRarity.Unique;
+        return M10LootRarityTable.BossRarity(floor, rng);
     }
 
     private static void EnsureLoaded()
@@ -112,14 +117,15 @@ public static class LootItemDatabase
                 Rarity = rarity,
                 AttackBonus = ParseInt(fields[4]),
                 DefenseBonus = ParseInt(fields[5]),
-                CapacityBonus = ParseInt(fields[6]),
-                IconKey = fields[7].Trim(),
-                DropWeight = ParseInt(fields[8]),
-                SellPrice = ParseInt(fields[9]),
-                GridWidth = ParseInt(fields[10]),
-                GridHeight = ParseInt(fields[11]),
-                BagGridWidth = ParseInt(fields[12]),
-                BagGridHeight = ParseInt(fields[13])
+                HPBonus = ParseInt(fields[6]),
+                CapacityBonus = ParseInt(fields[7]),
+                IconKey = fields[8].Trim(),
+                DropWeight = ParseInt(fields[9]),
+                SellPrice = ParseInt(fields[10]),
+                GridWidth = ParseInt(fields[11]),
+                GridHeight = ParseInt(fields[12]),
+                BagGridWidth = ParseInt(fields[13]),
+                BagGridHeight = ParseInt(fields[14])
             });
         }
         Debug.Log($"[LootItemDatabase] CSV 아이템 {items.Count}개 로드 완료.");

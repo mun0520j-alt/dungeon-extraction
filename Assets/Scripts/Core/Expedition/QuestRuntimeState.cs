@@ -307,6 +307,13 @@ public static class QuestRuntimeState
         Changed?.Invoke();
     }
 
+    public static void DebugUnlockEscapeScrollShop()
+    {
+        completed.Add("q06a");
+        Changed?.Invoke();
+        Debug.Log("[QA] q06a 완료 처리 — 탈출 스크롤 상점 해금.");
+    }
+
     public static void DebugResetAll()
     {
         completed.Clear();

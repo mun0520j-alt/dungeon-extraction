@@ -64,6 +64,7 @@ public static partial class LootRuntimeState
         insuranceReturns.Clear();
         ResetM9Storage();
         ResetM9Trade();
+        ResetM10ScrollShop();
     }
 
     public static void BeginNewRun()
@@ -517,8 +518,10 @@ public static partial class LootRuntimeState
         if (definition == null) return Fail("구매할 아이템을 찾을 수 없습니다.");
         if (!IsMerchantPurchaseItem(definition)) return Fail("상인이 판매하지 않는 아이템입니다.");
 
+        bool escapeScroll = string.Equals(definition.Id, "escape_scroll", StringComparison.Ordinal);
         int price = GetPurchasePrice(definition);
         if (Gold < price) return Fail("Gold가 부족합니다.");
+        if (escapeScroll && !TryConsumeEscapeScrollPurchaseStock()) return false;
 
         Gold -= price;
         StoreIncomingItem(new LootItemInstance(definition));
@@ -570,7 +573,8 @@ public static partial class LootRuntimeState
     public static bool IsMerchantPurchaseItem(LootItemData definition)
     {
         if (definition == null || definition.Id.StartsWith("basic_", StringComparison.Ordinal)) return false;
-        if (definition.Id == "escape_scroll") return true;
+        if (definition.Id == "escape_scroll") return IsEscapeScrollShopUnlocked;
+        if (M10ProgressionDatabase.Potion(definition.Id) != null) return true;
         if (definition.Type == LootItemType.Bag)
             return definition.Rarity == LootRarity.Normal || definition.Rarity == LootRarity.Rare;
         return definition.Rarity == LootRarity.Normal
@@ -580,10 +584,20 @@ public static partial class LootRuntimeState
     public static bool TryConsumeRunBagItem(string instanceId, string expectedItemId)
     {
         LootItemInstance item = runBag.Find(candidate => candidate.InstanceId == instanceId);
+        LootItemInstance parent = null;
+        if (item == null)
+        {
+            parent = FindRunParentBag(instanceId);
+            if (parent != null) item = parent.BagGrid.Find(instanceId)?.Item;
+        }
         if (item?.Definition == null || !string.Equals(item.Definition.Id, expectedItemId, StringComparison.Ordinal))
             return Fail("사용할 아이템을 찾을 수 없습니다.");
-        runBagGrid.Remove(instanceId, out _);
-        runBag.Remove(item);
+        if (parent != null) parent.BagGrid.Remove(instanceId, out _);
+        else
+        {
+            runBagGrid.Remove(instanceId, out _);
+            runBag.Remove(item);
+        }
         LastFailureReason = null;
         Changed?.Invoke();
         return true;
@@ -593,6 +607,9 @@ public static partial class LootRuntimeState
     {
         AdvanceInsuranceTicks(ExpeditionSession.ElapsedTicks);
         ResolveCurrentInsurance(result, ExpeditionSession.CurrentFloor);
+        // 결정 11: 엘리트 드롭(원정 한정) 아이템만 사라진다. 퀘스트 보상 스크롤은 일반 아이템으로 남는다.
+        PurgeExpeditionScrolls(runBagGrid);
+        runBag.RemoveAll(item => item != null && item.IsExpeditionBound);
         if (result == ExpeditionResult.Escaped) return;
         runBag.Clear();
         runBagGrid = new LootGridModel(BaseBagGridWidth, BaseBagGridHeight);
@@ -601,6 +618,17 @@ public static partial class LootRuntimeState
         EquippedBagCapacityBonus = 0;
         HasBasicLoadout = false;
         Changed?.Invoke();
+    }
+
+    private static void PurgeExpeditionScrolls(LootGridModel grid)
+    {
+        if (grid == null) return;
+        foreach (LootGridPlacement placement in grid.Placements.ToArray())
+        {
+            LootItemInstance item = placement.Item;
+            if (item?.Definition?.Type == LootItemType.Bag) PurgeExpeditionScrolls(item.BagGrid);
+            if (item != null && item.IsExpeditionBound) grid.Remove(item.InstanceId, out _);
+        }
     }
 
     // 보험은 원정이 아니라 장비 인스턴스에 건다 (사용자 결정 2026-11-12).
@@ -923,6 +951,12 @@ public static partial class LootRuntimeState
     {
         LastFailureReason = reason;
         return false;
+    }
+
+    public static bool TryConsumeRunBagItemByItemId(string itemId)
+    {
+        LootItemInstance item = FindCarriedItem(itemId, preferExpeditionBound: false);
+        return item != null && TryConsumeRunBagItem(item.InstanceId, itemId);
     }
 }
 

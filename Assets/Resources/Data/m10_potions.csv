@@ -1,0 +1,4 @@
+item_id,heal_pct,duration_ticks,use_ticks,instant_pct
+potion_small,30,10,2,50
+potion_medium,50,10,2,50
+potion_large,70,10,2,50

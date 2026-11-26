@@ -35,6 +35,39 @@ public sealed class EscapeScrollZone : MonoBehaviour
         transform.localScale = sprite != null ? new Vector3(2.4f, 2.4f, 1f) : new Vector3(3f, 3f, 1f);
     }
 
+    // 2026-11-23: 탈출 구역 안에서 E를 누르면 출격 가방의 탈출 스크롤을 바로 사용한다.
+    // 문·상자·바닥 더미·계단이 함께 있으면 그쪽 E 상호작용을 우선하고 여기서는 아무것도 하지 않는다.
+    // 원정 한정(엘리트 드롭) 스크롤을 먼저 쓴다 — 어차피 원정이 끝나면 사라지므로.
+    private static readonly System.Collections.Generic.List<DungeonDoor> nearbyDoors = new System.Collections.Generic.List<DungeonDoor>();
+    private static readonly System.Collections.Generic.List<DungeonChest> nearbyChests = new System.Collections.Generic.List<DungeonChest>();
+    private static readonly System.Collections.Generic.List<GroundLootPile> nearbyPiles = new System.Collections.Generic.List<GroundLootPile>();
+
+    private void HandleUseInput()
+    {
+        if (Active != this || activated || !Input.GetKeyDown(KeyCode.E)) return;
+        if (PauseMenuController.BlocksWorldInput || InventoryPanel.IsOpen || LootingPanel.IsOpen || GroundLoot.IsSelectionOpen) return;
+        PlayerTurnActor player = PlayerTurnActor.Instance;
+        if (player == null || !player.IsReadyForInput || player.FloorTilemap != Floor || !Contains(player.CurrentCell)) return;
+
+        nearbyDoors.Clear(); nearbyChests.Clear(); nearbyPiles.Clear();
+        DungeonDoor.CollectAdjacent(player.FloorTilemap, player.CurrentCell, nearbyDoors);
+        DungeonChest.CollectAdjacent(player.CurrentCell, nearbyChests);
+        GroundLootPile.CollectAdjacent(player.CurrentCell, nearbyPiles);
+        bool otherInteraction = nearbyDoors.Count + nearbyChests.Count + nearbyPiles.Count > 0
+            || DungeonStairs.TryGetDebugLabel(player.CurrentCell, out _);
+        nearbyDoors.Clear(); nearbyChests.Clear(); nearbyPiles.Clear();
+        if (otherInteraction) return;
+
+        LootItemInstance scroll = LootRuntimeState.FindCarriedItem("escape_scroll", preferExpeditionBound: true);
+        if (scroll == null)
+        {
+            InventoryPanel.ShowBagNotice("출격 가방에 탈출 스크롤이 없습니다.");
+            return;
+        }
+        if (!LootInteractionGate.TryClaim()) return;
+        if (!TryUseEscapeScroll(scroll.InstanceId, out string failure)) InventoryPanel.ShowBagNotice(failure);
+    }
+
     public bool Contains(Vector3Int cell)
     {
         return Mathf.Abs(cell.x - CenterCell.x) <= 1 && Mathf.Abs(cell.y - CenterCell.y) <= 1;
@@ -60,7 +93,8 @@ public sealed class EscapeScrollZone : MonoBehaviour
             failure = "탈출 구역 안에서만 사용할 수 있습니다.";
             return false;
         }
-        if (ExpeditionSession.CurrentFloor == 5 && GameObject.Find("Boss_F5") != null)
+        if (M10DungeonConfig.IsBossFloor(ExpeditionSession.CurrentFloor)
+            && GameObject.Find($"Boss_F{ExpeditionSession.CurrentFloor}") != null)
         {
             failure = "보스를 처치해야 탈출 구역을 활성화할 수 있습니다.";
             return false;
@@ -112,7 +146,7 @@ public sealed class EscapeScrollZone : MonoBehaviour
         float now = ExpeditionManager.Instance?.ElapsedTicks ?? 0f;
         if (now - activationTick >= M7EconomyConfig.EscapeScrollLifetimeTicks)
         {
-            Deactivate("50 Tick 만료");
+            Deactivate($"{M7EconomyConfig.EscapeScrollLifetimeTicks:0} Tick 만료");
             return;
         }
         if (!Contains(player.CurrentCell)) progressStartTick = -1f;
@@ -129,6 +163,7 @@ public sealed class EscapeScrollZone : MonoBehaviour
 
     private void Update()
     {
+        HandleUseInput();
         if (!activated || completionRequested) return;
         PlayerTurnActor player = PlayerTurnActor.Instance;
         if (player != null) RefreshState(player);

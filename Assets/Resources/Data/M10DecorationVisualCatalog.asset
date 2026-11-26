@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 36e8cbad92e649a194e5b3f95ce57793, type: 3}
+  m_Name: M10DecorationVisualCatalog
+  m_EditorClassIdentifier: Assembly-CSharp::M10DecorationVisualCatalog
+  entries:
+  - key: floor_spikes
+    sprite: {fileID: 3032241974121846738, guid: ef76d60b7c92c7c409340ff017073aae, type: 3}
+  - key: wall_goo
+    sprite: {fileID: -5393886427351524611, guid: 46bdff8dc69c89e44a07c1ac8ccd4e54, type: 3}
+  - key: wall_goo_base
+    sprite: {fileID: 6709554733873747094, guid: fe270ce0d0432d54b8af2e923cba4e3b, type: 3}
+  - key: wall_banner_green
+    sprite: {fileID: 8798772191771263795, guid: 20f0f1c85ea0255479d0457c30af2060, type: 3}
+  - key: wall_banner_blue
+    sprite: {fileID: 480522333830884734, guid: 9d4c4e90812b3b94a975268db0e7eb57, type: 3}
+  - key: wall_banner_red
+    sprite: {fileID: -8087077688831398623, guid: e23d36fba7d5fef409565e04f75c716e, type: 3}
+  - key: wall_fountain_blue
+    sprite: {fileID: 8266720257362942580, guid: 802c78c3177a6214e87ff961d2667ecc, type: 3}
+  - key: wall_fountain_red
+    sprite: {fileID: -1748208543972651604, guid: 09970d0fdce4f794d83c9085e60bddcb, type: 3}

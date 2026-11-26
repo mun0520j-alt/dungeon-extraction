@@ -102,6 +102,11 @@ public class TickManager : MonoBehaviour
     // 어디까지나 NextActionTime이 절대 제자리걸음하지 않게 막는 스케줄러 안전장치일 뿐이다.
     private const float MinimumTickCost = 0.01f;
 
+    // 액터가 모두 동기적으로 CompleteTurn을 호출하는 비정상 상태에서도 한 프레임을 영원히
+    // 점유하지 않게 하는 최후의 안전장치다. 정상 플레이에서는 Player 입력 차례에서 수 회 안에
+    // 반복이 끝나므로 이 값에 도달할 수 없다 (BUG-052, 2026-11-23).
+    private const int MaxScheduleIterationsPerAdvance = 10000;
+
     private void Awake()
     {
         if (Instance != null && Instance != this)
@@ -255,6 +260,7 @@ public class TickManager : MonoBehaviour
         // 예약 지연은 액터의 다음 실행 가능 시각만 늦춘다. 아직 실제로 소비하지 않은 미래
         // Tick을 전역 시계에 선반영하지 않도록 자연 행동 완료 시각만 보고한다.
         OnTimeAdvanced?.Invoke(actor, naturalNextActionTime);
+        M10RunProgression.AdvanceTo(naturalNextActionTime);
         DungeonClock dungeonClock = GetComponent<DungeonClock>();
         float globalTime = dungeonClock != null ? dungeonClock.ElapsedTicks : currentTurnActor.NextActionTime;
         M3MeasurementAutomation.RecordAction(actor, action, tickCost);
@@ -291,18 +297,71 @@ public class TickManager : MonoBehaviour
     // 이 함수 호출 하나(그 안의 do-while 반복문)로 전부 처리되고, 스택엔 절대 안 쌓인다.
     private void AdvanceSchedule()
     {
+        bool resolveDeathAfterLoop = false;
+        int iterations = 0;
         isAdvancingSchedule = true;
-        do
+        try
         {
-            turnJustCompletedInsideLoop = false;
-            currentTurnActor = FindEarliestActor();
-            if (currentTurnActor == null) break; // 등록된 액터가 없으면 대기
+            do
+            {
+                if (ShouldStopForExpeditionResult(out bool playerDeadBeforeTurn))
+                {
+                    resolveDeathAfterLoop |= playerDeadBeforeTurn;
+                    break;
+                }
 
-            watchdogElapsedSeconds = 0f;
-            stuckTurnAlreadyReported = false;
-            currentTurnActor.Actor.OnTurnStart();
-        } while (turnJustCompletedInsideLoop);
-        isAdvancingSchedule = false;
+                iterations++;
+                if (iterations > MaxScheduleIterationsPerAdvance)
+                {
+                    schedulerRunning = false;
+                    Debug.LogError($"[TickManager] 한 번의 AdvanceSchedule에서 {MaxScheduleIterationsPerAdvance}회 이상 " +
+                                   "동기 행동이 이어져 스케줄을 중단했습니다. 액터의 CompleteTurn/등록 상태를 확인하세요.");
+                    break;
+                }
+
+                turnJustCompletedInsideLoop = false;
+                currentTurnActor = FindEarliestActor();
+                if (currentTurnActor == null) break; // 등록된 액터가 없으면 대기
+
+                watchdogElapsedSeconds = 0f;
+                stuckTurnAlreadyReported = false;
+                currentTurnActor.Actor.OnTurnStart();
+
+                // Enemy.OnTurnStart 안에서 Player HP가 0이 되면 다음 Player Update/코루틴 프레임을
+                // 기다리지 않는다. 현재 액터 콜백이 반환된 뒤 반복문부터 빠져나와 한 번만 결과를
+                // 확정해야 보스만 영원히 행동하는 메인 스레드 무한 루프를 막을 수 있다.
+                if (ShouldStopForExpeditionResult(out bool playerDeadAfterTurn))
+                {
+                    resolveDeathAfterLoop |= playerDeadAfterTurn;
+                    break;
+                }
+            } while (turnJustCompletedInsideLoop);
+        }
+        finally
+        {
+            isAdvancingSchedule = false;
+        }
+
+        // Scene 전환은 OnTurnStart 콜백 한가운데가 아니라 스케줄 반복문을 완전히 빠져나온 뒤 한다.
+        if (resolveDeathAfterLoop) ExpeditionManager.Instance?.CompleteDeath();
+    }
+
+    private static bool ShouldStopForExpeditionResult(out bool playerDead)
+    {
+        playerDead = false;
+
+        // TickQueueTest처럼 원정 밖에서 TickManager만 검증하는 장면은 계속 동작해야 한다.
+        if (!ExpeditionSession.IsActive) return ExpeditionManager.Instance != null;
+
+        PlayerTurnActor player = PlayerTurnActor.Instance;
+        if (player == null)
+        {
+            Debug.LogError("[TickManager] 활성 원정 중 Player가 없어 스케줄을 중단합니다.");
+            return true;
+        }
+
+        playerDead = player.IsDead;
+        return playerDead;
     }
 
     // [임시 위치 — 2026-08-28 결정] Player/Enemy가 같은 셀에 겹쳐 이동하는 문제(콜라이더로는

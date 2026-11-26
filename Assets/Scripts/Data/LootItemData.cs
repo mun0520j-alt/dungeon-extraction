@@ -28,6 +28,7 @@ public sealed class LootItemData
     public LootRarity Rarity;
     public int AttackBonus;
     public int DefenseBonus;
+    public int HPBonus;
     public int CapacityBonus;
     public string IconKey;
     public int DropWeight;
@@ -44,6 +45,8 @@ public sealed class LootItemInstance
     public string InstanceId;
     public LootItemData Definition;
     public bool IsFoundInRaid;
+    // M10 결정 11: 엘리트가 떨어뜨린 탈출 스크롤처럼 원정이 끝나면 사라지는 아이템. 원정 중에만 존재하므로 저장하지 않는다.
+    [NonSerialized] public bool IsExpeditionBound;
     [NonSerialized] private LootGridModel bagGrid;
 
     public LootGridModel BagGrid

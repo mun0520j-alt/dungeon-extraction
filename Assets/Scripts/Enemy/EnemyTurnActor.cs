@@ -49,6 +49,8 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
     // 피격 플래시와 애니메이션 제어에 사용한다.
     private SpriteRenderer spriteRenderer;
     private Animator spriteAnimator;
+    private M10SpriteAnimation catalogAnimation;
+    private M10EnemyDefinition m10Definition;
 
     // AI는 차례가 오면 즉시 판단해서 바로 CompleteTurn을 불러야 하는 게 정상 동작이라(Player와
     // 반대), 이 호출을 깜빡하는 버그가 생기면 TickManager 워치독이 곧바로 잡아내야 한다.
@@ -75,6 +77,8 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
     private bool bossAoePending;
     private Vector3Int bossAoeCell;
     private int bossLootSeed;
+    private bool isElite;
+    private float eliteScrollDropChance;
     [SerializeField, Min(1)] private int bossAoeFinalDamage = 35;
     private GameObject bossTelegraph;
 
@@ -88,6 +92,23 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
         transform.position = GetCellCenterWorldPosition(cell);
     }
 #endif
+
+    public void ConfigureM10Identity(M10EnemyDefinition definition)
+    {
+        m10Definition = definition;
+        isElite = definition?.IsElite ?? false;
+        eliteScrollDropChance = Mathf.Clamp01(definition?.ScrollDropChance ?? 0f);
+        bossAoeFinalDamage = M10DungeonConfig.BossAoeFinalDamage;
+        if (isElite)
+        {
+            SpriteRenderer body = spriteRenderer != null ? spriteRenderer : GetComponentInChildren<SpriteRenderer>();
+            if (body != null)
+            {
+                body.color = M10DungeonConfig.EliteTint;
+                EliteSpriteOutline.Attach(body, M10DungeonConfig.EliteOutlineColor, M10DungeonConfig.EliteOutlinePixels);
+            }
+        }
+    }
 
     // behaviorType(Idle/Wander)은 "Player를 못 봤을 때의 평소 기본 행동"이고, 추적은 그 위에
     // 얹히는 임시 상태다(2026-08-28 결정, "감지 -> 추적 -> 놓치면 마지막 위치 -> 배회 복귀"
@@ -167,6 +188,7 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
 
         spriteRenderer = GetComponentInChildren<SpriteRenderer>();
         spriteAnimator = GetComponentInChildren<Animator>();
+        catalogAnimation = GetComponentInChildren<M10SpriteAnimation>();
         if (spriteRenderer == null)
         {
             Debug.LogWarning("[EnemyTurnActor] SpriteRenderer를 못 찾아서 발 위치 보정(Y) 없이 셀 바닥에 그대로 배치됩니다.");
@@ -328,9 +350,11 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
         {
             bossAoePending = false;
             if (bossTelegraph != null) Destroy(bossTelegraph);
+            catalogAnimation?.PlayAttackOnce();
+            BossAoeImpactVfx.Spawn(floorTilemap.GetCellCenterWorld(bossAoeCell));
             var delta = player.CurrentCell - bossAoeCell;
             if (Mathf.Abs(delta.x) <= 2 && Mathf.Abs(delta.y) <= 2)
-                player.TakeDamage(player.EffectiveDefense + bossAoeFinalDamage);
+                player.TakeFixedDamage(bossAoeFinalDamage, true);
             Debug.Log($"[Boss] 광역 발동 — 중심 {bossAoeCell}");
             bossPatternStep = 0;
             TickManager.Instance.CompleteTurn(this, TickCost.Attack, "BossAoE");
@@ -344,23 +368,24 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
             return;
         }
 
-        player.TakeDamage(attackPower);
+        catalogAnimation?.PlayAttackOnce();
+        player.TakeDamage(attackPower, m10Definition?.Id ?? name);
         bossPatternStep++;
         if (bossPatternStep >= 2)
         {
             bossAoePending = true;
             bossAoeCell = player.CurrentCell;
             CreateBossTelegraph();
-            Debug.Log($"[Boss] 광역 예고 — 중심 {bossAoeCell}, 5 Tick 뒤 발동");
+            Debug.Log($"[Boss] 광역 예고 — 중심 {bossAoeCell}, {M10DungeonConfig.BossAoeTelegraphTicks} Tick 뒤 발동");
         }
         float? minimumNextActionTime = null;
         if (bossAoePending)
         {
             // 추격 중 보스의 개인 시간축이 전역 시계보다 뒤처졌더라도 예고 직후 밀린 턴을
-            // 따라잡으며 즉시 발동하지 않게 한다. 다음 행동 시각을 현재 전역 Tick+5 이상으로 맞춘다.
+            // 따라잡으며 즉시 발동하지 않게 한다. 다음 행동 시각을 현재 전역 Tick+CSV 예고값 이상으로 맞춘다.
             float actorTime = TickManager.Instance.GetActorNextActionTime(this);
             float globalTime = ExpeditionManager.Instance?.ElapsedTicks ?? actorTime;
-            minimumNextActionTime = globalTime + 5f;
+            minimumNextActionTime = globalTime + M10DungeonConfig.BossAoeTelegraphTicks;
         }
         TickManager.Instance.CompleteTurn(this, TickCost.Attack,
             bossAoePending ? "BossSingle+Telegraph" : "BossSingle", minimumNextActionTime);
@@ -376,6 +401,19 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
         renderer.color = new Color(1f, 0.1f, 0.05f, 0.28f);
         renderer.sortingOrder = 4;
         bossTelegraph.transform.localScale = new Vector3(5f, 5f, 1f);
+
+        var labelObject = new GameObject("TelegraphTickLabel");
+        labelObject.transform.SetParent(bossTelegraph.transform, false);
+        labelObject.transform.localPosition = new Vector3(0f, 0f, -0.02f);
+        labelObject.transform.localScale = new Vector3(0.2f, 0.2f, 1f);
+        var label = labelObject.AddComponent<TextMesh>();
+        label.text = $"{M10DungeonConfig.BossAoeTelegraphTicks} Tick";
+        label.anchor = TextAnchor.MiddleCenter;
+        label.alignment = TextAlignment.Center;
+        label.characterSize = 0.16f;
+        label.fontSize = 48;
+        label.color = Color.white;
+        labelObject.GetComponent<MeshRenderer>().sortingOrder = 5;
     }
 
     private void AlertSameRoom(Vector3Int playerCell)
@@ -467,7 +505,8 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
             // 비용은 CompleteMyTurn()(이동/대기용 PerTileMove)이 아니라 TickCost.Attack — 공격은
             // Player.AttackEnemy()와 동일하게 항상 고정 비용(TickCost.cs 주석 참고, 속도 배율 영향 없음).
             UpdateFacingDirection(nextCell - currentCell);
-            player.TakeDamage(attackPower);
+            catalogAnimation?.PlayAttackOnce();
+            player.TakeDamage(attackPower, m10Definition?.Id ?? name);
             TickManager.Instance.CompleteTurn(this, TickCost.Attack);
             return;
         }
@@ -552,6 +591,7 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
     {
         isAnimating = true;
         if (spriteAnimator != null) spriteAnimator.Play("run", 0, 0f);
+        catalogAnimation?.PlayRun();
 
         Vector3 startPos = transform.position;
         Vector3 endPos = GetCellCenterWorldPosition(targetCell);
@@ -573,6 +613,7 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
 
         transform.position = endPos; // 부동소수점 오차 정리 — 정확히 목표 위치에 스냅.
         if (spriteAnimator != null) spriteAnimator.Play("idle", 0, 0f);
+        catalogAnimation?.PlayIdle();
         isAnimating = false;
         if (turnPendingDuringAnimation)
         {
@@ -591,7 +632,7 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
     }
 
     // [2026-09-03 신규] Player.AttackEnemy()가 호출한다. 데미지 공식은 PlayerTurnActor와 동일하게
-    // "공격력 - 방어력"(0 밑으로는 안 내려감). HP가 0 이하가 되면 즉시 제거한다 — Player 쪽처럼
+    // CombatDamage 공용 비율 감소 공식을 적용한다. HP가 0 이하가 되면 즉시 제거한다 — Player 쪽처럼
     // 한 프레임 미룰 필요가 없는 이유: 이 호출은 Player.Update()(수동 입력 처리) 안에서 오는
     // 거라 TickManager.AdvanceSchedule 반복문 도중이 아니고, 여기서 죽어도 이어서 실행되는 건
     // "내 턴을 넘긴다"가 아니라 Player 쪽 로직뿐이라 안전하다.
@@ -601,11 +642,14 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
     // 하면(등록이 아직 안 풀렸으니) 죽은 채로 OnTurnStart가 불릴 위험이 있다 — 즉시 해제해서 막는다.
     public void TakeDamage(int incomingAttackPower)
     {
-        int damage = Mathf.Max(1, incomingAttackPower - defensePower);
+        int damage = CombatDamage.Calculate(incomingAttackPower, defensePower);
         int before = currentHP;
         currentHP = Mathf.Max(0, currentHP - damage);
-        M3MeasurementAutomation.RecordEnemyDamage(before - currentHP);
+        int appliedDamage = before - currentHP;
+        M3MeasurementAutomation.RecordEnemyDamage(appliedDamage);
         healthBar?.SetFill((float)currentHP / maxHP);
+        CombatFeedback.ShowDamage(transform.position, appliedDamage, false);
+        if (appliedDamage > 0) CombatFeedback.AddLine($"{(m10Definition?.Id ?? name)}에게 {appliedDamage} 피해");
 
         // [2026-09-04 신규] 맞는 순간 시각 피드백 — HitImpactVfx.cs 참고. 죽어서 바로
         // Destroy되더라도 충격 이펙트 자체는 독립 오브젝트라 문제없이 재생된다(스프라이트 색
@@ -618,12 +662,15 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
 
         if (currentHP <= 0)
         {
+            M10RunProgression.RecordEnemyDefeated(m10Definition);
             if (isBoss)
             {
                 if (bossTelegraph != null) Destroy(bossTelegraph);
                 ExpeditionRunRecord.RecordBossDefeated();
                 DropBossLoot();
             }
+            else if (isElite) DropEliteScroll();
+            DropPotion();
             M3MeasurementAutomation.RecordEnemyKill();
             if (TickManager.Instance != null)
             {
@@ -633,14 +680,41 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
         }
     }
 
+    private void DropPotion()
+    {
+        if (m10Definition == null || m10Definition.PotionDropChance <= 0f) return;
+        int seed = currentCell.x * 92837111 ^ currentCell.y * 689287499 ^ ExpeditionSession.CurrentFloor * 19349663;
+        var rng = new System.Random(seed);
+        if (rng.NextDouble() >= m10Definition.PotionDropChance) return;
+        string itemId = m10Definition.IsElite || string.Equals(m10Definition.Tier, "boss", System.StringComparison.OrdinalIgnoreCase)
+            ? (ExpeditionSession.CurrentFloor >= 8 ? "potion_large" : "potion_medium") : "potion_small";
+        LootItemData definition = LootItemDatabase.FindById(itemId);
+        if (definition == null) return;
+        GroundLootPile.TryAddOrCreate(floorTilemap, currentCell,
+            new LootItemInstance(definition, foundInRaid: true), out _, "포션 전리품");
+    }
+
+    private void DropEliteScroll()
+    {
+        int seed = currentCell.x * 73856093 ^ currentCell.y * 19349663 ^ ExpeditionSession.CurrentFloor * 83492791;
+        var rng = new System.Random(seed);
+        if (rng.NextDouble() >= eliteScrollDropChance) return;
+        LootItemData definition = LootItemDatabase.FindById("escape_scroll");
+        if (definition == null) return;
+        var scroll = new LootItemInstance(definition, foundInRaid: true) { IsExpeditionBound = true };
+        GroundLootPile.Create(floorTilemap, currentCell,
+            new System.Collections.Generic.List<LootItemInstance> { scroll }, "엘리트 전리품");
+        Debug.Log("[M10] Elite가 원정 한정 탈출 스크롤을 드롭했습니다.");
+    }
+
     private void DropBossLoot()
     {
         var rng = new System.Random(bossLootSeed);
-        int count = LootItemDatabase.RollBossDropCount(rng);
+        int count = LootItemDatabase.RollBossDropCount(rng, ExpeditionSession.CurrentFloor);
         var drops = new System.Collections.Generic.List<LootItemInstance>();
         for (int i = 0; i < count; i++)
         {
-            LootRarity rarity = LootItemDatabase.RollBossDropRarity(rng);
+            LootRarity rarity = LootItemDatabase.RollBossDropRarity(rng, ExpeditionSession.CurrentFloor);
             LootItemData definition = LootItemDatabase.Roll(rarity, rng);
             if (definition == null) continue;
             // 보스 전리품은 바닥에 놓이기 전 생성 순간부터 인레이드 상태를 소유한다.

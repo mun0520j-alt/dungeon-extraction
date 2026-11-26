@@ -16,14 +16,19 @@ public sealed partial class ExpeditionDebugCommands : MonoBehaviour
     private const string DungeonSceneName = "InDungeon";
     private const int DebugChestSeed = 20261105;
 
-    [Min(0f)] public float targetElapsedTicks = 1439f;
+    [Min(0f)] public float targetElapsedTicks = 2879f; // M10: MIA 경계 직전 (2880 = 24시간)
     [Min(1)] public int targetPlayerHP = 1;
-    [Min(1f)] public float insuranceAdvanceTicks = 1500f;
+    [Min(1f)] public float insuranceAdvanceTicks = 3000f;
     [SerializeField] private bool showTileGrid;
     [SerializeField] private bool showM3Panel;
     [SerializeField] private bool showM6ItemPanel;
     private string seedInput;
     private Vector2 itemPanelScroll;
+    private Vector2 itemPanelOuterScroll;
+    private string qaEnemyIdInput = "masked_orc";
+    private string qaShopProgressInput = "0";
+    private string qaShopStockInput = "0";
+    private string qaElapsedInput = "2879";
     private GUIStyle gridLabelStyle;
 
     private readonly struct Hotkey
@@ -138,16 +143,59 @@ public sealed partial class ExpeditionDebugCommands : MonoBehaviour
     [ContextMenu("QA/Jump To Floor 5 (F7)")]
     public void JumpToFloorFive()
     {
+        JumpToFloor(5);
+    }
+
+    public void JumpToFloor(int floor)
+    {
         if (!ExpeditionSession.IsActive)
         {
-            Debug.LogWarning("[QA] 활성 원정이 없어 5층으로 이동할 수 없습니다.");
+            Debug.LogWarning("[QA] 활성 원정이 없어 층을 이동할 수 없습니다.");
             return;
         }
 
         M3MeasurementAutomation.MarkDebugRun();
-        ExpeditionSession.DebugSetCurrentFloor(5);
-        Debug.Log($"[QA] F7 — 누적 {ExpeditionSession.ElapsedTicks:0.##} Tick과 현재 장비·가방·HP를 유지하고 5층 보스 검증으로 이동합니다.");
+        int target = Mathf.Clamp(floor, ExpeditionSession.FirstFloor, ExpeditionSession.FinalFloor);
+        ExpeditionSession.DebugSetCurrentFloor(target);
+        Debug.Log($"[QA] 누적 {ExpeditionSession.ElapsedTicks:0.##} Tick과 현재 장비·가방·HP를 유지하고 {target}층으로 이동합니다.");
         SceneManager.LoadScene(DungeonSceneName);
+    }
+
+    public void DefeatCurrentFloorBoss()
+    {
+        int floor = ExpeditionSession.CurrentFloor;
+        GameObject boss = GameObject.Find($"Boss_F{floor}");
+        EnemyTurnActor actor = boss != null ? boss.GetComponent<EnemyTurnActor>() : null;
+        if (actor == null)
+        {
+            Debug.LogWarning($"[QA] {floor}층 보스를 찾지 못했습니다.");
+            return;
+        }
+        M3MeasurementAutomation.MarkDebugRun();
+        actor.TakeDamage(int.MaxValue);
+        Debug.Log($"[QA] {floor}층 보스 처치 처리 완료.");
+    }
+
+    public void SpawnDebugEnemy(string enemyId)
+    {
+        DungeonRunManager manager = FindFirstObjectByType<DungeonRunManager>();
+        if (manager == null || !manager.DebugSpawnEnemy(enemyId))
+        {
+            Debug.LogWarning($"[QA] 지정 몹 생성 실패: {enemyId}");
+            return;
+        }
+        M3MeasurementAutomation.MarkDebugRun();
+    }
+
+    public void DropEliteEscapeScroll()
+    {
+        PlayerTurnActor player = PlayerTurnActor.Instance;
+        LootItemData definition = LootItemDatabase.FindById("escape_scroll");
+        if (player?.FloorTilemap == null || definition == null) return;
+        M3MeasurementAutomation.MarkDebugRun();
+        var item = new LootItemInstance(definition, foundInRaid: true) { IsExpeditionBound = true };
+        GroundLootPile.TryAddOrCreate(player.FloorTilemap, player.CurrentCell, item, out _, "QA 엘리트 전리품");
+        Debug.Log("[QA] 원정 한정 엘리트 탈출 스크롤을 플레이어 발밑에 생성했습니다.");
     }
 
     [ContextMenu("QA/Fill Ground Loot Pile (F8)")]

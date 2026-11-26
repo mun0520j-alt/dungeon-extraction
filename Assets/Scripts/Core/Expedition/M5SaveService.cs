@@ -8,7 +8,7 @@ using UnityEngine;
 // LootRuntimeState가 상태를 소유하고, 이 클래스는 저장 파일 직렬화와 교체만 담당한다.
 public static class M5SaveService
 {
-    private const int CurrentSaveVersion = 6;
+    private const int CurrentSaveVersion = 7;
     private const string SaveFolderName = "Save";
     private const string SaveFileName = "save.json";
     private const string BackupFileName = "save.bak";
@@ -16,6 +16,7 @@ public static class M5SaveService
     private const string LegacyV3BackupFileName = "save_v3.bak";
     private const string LegacyV4BackupFileName = "save_v4.bak";
     private const string LegacyV5BackupFileName = "save_v5.bak";
+    private const string LegacyV6BackupFileName = "save_v6.bak";
     private const string TempFileName = "save.tmp";
 
     private static bool isRestoring;
@@ -29,6 +30,7 @@ public static class M5SaveService
     public static string LegacyV3BackupPath => Path.Combine(SaveDirectory, LegacyV3BackupFileName);
     public static string LegacyV4BackupPath => Path.Combine(SaveDirectory, LegacyV4BackupFileName);
     public static string LegacyV5BackupPath => Path.Combine(SaveDirectory, LegacyV5BackupFileName);
+    public static string LegacyV6BackupPath => Path.Combine(SaveDirectory, LegacyV6BackupFileName);
     public static bool Fullscreen => currentSettings.fullscreen;
     public static int ResolutionWidth => currentSettings.resolution_width;
     public static int ResolutionHeight => currentSettings.resolution_height;
@@ -147,6 +149,11 @@ public static class M5SaveService
             Debug.LogError("[Save] v5 원본 백업에 실패해 v6 마이그레이션을 중단했습니다. 기존 파일은 변경하지 않습니다.");
             return;
         }
+        if (data.save_version == 6 && !TryPreserveLegacyV6Save(loadedPath))
+        {
+            Debug.LogError("[Save] v6 원본 백업에 실패해 v7 마이그레이션을 중단했습니다. 기존 파일은 변경하지 않습니다.");
+            return;
+        }
         Restore(data);
         if (!data.expedition_in_progress)
         {
@@ -234,6 +241,23 @@ public static class M5SaveService
         }
     }
 
+    private static bool TryPreserveLegacyV6Save(string sourcePath)
+    {
+        try
+        {
+            Directory.CreateDirectory(SaveDirectory);
+            if (File.Exists(LegacyV6BackupPath)) return true;
+            File.Copy(sourcePath, LegacyV6BackupPath, false);
+            Debug.Log($"[Save] v6 원본을 별도 백업으로 보존했습니다: {LegacyV6BackupPath}");
+            return true;
+        }
+        catch (Exception exception)
+        {
+            Debug.LogError($"[Save] v6 원본 백업 실패: {LegacyV6BackupPath}\n{exception.Message}");
+            return false;
+        }
+    }
+
     private static SaveData TryRead(string path)
     {
         if (!File.Exists(path)) return null;
@@ -279,6 +303,7 @@ public static class M5SaveService
             LootRuntimeState.RestoreM9Storage(restoredStash, restoredTemporary);
             LootRuntimeState.RestoreInsurance(data.insurance_returns);
             LootRuntimeState.RestoreConfirmedInsurance(data.insured_this_run);
+            LootRuntimeState.RestoreM10ScrollShop(data.escape_scroll_restock_progress, data.escape_scroll_purchase_stock);
             currentSettings = data.settings != null ? data.settings.Normalized() : SaveSettings.Default();
         }
         finally
@@ -320,6 +345,11 @@ public static class M5SaveService
     private static LootItemInstance RestoreItem(SavedItem saved, RestoreContext context, int bagDepth)
     {
         if (saved == null) return null;
+        if (context.SaveVersion <= 6 && string.Equals(saved.item_id, "escape_scroll", StringComparison.Ordinal))
+        {
+            Debug.Log("[Save] v7 변환에서 기존 탈출 스크롤을 삭제했습니다.");
+            return null;
+        }
         LootItemData definition = ResolveDefinition(saved.item_id);
         if (definition == null)
         {
@@ -372,19 +402,19 @@ public static class M5SaveService
         if (csvItem != null) return csvItem;
         switch (itemId)
         {
-            case "basic_weapon": return Basic("basic_weapon", "기본 검", LootItemType.Weapon, 20, 0);
-            case "basic_shield": return Basic("basic_shield", "낡은 방패", LootItemType.Shield, 0, 6);
-            case "basic_armor": return Basic("basic_armor", "가죽 갑옷", LootItemType.Armor, 0, 6);
+            case "basic_weapon": return Basic("basic_weapon", "기본 검", LootItemType.Weapon, 15, 0, 0);
+            case "basic_shield": return Basic("basic_shield", "낡은 방패", LootItemType.Shield, 0, 4, 10);
+            case "basic_armor": return Basic("basic_armor", "가죽 갑옷", LootItemType.Armor, 0, 5, 20);
             default: return null;
         }
     }
 
-    private static LootItemData Basic(string id, string name, LootItemType type, int attack, int defense)
+    private static LootItemData Basic(string id, string name, LootItemType type, int attack, int defense, int hp)
     {
         return new LootItemData
         {
             Id = id, Name = name, Type = type, Rarity = LootRarity.Normal,
-            AttackBonus = attack, DefenseBonus = defense, CapacityBonus = 0,
+            AttackBonus = attack, DefenseBonus = defense, HPBonus = hp, CapacityBonus = 0,
             IconKey = string.Empty, DropWeight = 0,
             GridWidth = type == LootItemType.Weapon ? 1 : 2,
             GridHeight = type == LootItemType.Shield ? 2 : 3
@@ -436,6 +466,8 @@ public static class M5SaveService
                 ItemId = LootRuntimeState.GetInsuredItemId(instanceId)
             }).ToList()
             ,quest_state = QuestRuntimeState.CapturePersistentState()
+            ,escape_scroll_restock_progress = LootRuntimeState.EscapeScrollRestockProgress
+            ,escape_scroll_purchase_stock = LootRuntimeState.EscapeScrollPurchaseStock
         };
     }
 
@@ -558,6 +590,8 @@ public static class M5SaveService
         public List<LootRuntimeState.InsuranceReturn> insurance_returns = new List<LootRuntimeState.InsuranceReturn>();
         public List<LootRuntimeState.InsurancePolicy> insured_this_run = new List<LootRuntimeState.InsurancePolicy>();
         public QuestRuntimeState.PersistentState quest_state = new QuestRuntimeState.PersistentState();
+        public float escape_scroll_restock_progress;
+        public int escape_scroll_purchase_stock;
     }
 
     [Serializable]

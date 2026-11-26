@@ -27,11 +27,11 @@ public class DungeonClock : MonoBehaviour
     // 상한선(threshold)이라서, 이름만 보고 헷갈리지 않게 Threshold로 바꿨다.
     // [2026-09-03] MinutesPerTick이 5 → 1로 바뀌면서(TickCost.cs 참고) 같이 5배 재조정됨:
     // 1분/tick * 1440tick = 1440분 = 24시간 — 실제 게임 내 24시간이라는 밸런스는 그대로 유지.
-    public const float MIAThresholdTicks = 1440f; // 24시간 = 1440tick(신규 기준, 구 기준으로는 288tick)
+    public const float MIAThresholdTicks = 2880f; // 24시간 = 2880tick
 
     // "tick 하나가 게임 내 시간으로 몇 분인지"의 환산 비율. 이건 진짜 "~당(Per)" 관계라 이름 그대로 둔다.
     // [2026-09-03] 5 → 1로 변경 — "1tick = 1분 = 이동 1타일"로 기준 단위를 바꾼 결정(TickCost.cs 참고).
-    public const float MinutesPerTick = 1f;
+    public const float MinutesPerTick = 0.5f;
 
     [Tooltip("던전 출격 시각(시). 기본 06:00 — MAP_GENERATOR_DESIGN.md 예시 기준.")]
     [SerializeField] private int departureHour = 6;

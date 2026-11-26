@@ -9,7 +9,7 @@ public sealed class ExpeditionManager : MonoBehaviour
 
     [Header("미확정 임시값 (Inspector에서 조정)")]
     [SerializeField, Min(1f)] private float floorChangeTickCost = TickCost.Interact;
-    [SerializeField, Min(1f)] private float escapeProcedureTickCost = 10f;
+    [SerializeField, Min(1f)] private float escapeProcedureTickCost = 20f;
 
     private DungeonClock dungeonClock;
     private bool transitionRequested;
@@ -76,7 +76,9 @@ public sealed class ExpeditionManager : MonoBehaviour
     private bool TryCompleteExtraction(PlayerTurnActor player, bool allowAnyFloor)
     {
         if (transitionRequested || player == null || player.IsDead || !ExpeditionSession.IsActive) return false;
-        if (!allowAnyFloor && ExpeditionSession.CurrentFloor != 3 && ExpeditionSession.CurrentFloor != 5) return false;
+        if (!allowAnyFloor && ExpeditionSession.CurrentFloor != 3
+            && ExpeditionSession.CurrentFloor != M10DungeonConfig.FirstBossFloor
+            && ExpeditionSession.CurrentFloor != ExpeditionSession.FinalFloor) return false;
         if (miaResolutionPending || (dungeonClock != null && dungeonClock.IsMIA)) return false;
 
         transitionRequested = true;
