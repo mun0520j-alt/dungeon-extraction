@@ -9,6 +9,7 @@ public sealed class DungeonStairs : MonoBehaviour
     private Vector3Int cell;
     private bool isFinalExit;
     private bool requestSent;
+    private bool closeNoticeShown;
     private float extractionStartTick = -1f;
     private Tilemap floor;
     public Vector3Int Cell => cell;
@@ -66,6 +67,7 @@ public sealed class DungeonStairs : MonoBehaviour
         {
             if (stairs == null || !stairs.isFinalExit || stairs.requestSent
                 || stairs.IsLockedByBoss()
+                || stairs.IsClosedSeventhFloorExit()
                 || stairs.extractionStartTick >= 0f
                 || !stairs.IsInsideExtractionZone(player.CurrentCell)) continue;
 
@@ -87,6 +89,7 @@ public sealed class DungeonStairs : MonoBehaviour
         {
             if (stairs == null || !stairs.isFinalExit || stairs.requestSent
                 || stairs.IsLockedByBoss()
+                || stairs.IsClosedSeventhFloorExit()
                 || stairs.extractionStartTick < 0f
                 || !stairs.IsInsideExtractionZone(player.CurrentCell)) continue;
 
@@ -110,6 +113,16 @@ public sealed class DungeonStairs : MonoBehaviour
 
         if (isFinalExit)
         {
+            if (IsClosedSeventhFloorExit())
+            {
+                extractionStartTick = -1f;
+                if (!closeNoticeShown)
+                {
+                    closeNoticeShown = true;
+                    CombatFeedback.AddLine("탈출구가 닫혔다 — 10층 또는 탈출 스크롤");
+                }
+                return;
+            }
             if (IsLockedByBoss())
             {
                 extractionStartTick = -1f;
@@ -152,6 +165,12 @@ public sealed class DungeonStairs : MonoBehaviour
         string label;
         if (isFinalExit)
         {
+            if (IsClosedSeventhFloorExit())
+            {
+                label = "탈출구가 닫혔다 — 10층 또는 탈출 스크롤";
+                GUI.Box(new Rect(Screen.width * 0.5f - 180f, Screen.height - 90f, 360f, 40f), label);
+                return;
+            }
             if (IsLockedByBoss())
             {
                 label = "보스를 처치해야 탈출할 수 있습니다.";
@@ -179,6 +198,16 @@ public sealed class DungeonStairs : MonoBehaviour
     {
         return M10DungeonConfig.IsBossFloor(ExpeditionSession.CurrentFloor)
             && GameObject.Find($"Boss_F{ExpeditionSession.CurrentFloor}") != null;
+    }
+
+    private bool IsClosedSeventhFloorExit()
+    {
+        if (!isFinalExit || ExpeditionSession.CurrentFloor != 7) return false;
+        float elapsed = ExpeditionManager.Instance?.ElapsedTicks ?? ExpeditionSession.ElapsedTicks;
+        bool closed = elapsed >= M11TimeConfig.SevenFloorExitCloseTicks;
+        SpriteRenderer renderer = GetComponent<SpriteRenderer>();
+        if (closed && renderer != null) renderer.color = new Color(0.25f, 0.25f, 0.28f, 0.75f);
+        return closed;
     }
 
     private float RequiredExtractionTicks(ExpeditionManager manager)
