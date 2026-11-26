@@ -1291,7 +1291,7 @@ DungeonRunManager.CreateRuntimeEnemy () (at Assets/Scripts/MapGen/DungeonRunMana
 | 항목 | 내용 |
 |---|---|
 | 상태 | Fixed — Play 검증 대기 (TC-M10-33) |
-| Jira | 미등록 |
+| Jira | DUN-83 |
 | 심각도 | Critical |
 | 우선순위 | P0 |
 | 발견 단계 | M10 코드 리뷰 (2026-11-23) |
@@ -1309,7 +1309,7 @@ DungeonRunManager.CreateRuntimeEnemy () (at Assets/Scripts/MapGen/DungeonRunMana
 | 항목 | 내용 |
 |---|---|
 | 상태 | Fixed — Play 검증 대기 |
-| Jira | 미등록 |
+| Jira | DUN-84 |
 | 우선순위 | Major / P1 |
 | 재현 | zombie·slug 및 단일 `_anim` 몬스터를 생성해 대기·이동 관찰 |
 | 실제 | 부분 이름 검색으로 tiny/big 변형 프레임이 섞이고, 런타임은 catalog `runFrames`를 사용하지 않음 |
@@ -1323,7 +1323,7 @@ DungeonRunManager.CreateRuntimeEnemy () (at Assets/Scripts/MapGen/DungeonRunMana
 | 항목 | 내용 |
 |---|---|
 | 상태 | Fixed — Play 검증 대기 |
-| Jira | 미등록 |
+| Jira | DUN-86 |
 | 우선순위 | Critical / P0 |
 | 발견 단계 | M10 보스 Play (사용자, 2026-11-23) |
 | 관련 결함 | BUG-032, BUG-034 재발 |
@@ -1340,7 +1340,7 @@ DungeonRunManager.CreateRuntimeEnemy () (at Assets/Scripts/MapGen/DungeonRunMana
 | 항목 | 내용 |
 |---|---|
 | 상태 | Fixed — Play 검증 대기 |
-| Jira | 미등록 |
+| Jira | DUN-85 |
 | 우선순위 | Minor / P2 |
 | 발견 단계 | M10 Play (사용자, 2026-11-24) |
 | 실제 | 경험치 패널이 Tick 시계의 남은 시간과 겹치며 누적 XP/누적 기준값만 보여 현재 레벨 진행도를 바로 알기 어려움 |
