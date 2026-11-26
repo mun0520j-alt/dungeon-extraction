@@ -220,6 +220,7 @@ public sealed class BaseCampGridPanel : MonoBehaviour
         stashGridView.SetDimPredicate(BaseCampManagementPanel.ShouldDimStashItem);
         stashGridView.SetItemClickHandler(SelectStashItem);
         stashGridView.SetItemDoubleClickHandler(HandleStoredItemDoubleClick);
+        stashGridView.SetItemQuickMoveHandler(HandleStoredItemDoubleClick);
         stashGridView.SetItemOpenHandler(OpenBagWindow); // 결정 42: 우클릭으로도 가방 열기
         saleGridView.Bind(LootRuntimeState.SaleBasketGrid, LootRuntimeState.MoveSaleBasketItem);
         saleGridView.SetItemClickHandler(SelectSaleBasketItem);

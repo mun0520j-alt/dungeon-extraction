@@ -1,0 +1,11 @@
+key,value,note
+pocket_1_width,2,initial
+pocket_1_height,2,initial
+pocket_2_width,2,ten quests
+pocket_2_height,3,ten quests
+pocket_3_width,3,thirty quests
+pocket_3_height,3,thirty quests
+pocket_six_quest_count,10,temporary
+pocket_nine_quest_count,30,temporary
+starting_small_potions,2,expedition bound
+carry_limit,14,root and nested items

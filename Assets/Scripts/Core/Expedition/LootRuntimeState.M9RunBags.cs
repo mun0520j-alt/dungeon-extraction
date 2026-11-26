@@ -6,7 +6,7 @@ using System.Collections.Generic;
 // 중첩 깊이(4단계)·자기 포함 금지 규칙은 영지와 같다. 출격 가방에 직접 놓인 아이템은 상한에 포함하지 않는다.
 public static partial class LootRuntimeState
 {
-    public static int RunNestedItemCount => CountNestedItems(runBag);
+    public static int RunNestedItemCount => runBag.Count + CountNestedItems(runBag);
 
     // 출격 가방 전체 트리에서 같은 item_id를 찾는다. 원정 한정 아이템을 먼저 반환할 수 있어
     // 자동 사용 시 하위 가방에 든 원정 한정 스크롤이 일반 스크롤보다 뒤로 밀리지 않는다.
@@ -52,7 +52,7 @@ public static partial class LootRuntimeState
         return RunNestedItemCount + descendants;
     }
 
-    public static string RunNestedLimitReason => $"하위 가방 아이템은 원정 중 최대 {M9StashConfig.RunNestedItemLimit}개입니다.";
+    public static string RunNestedLimitReason => $"무게 초과 — 현재 {RunNestedItemCount}/{M11PouchConfig.CarryLimit}";
 
     public static bool BagHasFreeSpace(LootItemInstance bag, LootItemInstance item) => bag?.BagGrid != null && HasFreeSpace(bag.BagGrid, item);
 
@@ -206,7 +206,7 @@ public static partial class LootRuntimeState
         // 출격 가방 직속 아이템을 하위 가방으로 옮기는 경우, 그 아이템의 하위 내용물은 이미 세어져 있다.
         bool alreadyCountedChildren = runBag.Exists(value => value?.InstanceId == item.InstanceId);
         if (alreadyCountedChildren) adding = 1;
-        if (RunNestedItemCount + adding > M9StashConfig.RunNestedItemLimit) { reason = RunNestedLimitReason; return false; }
+        if (RunNestedItemCount + adding > M11PouchConfig.CarryLimit) { reason = RunNestedLimitReason; return false; }
         return true;
     }
 

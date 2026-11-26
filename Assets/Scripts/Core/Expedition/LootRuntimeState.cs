@@ -65,10 +65,12 @@ public static partial class LootRuntimeState
         ResetM9Storage();
         ResetM9Trade();
         ResetM10ScrollShop();
+        ResetM11Protection();
     }
 
     public static void BeginNewRun()
     {
+        GrantStartingPotions();
         if (HasBasicLoadout) return;
         HasBasicLoadout = true;
         Debug.Log("[Loadout] 장비가 없어 기본 검·방패·갑옷을 무료 지급했습니다.");
@@ -77,7 +79,7 @@ public static partial class LootRuntimeState
     public static bool TryAddToRunBag(LootItemInstance item)
     {
         if (item == null) return Fail("공간 부족");
-        if (ExpeditionSession.IsActive && RunNestedCountAfterTakingToRunBag(item) > M9StashConfig.RunNestedItemLimit)
+        if (ExpeditionSession.IsActive && RunNestedCountAfterTakingToRunBag(item) + 1 > M11PouchConfig.CarryLimit)
             return Fail(RunNestedLimitReason);
         if (!runBagGrid.TryAutoPlace(item, out _)) return Fail("공간 부족");
         runBag.Add(item);
@@ -91,7 +93,7 @@ public static partial class LootRuntimeState
     public static bool TryAddToRunBagAt(LootItemInstance item, int x, int y, bool rotated)
     {
         if (item == null) return Fail("공간 부족");
-        if (ExpeditionSession.IsActive && RunNestedCountAfterTakingToRunBag(item) > M9StashConfig.RunNestedItemLimit)
+        if (ExpeditionSession.IsActive && RunNestedCountAfterTakingToRunBag(item) + 1 > M11PouchConfig.CarryLimit)
             return Fail(RunNestedLimitReason);
         if (!runBagGrid.TryPlace(item, x, y, rotated)) return Fail("그 자리에 놓을 수 없습니다.");
         runBag.Add(item);
@@ -237,7 +239,7 @@ public static partial class LootRuntimeState
             return Fail("새 가방에 현재 아이템을 모두 넣을 공간이 없습니다.");
         var candidateRoots = new List<LootItemInstance>();
         foreach (LootGridPlacement placed in candidateBagGrid.Placements) candidateRoots.Add(placed.Item);
-        if (CountNestedItems(candidateRoots) > M9StashConfig.RunNestedItemLimit)
+        if (candidateRoots.Count + CountNestedItems(candidateRoots) > M11PouchConfig.CarryLimit)
             return Fail("새 가방의 하위 가방 내용물이 많아 장착할 수 없습니다. " + RunNestedLimitReason);
 
         LootGridModel candidateSource = CloneGridExcept(sourceGrid, newBag.InstanceId);
@@ -609,6 +611,7 @@ public static partial class LootRuntimeState
         ResolveCurrentInsurance(result, ExpeditionSession.CurrentFloor);
         // 결정 11: 엘리트 드롭(원정 한정) 아이템만 사라진다. 퀘스트 보상 스크롤은 일반 아이템으로 남는다.
         PurgeExpeditionScrolls(runBagGrid);
+        EndM11Run();
         runBag.RemoveAll(item => item != null && item.IsExpeditionBound);
         if (result == ExpeditionResult.Escaped) return;
         runBag.Clear();

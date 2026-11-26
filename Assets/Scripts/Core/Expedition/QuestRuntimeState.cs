@@ -172,6 +172,7 @@ public static class QuestRuntimeState
             if (reward != null) LootRuntimeState.AddRewardToStash(new LootItemInstance(reward, foundInRaid: false));
         }
         completed.Add(ActiveQuestId);
+        LootRuntimeState.RefreshProtectedPocketUnlock();
         ActiveQuestId = null;
         Progress = 0;
         ObjectiveReady = false;
@@ -275,6 +276,21 @@ public static class QuestRuntimeState
     }
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
+    public static void DebugSetCompletedQuestCount(int count)
+    {
+        int target = Mathf.Max(0, count);
+        int index = 0;
+        while (completed.Count < target) completed.Add($"m11_debug_completed_{index++:00}");
+        foreach (string id in completed.Where(value => value.StartsWith("m11_debug_completed_")).ToArray())
+        {
+            if (completed.Count <= target) break;
+            completed.Remove(id);
+        }
+        LootRuntimeState.RefreshProtectedPocketUnlock();
+        Changed?.Invoke();
+        M3MeasurementAutomation.MarkDebugRun();
+    }
+
     public static bool DebugGrantDeliveryRequirements()
     {
         QuestDefinition quest = ActiveQuest;

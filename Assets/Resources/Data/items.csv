@@ -19,6 +19,8 @@ bag_rare,용병의 가방,Bag,Rare,0,0,0,3,,50,30,3,3,3,3
 bag_epic,기사의 가방,Bag,Epic,0,0,0,4,,50,80,5,3,5,3
 bag_unique,왕실 원정 가방,Bag,Unique,0,0,0,6,,50,200,4,5,4,5
 bag_legendary,심연 원정 배낭,Bag,Legendary,0,0,0,8,,50,500,5,6,5,6
+pouch_potion,포션 파우치,Bag,Normal,0,0,0,0,,0,40,1,2,2,2
+case_junk,잡템함,Bag,Rare,0,0,0,0,,0,90,2,2,3,3
 basic_weapon,기본 검,Weapon,Normal,15,0,0,0,,0,0,1,3,0,0
 basic_shield,낡은 방패,Shield,Normal,0,4,10,0,,0,0,2,2,0,0
 basic_armor,가죽 갑옷,Armor,Normal,0,5,20,0,,0,0,2,3,0,0

@@ -300,6 +300,17 @@ public static partial class LootRuntimeState
             reason = "대상 가방을 찾을 수 없습니다.";
             return false;
         }
+        if (targetBag.Definition.Id == "pouch_potion" && item.Definition.Id != "potion_small"
+            && item.Definition.Id != "potion_medium" && item.Definition.Id != "potion_large")
+        {
+            reason = "포션 파우치에는 포션만 넣을 수 있습니다.";
+            return false;
+        }
+        if (targetBag.Definition.Id == "case_junk" && item.Definition.Type != LootItemType.Junk)
+        {
+            reason = "잡템함에는 잡템만 넣을 수 있습니다.";
+            return false;
+        }
         if (item.InstanceId == targetBag.InstanceId || ContainsRecursive(item, targetBag.InstanceId, new HashSet<string>(StringComparer.Ordinal)))
         {
             reason = "가방을 자기 자신이나 하위 가방 안에 넣을 수 없습니다.";

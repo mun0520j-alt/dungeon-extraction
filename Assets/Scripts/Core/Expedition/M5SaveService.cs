@@ -8,7 +8,7 @@ using UnityEngine;
 // LootRuntimeState가 상태를 소유하고, 이 클래스는 저장 파일 직렬화와 교체만 담당한다.
 public static class M5SaveService
 {
-    private const int CurrentSaveVersion = 7;
+    private const int CurrentSaveVersion = 8;
     private const string SaveFolderName = "Save";
     private const string SaveFileName = "save.json";
     private const string BackupFileName = "save.bak";
@@ -17,6 +17,7 @@ public static class M5SaveService
     private const string LegacyV4BackupFileName = "save_v4.bak";
     private const string LegacyV5BackupFileName = "save_v5.bak";
     private const string LegacyV6BackupFileName = "save_v6.bak";
+    private const string LegacyV7BackupFileName = "save_v7.bak";
     private const string TempFileName = "save.tmp";
 
     private static bool isRestoring;
@@ -31,6 +32,7 @@ public static class M5SaveService
     public static string LegacyV4BackupPath => Path.Combine(SaveDirectory, LegacyV4BackupFileName);
     public static string LegacyV5BackupPath => Path.Combine(SaveDirectory, LegacyV5BackupFileName);
     public static string LegacyV6BackupPath => Path.Combine(SaveDirectory, LegacyV6BackupFileName);
+    public static string LegacyV7BackupPath => Path.Combine(SaveDirectory, LegacyV7BackupFileName);
     public static bool Fullscreen => currentSettings.fullscreen;
     public static int ResolutionWidth => currentSettings.resolution_width;
     public static int ResolutionHeight => currentSettings.resolution_height;
@@ -154,6 +156,11 @@ public static class M5SaveService
             Debug.LogError("[Save] v6 원본 백업에 실패해 v7 마이그레이션을 중단했습니다. 기존 파일은 변경하지 않습니다.");
             return;
         }
+        if (data.save_version == 7 && !TryPreserveLegacyV7Save(loadedPath))
+        {
+            Debug.LogError("[Save] v7 원본 백업에 실패해 v8 마이그레이션을 중단했습니다. 기존 파일은 변경하지 않습니다.");
+            return;
+        }
         Restore(data);
         if (!data.expedition_in_progress)
         {
@@ -258,6 +265,23 @@ public static class M5SaveService
         }
     }
 
+    private static bool TryPreserveLegacyV7Save(string sourcePath)
+    {
+        try
+        {
+            Directory.CreateDirectory(SaveDirectory);
+            if (File.Exists(LegacyV7BackupPath)) return true;
+            File.Copy(sourcePath, LegacyV7BackupPath, false);
+            Debug.Log($"[Save] v7 원본을 별도 백업으로 보존했습니다: {LegacyV7BackupPath}");
+            return true;
+        }
+        catch (Exception exception)
+        {
+            Debug.LogError($"[Save] v7 원본 백업 실패: {LegacyV7BackupPath}\n{exception.Message}");
+            return false;
+        }
+    }
+
     private static SaveData TryRead(string path)
     {
         if (!File.Exists(path)) return null;
@@ -304,6 +328,9 @@ public static class M5SaveService
             LootRuntimeState.RestoreInsurance(data.insurance_returns);
             LootRuntimeState.RestoreConfirmedInsurance(data.insured_this_run);
             LootRuntimeState.RestoreM10ScrollShop(data.escape_scroll_restock_progress, data.escape_scroll_purchase_stock);
+            LootRuntimeState.RestoreM11Protection(
+                RestoreGridItems(data.protected_pocket, context, bagDepth: 0, placementSupported: data.save_version >= 8),
+                data.protected_pocket_tier <= 0 ? 1 : data.protected_pocket_tier);
             currentSettings = data.settings != null ? data.settings.Normalized() : SaveSettings.Default();
         }
         finally
@@ -468,6 +495,8 @@ public static class M5SaveService
             ,quest_state = QuestRuntimeState.CapturePersistentState()
             ,escape_scroll_restock_progress = LootRuntimeState.EscapeScrollRestockProgress
             ,escape_scroll_purchase_stock = LootRuntimeState.EscapeScrollPurchaseStock
+            ,protected_pocket = SaveRestoreItems(LootRuntimeState.PersistentProtectedPocketItems())
+            ,protected_pocket_tier = LootRuntimeState.ProtectedPocketTier
         };
     }
 
@@ -592,6 +621,8 @@ public static class M5SaveService
         public QuestRuntimeState.PersistentState quest_state = new QuestRuntimeState.PersistentState();
         public float escape_scroll_restock_progress;
         public int escape_scroll_purchase_stock;
+        public List<SavedItem> protected_pocket = new List<SavedItem>();
+        public int protected_pocket_tier = 1;
     }
 
     [Serializable]

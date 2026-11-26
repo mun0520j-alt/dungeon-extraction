@@ -91,6 +91,7 @@ public class DungeonSceneBootstrapper : MonoBehaviour
         Vector3Int playerCell = player.CurrentCell;
         Dictionary<Vector3Int, int> distanceFromSpawn = TilePathfinder.FindReachableDistances(playerCell, walls, floor);
         Vector3Int exitCell = FindFarthestAvailable(distanceFromSpawn, playerCell, default, false, floor);
+        ClearGeneratedExitZone(floor, exitCell);
 
         bool finalExit = ExpeditionSession.CurrentFloor >= ExpeditionSession.FinalFloor;
         var exitObject = new GameObject(finalExit ? "EscapeExit(AutoCreated)" : "DownStairs(AutoCreated)");
@@ -122,6 +123,7 @@ public class DungeonSceneBootstrapper : MonoBehaviour
 
             new GameObject($"EscapeExit_F{ExpeditionSession.CurrentFloor}(AutoCreated)")
                 .AddComponent<DungeonStairs>().Initialize(floor, escapeCell, true);
+            ClearGeneratedExitZone(floor, escapeCell);
 
             int spawnRoom = DungeonRoomRegistry.GetRoomId(floor, playerCell);
             int stairsRoom = DungeonRoomRegistry.GetRoomId(floor, exitCell);
@@ -191,5 +193,19 @@ public class DungeonSceneBootstrapper : MonoBehaviour
             || DungeonChest.IsCellBlocked(cell)
             || DungeonDoor.IsDoorCell(floor, cell)
             || GroundLootPile.IsCellBlocked(floor, cell);
+    }
+
+    private static void ClearGeneratedExitZone(Tilemap floor, Vector3Int center)
+    {
+        DungeonChest.RemoveGeneratedInZone(floor, center, 1);
+        Transform parent = floor.transform.parent;
+        if (parent == null) return;
+        foreach (SpriteRenderer renderer in parent.GetComponentsInChildren<SpriteRenderer>(true))
+        {
+            if (renderer == null || !renderer.gameObject.name.StartsWith("Decor_")) continue;
+            Vector3Int cell = floor.WorldToCell(renderer.transform.position);
+            if (Mathf.Abs(cell.x - center.x) <= 1 && Mathf.Abs(cell.y - center.y) <= 1)
+                Destroy(renderer.gameObject);
+        }
     }
 }

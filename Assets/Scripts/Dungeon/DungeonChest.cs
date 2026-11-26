@@ -50,6 +50,18 @@ public sealed class DungeonChest : MonoBehaviour, ILootContainer
         return occupiedCells.Contains(targetCell);
     }
 
+    public static void RemoveGeneratedInZone(Tilemap targetFloor, Vector3Int center, int radius)
+    {
+        foreach (DungeonChest chest in new List<DungeonChest>(chestsByCell.Values))
+        {
+            if (chest == null || chest.floor != targetFloor) continue;
+            if (Mathf.Abs(chest.cell.x - center.x) > radius || Mathf.Abs(chest.cell.y - center.y) > radius) continue;
+            occupiedCells.Remove(chest.cell);
+            chestsByCell.Remove(chest.cell);
+            Destroy(chest.gameObject);
+        }
+    }
+
     public static bool TryOpenAt(Vector3Int targetCell, PlayerTurnActor player)
     {
         return chestsByCell.TryGetValue(targetCell, out var chest) && chest != null && chest.TryBeginOpen(player);

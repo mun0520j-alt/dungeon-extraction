@@ -96,6 +96,7 @@ public class InventoryPanel : MonoBehaviour
     private readonly List<Button> bagDropButtons = new List<Button>();
     private readonly List<Button> bagEquipButtons = new List<Button>();
     private LootGridView bagGridView;
+    private LootGridView protectedPocketGridView;
     private System.Action<LootItemInstance> lootTransferHandler;
     private GameObject actionRoot;
     private Text actionLabel;
@@ -379,6 +380,7 @@ public class InventoryPanel : MonoBehaviour
         bagGridView.SetItemOpenHandler(OpenRunNestedBag);
         bagGridView.SetItemQuickMoveHandler(QuickMoveToLoot);
         bagGridView.SetBagDropHandler(DungeonBagWindows.CanDropOnBagIcon, DungeonBagWindows.DropOnBagIcon);
+        EnsureProtectedPocketBindings(panelRoot.transform);
         if (dimensionsChanged) ReflowPanelForBagGrid();
     }
 
@@ -412,6 +414,11 @@ public class InventoryPanel : MonoBehaviour
             || bagGridView.GetComponent<RectTransform>().sizeDelta.y != LootRuntimeState.RunBagGrid.Height * LootGridView.MinimumCellSize)
             EnsureBagBindings();
         else bagGridView.Refresh();
+        if (protectedPocketGridView != null)
+        {
+            protectedPocketGridView.Bind(LootRuntimeState.ProtectedPocket, LootRuntimeState.MoveProtectedPocketItem);
+            protectedPocketGridView.SetItemDoubleClickHandler(item => LootRuntimeState.TryMoveProtectedPocketItemToRunBag(item));
+        }
         if (selectedBagItem != null && LootRuntimeState.RunBagGrid.Find(selectedBagItem.InstanceId) == null) HideItemActions();
         RefreshEquipmentSlots();
     }
@@ -509,7 +516,8 @@ public class InventoryPanel : MonoBehaviour
             EnsureBagEquipmentRow(existing);
             BindExisting(existing);
             var oldStash = existing.Find("StashSection");
-            if (oldStash != null) oldStash.gameObject.SetActive(false);
+            if (oldStash != null) oldStash.gameObject.SetActive(true);
+            EnsureProtectedPocketBindings(existing);
             return;
         }
 
@@ -564,6 +572,7 @@ public class InventoryPanel : MonoBehaviour
         BuildEquipmentColumn(contentRect);
         BuildBagGrid(contentRect);
         BuildItemActions(panelRect);
+        BuildStashSection(panelRect);
 
         // 인벤토리(장비 칸 + 가방) 바로 아래, 완전히 별도 섹션으로 빤스칸(보관함)을 붙인다.
         // M6 출격 가방은 장비 슬롯 아래에 둔다. 기존 임시 보관함은 M8 Stash 격자까지 숨긴다.
@@ -806,6 +815,7 @@ public class InventoryPanel : MonoBehaviour
         actionLabel = CreateLabel(actionRoot.transform, "SelectedItem", "아이템 선택", 12, TextAnchor.MiddleLeft);
         actionLabel.gameObject.AddComponent<LayoutElement>().preferredWidth = 140f;
         CreateActionButton("Equip", "장착", UseOrEquipSelectedItem);
+        CreateActionButton("Protect", "보호", MoveSelectedToProtectedPocket);
         CreateActionButton("Drop", "버리기", () => { if (selectedBagItem != null) DropBagItem(selectedBagItem.InstanceId); });
         actionRoot.SetActive(false);
     }
@@ -964,7 +974,7 @@ public class InventoryPanel : MonoBehaviour
         sectionFitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
         sectionFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-        var stashTitle = CreateLabel(sectionGo.transform, "StashTitle", "보관함", 14, TextAnchor.MiddleCenter);
+        var stashTitle = CreateLabel(sectionGo.transform, "StashTitle", "보호 주머니", 14, TextAnchor.MiddleCenter);
         stashTitle.color = new Color(1f, 0.85f, 0.6f, 0.9f); // 가방과 다른 색조로 살짝 구분.
         var stashTitleLayout = stashTitle.gameObject.AddComponent<LayoutElement>();
         stashTitleLayout.preferredHeight = 20f;
@@ -973,22 +983,33 @@ public class InventoryPanel : MonoBehaviour
         gridGo.transform.SetParent(sectionGo.transform, false);
         gridGo.AddComponent<RectTransform>();
 
-        var gridLayout = gridGo.AddComponent<GridLayoutGroup>();
-        gridLayout.cellSize = new Vector2(slotSize, slotSize);
-        gridLayout.spacing = new Vector2(slotSpacing, slotSpacing);
-        gridLayout.childAlignment = TextAnchor.UpperLeft;
-        gridLayout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-        gridLayout.constraintCount = stashColumns;
-
         var gridLayoutElement = gridGo.AddComponent<LayoutElement>();
-        gridLayoutElement.preferredWidth = stashColumns * slotSize + (stashColumns - 1) * slotSpacing;
-        gridLayoutElement.preferredHeight = stashRows * slotSize + (stashRows - 1) * slotSpacing;
+        gridLayoutElement.preferredWidth = LootRuntimeState.ProtectedPocket.Width * LootGridView.MinimumCellSize;
+        gridLayoutElement.preferredHeight = LootRuntimeState.ProtectedPocket.Height * LootGridView.MinimumCellSize;
+        protectedPocketGridView = gridGo.AddComponent<LootGridView>();
+        protectedPocketGridView.Bind(LootRuntimeState.ProtectedPocket, LootRuntimeState.MoveProtectedPocketItem);
+        protectedPocketGridView.SetItemDoubleClickHandler(item => LootRuntimeState.TryMoveProtectedPocketItemToRunBag(item));
+    }
 
-        int totalSlots = stashColumns * stashRows;
-        for (int i = 0; i < totalSlots; i++)
-        {
-            CreateEmptySlot(gridGo.transform, i, GeneratedUiSprites.FrameThickMedium, new Color(0.9f, 0.75f, 0.3f, 0.18f), "StashSlot_");
-        }
+    private void EnsureProtectedPocketBindings(Transform root)
+    {
+        Transform section = root?.Find("StashSection");
+        if (section == null) return;
+        section.gameObject.SetActive(true);
+        Transform grid = section.Find("StashGrid");
+        if (grid == null) return;
+        foreach (Transform child in grid) child.gameObject.SetActive(false);
+        protectedPocketGridView = grid.GetComponent<LootGridView>() ?? grid.gameObject.AddComponent<LootGridView>();
+        protectedPocketGridView.Bind(LootRuntimeState.ProtectedPocket, LootRuntimeState.MoveProtectedPocketItem);
+        protectedPocketGridView.SetItemDoubleClickHandler(item => LootRuntimeState.TryMoveProtectedPocketItemToRunBag(item));
+    }
+
+    private void MoveSelectedToProtectedPocket()
+    {
+        if (selectedBagItem == null) return;
+        bool moved = LootRuntimeState.TryMoveRunItemToProtectedPocket(selectedBagItem.InstanceId);
+        SetBagNotice(moved ? null : LootRuntimeState.LastFailureReason);
+        if (moved) HideItemActions();
     }
 
     // 빈 슬롯 하나 — 지금은 배경 프레임뿐이라 시각적으로 "칸이 있다"만 보여준다. 아이템이
