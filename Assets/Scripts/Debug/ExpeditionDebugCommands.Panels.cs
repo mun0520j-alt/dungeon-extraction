@@ -70,6 +70,18 @@ public sealed partial class ExpeditionDebugCommands
             if (GUILayout.Button("지정 몹 소환", GUILayout.Width(100f))) SpawnDebugEnemy(qaEnemyIdInput);
             GUILayout.EndHorizontal();
             DrawElapsedTickControls();
+            GUILayout.Label("M11 시간 경계");
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("심야 직전 1799")) SetElapsedTicks(1799f);
+            if (GUILayout.Button("심야 시작 1800")) SetElapsedTicks(1800f);
+            if (GUILayout.Button("7층 폐쇄 직전 2219")) SetElapsedTicks(2219f);
+            GUILayout.EndHorizontal();
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("완료 퀘스트 10")) QuestRuntimeState.DebugSetCompletedQuestCount(10);
+            if (GUILayout.Button("완료 퀘스트 30")) QuestRuntimeState.DebugSetCompletedQuestCount(30);
+            if (GUILayout.Button("월식 제단 해금")) M11EclipseState.DebugUnlockAltar(false);
+            if (GUILayout.Button("월식 제단 ON")) M11EclipseState.DebugUnlockAltar(true);
+            GUILayout.EndHorizontal();
             GUILayout.Label($"레벨 Lv.{M10RunProgression.Level} · XP {M10RunProgression.Experience}/{M10RunProgression.NextLevelXP}");
             GUILayout.Label("최근 경험치");
             if (M10RunProgression.RecentExperienceEvents.Count == 0) GUILayout.Label("  기록 없음");

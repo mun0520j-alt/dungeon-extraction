@@ -176,6 +176,26 @@ public static class M10DataValidator
         Debug.Log($"[M10 Validation] PASS — % 피해 K={M10DungeonConfig.DamageFormulaK}, 장비 HP, Lv당 HP+25/공+2/방+1, 휴식 {M10DungeonConfig.RestHealPercent}%·보스 후 {M10DungeonConfig.RestHealPercentAfterBoss}%, 일반몹 포션 10%, 보스 광역 예고 {M10DungeonConfig.BossAoeTelegraphTicks}Tick 확인.");
     }
 
+    [MenuItem("Tools/Dungeon/M11/Validate Data")]
+    public static void ValidateM11()
+    {
+        Validate();
+        bool ok = M11TimeConfig.NightStartTicks == 1800
+            && M11TimeConfig.SevenFloorExitCloseTicks == 2220
+            && M11TimeConfig.NightSpawnCount == 2
+            && M11TimeConfig.OrcCrossRadius == 3
+            && M11PouchConfig.CarryLimit == 14
+            && M11PouchConfig.Width(1) == 2 && M11PouchConfig.Height(1) == 2
+            && M11PouchConfig.Width(2) == 2 && M11PouchConfig.Height(2) == 3
+            && M11PouchConfig.Width(3) == 3 && M11PouchConfig.Height(3) == 3;
+        LootItemData potionPouch = LootItemDatabase.FindById("pouch_potion");
+        LootItemData junkCase = LootItemDatabase.FindById("case_junk");
+        ok &= potionPouch?.BagGridWidth == 2 && potionPouch.BagGridHeight == 2
+            && junkCase?.BagGridWidth == 3 && junkCase.BagGridHeight == 3;
+        if (!ok) throw new InvalidOperationException("M11 data validation failed.");
+        Debug.Log("[M11 Validation] PASS — 심야 1800, 7층 폐쇄 2220, 보호 주머니 4/6/9칸, 무게 14, 오크 십자 확인.");
+    }
+
     private static void LogMatchup(string label, int level, string weaponId, string shieldId, string armorId, string enemyId)
     {
         M10LevelDefinition growth = M10ProgressionDatabase.Level(level);
