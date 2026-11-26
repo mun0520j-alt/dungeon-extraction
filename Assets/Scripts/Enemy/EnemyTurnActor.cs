@@ -78,6 +78,7 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
     private Vector3Int bossAoeCell;
     private int bossLootSeed;
     private bool isElite;
+    private bool isNightEnemy;
     private float eliteScrollDropChance;
     [SerializeField, Min(1)] private int bossAoeFinalDamage = 35;
     private GameObject bossTelegraph;
@@ -176,6 +177,38 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
         isBoss = true;
         bossLootSeed = lootSeed;
         sightRangeInTiles = 100;
+    }
+
+    public void ConfigureNightEnemy()
+    {
+        isNightEnemy = true;
+        int pct = M11TimeConfig.NightStatPercent;
+        maxHP = Mathf.Max(1, Mathf.RoundToInt(maxHP * pct / 100f));
+        currentHP = maxHP;
+        attackPower = Mathf.Max(1, Mathf.RoundToInt(attackPower * pct / 100f));
+        if (spriteRenderer != null) spriteRenderer.color = M11TimeConfig.NightTint;
+        healthBar?.SetFill(1f);
+    }
+
+    private void LateUpdate()
+    {
+        if (spriteRenderer == null) return;
+        bool visible = true;
+        if (DungeonClock.IsNightNow)
+        {
+            PlayerTurnActor player = PlayerTurnActor.Instance;
+            if (player != null && player.FloorTilemap == floorTilemap)
+            {
+                int playerRoom = DungeonRoomRegistry.GetRoomId(floorTilemap, player.CurrentCell);
+                int enemyRoom = DungeonRoomRegistry.GetRoomId(floorTilemap, currentCell);
+                int distance = Mathf.Abs(player.CurrentCell.x - currentCell.x) + Mathf.Abs(player.CurrentCell.y - currentCell.y);
+                visible = playerRoom >= 0 && playerRoom == enemyRoom || distance <= M11TimeConfig.NightRevealRange;
+            }
+        }
+        spriteRenderer.enabled = visible;
+        spriteRenderer.GetComponent<EliteSpriteOutline>()?.SetVisible(visible);
+        if (healthBar != null) healthBar.enabled = visible;
+        if (alertIndicatorObject != null && !visible) alertIndicatorObject.SetActive(false);
     }
 
     private bool TryInitialize()
@@ -662,7 +695,8 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
 
         if (currentHP <= 0)
         {
-            M10RunProgression.RecordEnemyDefeated(m10Definition);
+            M10RunProgression.RecordEnemyDefeated(m10Definition,
+                isNightEnemy ? M11TimeConfig.NightXpPercent / 100f : 1f);
             if (isBoss)
             {
                 if (bossTelegraph != null) Destroy(bossTelegraph);
@@ -670,6 +704,7 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
                 DropBossLoot();
             }
             else if (isElite) DropEliteScroll();
+            if (isNightEnemy) DropNightLoot();
             DropPotion();
             M3MeasurementAutomation.RecordEnemyKill();
             if (TickManager.Instance != null)
@@ -685,13 +720,28 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
         if (m10Definition == null || m10Definition.PotionDropChance <= 0f) return;
         int seed = currentCell.x * 92837111 ^ currentCell.y * 689287499 ^ ExpeditionSession.CurrentFloor * 19349663;
         var rng = new System.Random(seed);
-        if (rng.NextDouble() >= m10Definition.PotionDropChance) return;
+        float chance = m10Definition.PotionDropChance * (isNightEnemy ? M11TimeConfig.NightPotionDropPercent / 100f : 1f);
+        if (rng.NextDouble() >= chance) return;
         string itemId = m10Definition.IsElite || string.Equals(m10Definition.Tier, "boss", System.StringComparison.OrdinalIgnoreCase)
             ? (ExpeditionSession.CurrentFloor >= 8 ? "potion_large" : "potion_medium") : "potion_small";
         LootItemData definition = LootItemDatabase.FindById(itemId);
         if (definition == null) return;
         GroundLootPile.TryAddOrCreate(floorTilemap, currentCell,
             new LootItemInstance(definition, foundInRaid: true), out _, "포션 전리품");
+    }
+
+    private void DropNightLoot()
+    {
+        int seed = currentCell.x * 19349663 ^ currentCell.y * 83492791 ^ ExpeditionSession.CurrentFloor * 297121507;
+        var rng = new System.Random(seed);
+        int count = M11TimeConfig.RollNightDropCount(rng);
+        var drops = new System.Collections.Generic.List<LootItemInstance>();
+        for (int i = 0; i < count; i++)
+        {
+            LootItemData definition = LootItemDatabase.Roll(ExpeditionSession.CurrentFloor, rng);
+            if (definition != null) drops.Add(new LootItemInstance(definition, foundInRaid: true));
+        }
+        if (drops.Count > 0) GroundLootPile.Create(floorTilemap, currentCell, drops, "심야 전리품");
     }
 
     private void DropEliteScroll()

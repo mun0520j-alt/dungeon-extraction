@@ -14,6 +14,7 @@ public sealed class EliteSpriteOutline : MonoBehaviour
     private SpriteRenderer body;
     private Color outlineColor;
     private int thicknessPixels;
+    private bool externallyVisible = true;
 
     public static void Attach(SpriteRenderer target, Color color, int pixels)
     {
@@ -58,6 +59,12 @@ public sealed class EliteSpriteOutline : MonoBehaviour
 
     private void LateUpdate() => Synchronize();
 
+    public void SetVisible(bool value)
+    {
+        externallyVisible = value;
+        Synchronize();
+    }
+
     private void Synchronize()
     {
         if (body == null) return;
@@ -76,7 +83,7 @@ public sealed class EliteSpriteOutline : MonoBehaviour
             outline.sortingLayerID = body.sortingLayerID;
             outline.sortingOrder = body.sortingOrder - 1;
             outline.maskInteraction = body.maskInteraction;
-            outline.enabled = body.enabled && body.sprite != null && sharedSilhouetteMaterial != null;
+            outline.enabled = externallyVisible && body.enabled && body.sprite != null && sharedSilhouetteMaterial != null;
         }
     }
 }

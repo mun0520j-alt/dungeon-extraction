@@ -83,12 +83,13 @@ public static class M10RunProgression
         AddExperience(award, fast ? $"{floor}층 첫 도착·빠른 도착" : $"{floor}층 첫 도착");
     }
 
-    public static void RecordEnemyDefeated(M10EnemyDefinition definition)
+    public static void RecordEnemyDefeated(M10EnemyDefinition definition, float experienceMultiplier = 1f)
     {
         if (definition != null)
         {
-            AddExperience(definition.XP, $"{definition.Id} 처치");
-            CombatFeedback.AddLine($"{definition.Id} 처치 +{definition.XP} XP");
+            int award = Mathf.Max(1, Mathf.RoundToInt(definition.XP * Mathf.Max(0f, experienceMultiplier)));
+            AddExperience(award, $"{definition.Id} 처치");
+            CombatFeedback.AddLine($"{definition.Id} 처치 +{award} XP");
         }
     }
 

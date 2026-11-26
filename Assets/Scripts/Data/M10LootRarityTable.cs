@@ -26,7 +26,10 @@ public static class M10LootRarityTable
     public static LootRarity Rarity(int floor, System.Random rng)
     {
         int[] r = Row(floor); if (r == null) return LootRarity.Normal;
-        int roll = rng.Next(100); int sum = r[0]; if (roll < sum) return LootRarity.Normal;
+        int legendary = DungeonClock.IsNightNow && floor >= 6
+            ? M11TimeConfig.NightLegendaryPercent : r[4];
+        int normal = Mathf.Max(0, r[0] + r[4] - legendary);
+        int roll = rng.Next(100); int sum = normal; if (roll < sum) return LootRarity.Normal;
         sum += r[1]; if (roll < sum) return LootRarity.Rare; sum += r[2]; if (roll < sum) return LootRarity.Epic;
         sum += r[3]; return roll < sum ? LootRarity.Unique : LootRarity.Legendary;
     }

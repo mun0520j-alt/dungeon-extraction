@@ -43,6 +43,7 @@ public class DungeonSceneBootstrapper : MonoBehaviour
         var expeditionManager = FindFirstObjectByType<ExpeditionManager>();
         if (expeditionManager == null) expeditionManager = gameObject.AddComponent<ExpeditionManager>();
         expeditionManager.Initialize(dungeonClock);
+        FindFirstObjectByType<DungeonRunManager>()?.BindClock(dungeonClock);
 
         tickManager.BeginSchedule();
 

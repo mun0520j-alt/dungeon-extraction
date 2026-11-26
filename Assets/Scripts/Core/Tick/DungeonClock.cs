@@ -51,11 +51,15 @@ public class DungeonClock : MonoBehaviour
     // 지금은 아무도 LockDisplayToMidnight()을 안 부르니 항상 false).
     public bool IsDisplayLocked { get; private set; }
 
+    public bool IsNight { get; private set; }
+    public static bool IsNightNow { get; private set; }
+
     // MIA 판정이 발생한 순간 한 번 호출된다(구독자 없어도 안전 — ?.Invoke).
     public event Action OnMIA;
 
     // tick이 누적될 때마다(=시간이 흐를 때마다) 호출된다. 인자는 갱신된 ElapsedTicks 값.
     public event Action<float> OnClockChanged;
+    public event Action OnNightStarted;
 
     private void OnEnable()
     {
@@ -89,6 +93,8 @@ public class DungeonClock : MonoBehaviour
         ElapsedTicks = 0f;
         IsMIA = false;
         IsDisplayLocked = false;
+        IsNight = false;
+        IsNightNow = false;
     }
 
     // 층 이동으로 InDungeon 씬을 다시 불러올 때 같은 원정의 누적 시간을 복원한다.
@@ -97,6 +103,7 @@ public class DungeonClock : MonoBehaviour
         ElapsedTicks = Mathf.Max(0f, elapsedTicks);
         IsMIA = ElapsedTicks >= MIAThresholdTicks;
         IsDisplayLocked = false;
+        RefreshNightState(false);
         OnClockChanged?.Invoke(ElapsedTicks);
     }
 
@@ -105,6 +112,7 @@ public class DungeonClock : MonoBehaviour
     {
         ElapsedTicks = Mathf.Max(0f, elapsedTicks);
         IsMIA = ElapsedTicks >= MIAThresholdTicks;
+        RefreshNightState(true);
         OnClockChanged?.Invoke(ElapsedTicks);
         if (IsMIA) OnMIA?.Invoke();
     }
@@ -117,6 +125,13 @@ public class DungeonClock : MonoBehaviour
     public void LockDisplayToMidnight()
     {
         IsDisplayLocked = true;
+        RefreshNightState(true);
+    }
+
+    public void UnlockDisplayTime()
+    {
+        IsDisplayLocked = false;
+        RefreshNightState(false);
     }
 
     // TickManager.OnTimeAdvanced 구독 콜백 — [2026-09-04 버그 수정] 인자가 "이번에 소비된
@@ -140,6 +155,7 @@ public class DungeonClock : MonoBehaviour
         if (IsMIA) return;
 
         ElapsedTicks = Mathf.Max(ElapsedTicks, actorNextActionTime);
+        RefreshNightState(true);
         OnClockChanged?.Invoke(ElapsedTicks);
 
         if (ElapsedTicks >= MIAThresholdTicks)
@@ -168,4 +184,16 @@ public class DungeonClock : MonoBehaviour
 
     // MIA까지 남은 tick 수 — 나중에 "귀환 남은 시간 XX분" 같은 UI에 바로 쓸 수 있게 미리 노출.
     public float RemainingTicks => Mathf.Max(0f, MIAThresholdTicks - ElapsedTicks);
+
+    private void RefreshNightState(bool notify)
+    {
+        bool next = IsDisplayLocked || ElapsedTicks >= M11TimeConfig.NightStartTicks;
+        bool entered = !IsNight && next;
+        IsNight = next;
+        IsNightNow = next;
+        if (!entered || !notify) return;
+        Debug.Log($"[M11 Night] 심야 진입 — 누적 {ElapsedTicks:0} Tick");
+        CombatFeedback.AddLine("심야가 시작되었습니다.");
+        OnNightStarted?.Invoke();
+    }
 }

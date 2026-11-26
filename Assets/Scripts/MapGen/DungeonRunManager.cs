@@ -66,9 +66,33 @@ public class DungeonRunManager : MonoBehaviour
     private readonly List<Tilemap> floorWallTilemaps = new List<Tilemap>();
     private readonly List<int> floorSeeds = new List<int>();
     private GameObject player;
+    private DungeonClock dungeonClock;
+    private bool nightEnemiesSpawned;
 
     public int EscapeProcedureTickCost => escapeProcedureTickCost;
     public int RunSeed => runSeed;
+
+    public void BindClock(DungeonClock clock)
+    {
+        if (dungeonClock != null) dungeonClock.OnNightStarted -= HandleNightStarted;
+        dungeonClock = clock;
+        if (dungeonClock == null) return;
+        dungeonClock.OnNightStarted -= HandleNightStarted;
+        dungeonClock.OnNightStarted += HandleNightStarted;
+        if (dungeonClock.IsNight) HandleNightStarted();
+    }
+
+    private void OnDestroy()
+    {
+        if (dungeonClock != null) dungeonClock.OnNightStarted -= HandleNightStarted;
+    }
+
+    private void HandleNightStarted()
+    {
+        if (nightEnemiesSpawned || M10DungeonConfig.IsBossFloor(ExpeditionSession.CurrentFloor)) return;
+        nightEnemiesSpawned = true;
+        SpawnNightEnemiesAtFloor(ExpeditionSession.CurrentFloor - 1);
+    }
 
     private void Awake()
     {
@@ -467,6 +491,38 @@ public class DungeonRunManager : MonoBehaviour
         if (bossDefinition == null) bossActor.ConfigureCombatStats(bossMaxHP, bossAttackPower, bossDefensePower);
         bossActor.ConfigureBoss(floorSeeds[floorIndex] ^ 0x4D345F42);
         Debug.Log($"[DungeonRunManager] {floor}층 단일 보스 아레나 생성 — 일반 Enemy 0, 일반 상자 0.");
+    }
+
+    private void SpawnNightEnemiesAtFloor(int floorIndex)
+    {
+        if (floorIndex < 0 || floorIndex >= floors.Count || player == null) return;
+        Tilemap floor = floorTileTilemaps[floorIndex];
+        Tilemap walls = floorWallTilemaps[floorIndex];
+        PlayerTurnActor playerActor = player.GetComponent<PlayerTurnActor>();
+        if (playerActor == null) return;
+        Vector3Int playerCell = playerActor.CurrentCell;
+        int playerRoom = DungeonRoomRegistry.GetRoomId(floor, playerCell);
+        var candidates = new List<Vector3Int>();
+        foreach (Vector3Int cell in floor.cellBounds.allPositionsWithin)
+        {
+            if (!floor.HasTile(cell) || walls.HasTile(cell) || DungeonChest.IsCellBlocked(cell)) continue;
+            if (TickManager.Instance != null && TickManager.Instance.IsCellOccupied(cell)) continue;
+            int room = DungeonRoomRegistry.GetRoomId(floor, cell);
+            if (room < 0 || room == playerRoom) continue;
+            int distance = Mathf.Abs(cell.x - playerCell.x) + Mathf.Abs(cell.y - playerCell.y);
+            if (distance < 6) continue;
+            candidates.Add(cell);
+        }
+        var rng = new System.Random(floorSeeds[floorIndex] ^ 0x4D31314E);
+        Shuffle(candidates, rng);
+        M10EnemyDefinition goblin = M10EnemyDatabase.Find(floorIndex + 1 >= 8 ? "goblin_f8" : floorIndex + 1 >= 6 ? "goblin_f6" : floorIndex + 1 >= 3 ? "goblin_f3" : "goblin");
+        int count = Mathf.Min(M11TimeConfig.NightSpawnCount, candidates.Count);
+        for (int i = 0; i < count; i++)
+        {
+            GameObject enemy = CreateRuntimeEnemy(floorIndex, 7000 + i, candidates[i], floor, walls, goblin);
+            enemy.GetComponent<EnemyTurnActor>()?.ConfigureNightEnemy();
+        }
+        Debug.Log($"[M11 Night] F{floorIndex + 1} 심야몹 {count}마리 추가 스폰");
     }
 
     private static void Shuffle<T>(IList<T> values, System.Random rng)

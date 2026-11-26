@@ -1,0 +1,21 @@
+key,value,note
+night_start_ticks,1800,심야 시작
+night_stat_pct,120,심야몹 HP 공격 배율
+night_xp_pct,150,심야몹 XP 배율
+night_potion_drop_pct,150,심야몹 포션 드롭 배율
+night_spawn_count,2,일반층 추가 스폰
+night_reveal_range,4,심야 몹 공개 반경
+night_tint,8C9CFF,심야몹 색조
+night_legendary_pct,3,6~10층 심야 Legendary 확률
+night_drop_one_pct,50,심야몹 1개 드롭 확률
+seven_floor_exit_close_ticks,2220,7층 탈출구 폐쇄
+chest_day_one_pct,60,평시 상자 1개 확률
+chest_night_two_pct,70,심야 상자 2개 확률
+carry_limit,14,출격 가방 아이템 제한
+orc_cross_damage,50,오크 십자 고정 피해
+orc_cross_radius,3,오크 십자 팔 길이
+pocket_start_width,2,기본 보호 주머니 폭
+pocket_start_height,2,기본 보호 주머니 높이
+pocket_six_quest_count,10,6칸 해금 퀘스트 노출
+pocket_nine_quest_count,30,9칸 해금 퀘스트 노출
+starting_small_potions,2,원정 한정 출격 포션
