@@ -725,6 +725,8 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
                 if (bossTelegraph != null) Destroy(bossTelegraph);
                 ExpeditionRunRecord.RecordBossDefeated();
                 DropBossLoot();
+                if (ExpeditionSession.CurrentFloor == M10DungeonConfig.FirstBossFloor)
+                    M11EclipseState.OnMimicDefeated(floorTilemap, currentCell);
             }
             else if (isElite) DropEliteScroll();
             if (isNightEnemy) DropNightLoot();

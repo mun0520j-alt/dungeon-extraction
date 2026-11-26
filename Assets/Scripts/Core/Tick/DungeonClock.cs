@@ -95,6 +95,7 @@ public class DungeonClock : MonoBehaviour
         IsDisplayLocked = false;
         IsNight = false;
         IsNightNow = false;
+        if (M11EclipseState.AltarEnabled) LockDisplayToMidnight();
     }
 
     // 층 이동으로 InDungeon 씬을 다시 불러올 때 같은 원정의 누적 시간을 복원한다.
@@ -104,6 +105,7 @@ public class DungeonClock : MonoBehaviour
         IsMIA = ElapsedTicks >= MIAThresholdTicks;
         IsDisplayLocked = false;
         RefreshNightState(false);
+        if (M11EclipseState.AltarEnabled) LockDisplayToMidnight();
         OnClockChanged?.Invoke(ElapsedTicks);
     }
 

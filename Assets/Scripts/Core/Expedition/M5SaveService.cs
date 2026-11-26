@@ -331,6 +331,7 @@ public static class M5SaveService
             LootRuntimeState.RestoreM11Protection(
                 RestoreGridItems(data.protected_pocket, context, bagDepth: 0, placementSupported: data.save_version >= 8),
                 data.protected_pocket_tier <= 0 ? 1 : data.protected_pocket_tier);
+            M11EclipseState.RestorePersistent(data.eclipse_altar_unlocked, data.eclipse_altar_enabled);
             currentSettings = data.settings != null ? data.settings.Normalized() : SaveSettings.Default();
         }
         finally
@@ -497,6 +498,8 @@ public static class M5SaveService
             ,escape_scroll_purchase_stock = LootRuntimeState.EscapeScrollPurchaseStock
             ,protected_pocket = SaveRestoreItems(LootRuntimeState.PersistentProtectedPocketItems())
             ,protected_pocket_tier = LootRuntimeState.ProtectedPocketTier
+            ,eclipse_altar_unlocked = M11EclipseState.AltarUnlocked
+            ,eclipse_altar_enabled = M11EclipseState.AltarEnabled
         };
     }
 
@@ -623,6 +626,8 @@ public static class M5SaveService
         public int escape_scroll_purchase_stock;
         public List<SavedItem> protected_pocket = new List<SavedItem>();
         public int protected_pocket_tier = 1;
+        public bool eclipse_altar_unlocked;
+        public bool eclipse_altar_enabled;
     }
 
     [Serializable]

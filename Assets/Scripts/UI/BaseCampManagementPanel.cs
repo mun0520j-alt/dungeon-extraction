@@ -48,6 +48,13 @@ public sealed class BaseCampManagementPanel : MonoBehaviour
     private void DrawInsuranceArea(Rect area)
     {
         GUILayout.BeginArea(area, GUI.skin.box);
+        if (M11EclipseState.AltarUnlocked)
+        {
+            GUILayout.Label("월식의 제단");
+            if (GUILayout.Button(M11EclipseState.AltarEnabled ? "월식 활성 — 끄기" : "월식 비활성 — 켜기"))
+                notice = M11EclipseState.ToggleAltar() ? "다음 원정 시간 상태가 변경되었습니다." : "제단이 해금되지 않았습니다.";
+            GUILayout.Space(6);
+        }
         DrawInsurancePanel();
         if (!string.IsNullOrEmpty(notice)) GUILayout.Label(notice);
         GUILayout.EndArea();

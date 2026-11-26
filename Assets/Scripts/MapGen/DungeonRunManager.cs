@@ -89,9 +89,15 @@ public class DungeonRunManager : MonoBehaviour
 
     private void HandleNightStarted()
     {
-        if (nightEnemiesSpawned || M10DungeonConfig.IsBossFloor(ExpeditionSession.CurrentFloor)) return;
-        nightEnemiesSpawned = true;
-        SpawnNightEnemiesAtFloor(ExpeditionSession.CurrentFloor - 1);
+        int floorIndex = ExpeditionSession.CurrentFloor - 1;
+        if (!nightEnemiesSpawned && !M10DungeonConfig.IsBossFloor(ExpeditionSession.CurrentFloor))
+        {
+            nightEnemiesSpawned = true;
+            SpawnNightEnemiesAtFloor(floorIndex);
+        }
+        if (floorIndex >= 0 && floorIndex < floorTileTilemaps.Count && player != null)
+            M11EclipseState.TrySpawnFragment(floorTileTilemaps[floorIndex], floorWallTilemaps[floorIndex],
+                player.GetComponent<PlayerTurnActor>().CurrentCell);
     }
 
     private void Awake()
