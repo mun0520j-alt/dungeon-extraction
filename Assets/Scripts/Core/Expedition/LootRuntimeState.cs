@@ -31,17 +31,24 @@ public static partial class LootRuntimeState
     public static int Gold { get; private set; }
     public static int BagCapacity => runBagGrid.Width * runBagGrid.Height;
     public static string LastFailureReason { get; private set; }
+    public static string TradingMerchantId { get; private set; } = M11MerchantDatabase.Armor;
     public static event Action Changed;
     public static IReadOnlyList<InsuranceReturn> InsuranceReturns => insuranceReturns;
     public static IEnumerable<string> InsuredThisRunIds => insuredThisRun;
     public static string GetInsuredItemId(string instanceId) => insuredItemIds.TryGetValue(instanceId, out string itemId) ? itemId : null;
     public static float EffectiveInsuranceReturnRate => Mathf.Clamp01(M7EconomyConfig.InsuranceReturnRate
-        + (QuestRuntimeState.ReputationLevel - 1) * M8EconomyConfig.InsuranceBonusPerLevel);
+        + (QuestRuntimeState.GetReputationLevel(M11MerchantDatabase.Armor) - 1) * M8EconomyConfig.InsuranceBonusPerLevel);
     public static int GetSellPrice(LootItemData item) => item == null ? 0 : Mathf.Max(0,
-        Mathf.RoundToInt(item.SellPrice * (1f + (QuestRuntimeState.ReputationLevel - 1) * M8EconomyConfig.SellBonusPerLevel)));
+        Mathf.RoundToInt(item.SellPrice * M11MerchantDatabase.SellMultiplier(TradingMerchantId, item)
+            * (1f + (QuestRuntimeState.GetReputationLevel(TradingMerchantId) - 1) * M8EconomyConfig.SellBonusPerLevel)));
     public static int GetPurchasePrice(LootItemData item) => item == null ? 0 : Mathf.Max(0,
         Mathf.RoundToInt(item.SellPrice * M7EconomyConfig.PurchasePriceMultiplier
-            * (1f - (QuestRuntimeState.ReputationLevel - 1) * M8EconomyConfig.BuyDiscountPerLevel)));
+            * (1f - (QuestRuntimeState.GetReputationLevel(TradingMerchantId) - 1) * M8EconomyConfig.BuyDiscountPerLevel)));
+
+    public static void SetTradingMerchant(string merchantId)
+    {
+        if (M11MerchantDatabase.Find(merchantId) != null) TradingMerchantId = merchantId;
+    }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetRuntimeState()
@@ -55,6 +62,7 @@ public static partial class LootRuntimeState
         EquippedBagCapacityBonus = 0;
         HasBasicLoadout = false;
         Gold = 0;
+        TradingMerchantId = M11MerchantDatabase.Armor;
         LastFailureReason = null;
         Changed = null;
         insuranceSelection.Clear();
@@ -575,6 +583,7 @@ public static partial class LootRuntimeState
     public static bool IsMerchantPurchaseItem(LootItemData definition)
     {
         if (definition == null || definition.Id.StartsWith("basic_", StringComparison.Ordinal)) return false;
+        if (!M11MerchantDatabase.IsPurchaseItemFor(TradingMerchantId, definition)) return false;
         if (definition.Id == "escape_scroll") return IsEscapeScrollShopUnlocked;
         if (M10ProgressionDatabase.Potion(definition.Id) != null) return true;
         if (definition.Type == LootItemType.Bag)

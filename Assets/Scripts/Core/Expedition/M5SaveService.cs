@@ -8,7 +8,7 @@ using UnityEngine;
 // LootRuntimeState가 상태를 소유하고, 이 클래스는 저장 파일 직렬화와 교체만 담당한다.
 public static class M5SaveService
 {
-    private const int CurrentSaveVersion = 8;
+    private const int CurrentSaveVersion = 9;
     private const string SaveFolderName = "Save";
     private const string SaveFileName = "save.json";
     private const string BackupFileName = "save.bak";
@@ -18,6 +18,7 @@ public static class M5SaveService
     private const string LegacyV5BackupFileName = "save_v5.bak";
     private const string LegacyV6BackupFileName = "save_v6.bak";
     private const string LegacyV7BackupFileName = "save_v7.bak";
+    private const string LegacyV8BackupFileName = "save_v8.bak";
     private const string TempFileName = "save.tmp";
 
     private static bool isRestoring;
@@ -33,6 +34,7 @@ public static class M5SaveService
     public static string LegacyV5BackupPath => Path.Combine(SaveDirectory, LegacyV5BackupFileName);
     public static string LegacyV6BackupPath => Path.Combine(SaveDirectory, LegacyV6BackupFileName);
     public static string LegacyV7BackupPath => Path.Combine(SaveDirectory, LegacyV7BackupFileName);
+    public static string LegacyV8BackupPath => Path.Combine(SaveDirectory, LegacyV8BackupFileName);
     public static bool Fullscreen => currentSettings.fullscreen;
     public static int ResolutionWidth => currentSettings.resolution_width;
     public static int ResolutionHeight => currentSettings.resolution_height;
@@ -161,6 +163,11 @@ public static class M5SaveService
             Debug.LogError("[Save] v7 원본 백업에 실패해 v8 마이그레이션을 중단했습니다. 기존 파일은 변경하지 않습니다.");
             return;
         }
+        if (data.save_version == 8 && !TryPreserveLegacyV8Save(loadedPath))
+        {
+            Debug.LogError("[Save] v8 원본 백업에 실패해 v9 마이그레이션을 중단했습니다. 기존 파일은 변경하지 않습니다.");
+            return;
+        }
         Restore(data);
         if (!data.expedition_in_progress)
         {
@@ -278,6 +285,23 @@ public static class M5SaveService
         catch (Exception exception)
         {
             Debug.LogError($"[Save] v7 원본 백업 실패: {LegacyV7BackupPath}\n{exception.Message}");
+            return false;
+        }
+    }
+
+    private static bool TryPreserveLegacyV8Save(string sourcePath)
+    {
+        try
+        {
+            Directory.CreateDirectory(SaveDirectory);
+            if (File.Exists(LegacyV8BackupPath)) return true;
+            File.Copy(sourcePath, LegacyV8BackupPath, false);
+            Debug.Log($"[Save] v8 원본을 별도 백업으로 보존했습니다: {LegacyV8BackupPath}");
+            return true;
+        }
+        catch (Exception exception)
+        {
+            Debug.LogError($"[Save] v8 원본 백업 실패: {LegacyV8BackupPath}\n{exception.Message}");
             return false;
         }
     }
