@@ -7,7 +7,14 @@ public enum QuestObjectiveType
 {
     Delivery,
     Escape,
-    Carry
+    Carry,
+    Kill,
+    EliteKill,
+    BossKill,
+    NightEscape,
+    RarityObtain,
+    TimedEscape,
+    CarryCount
 }
 
 public enum QuestRoute
@@ -22,6 +29,7 @@ public sealed class QuestDefinition
 {
     public string Id;
     public int Order;
+    public string MerchantId;
     public QuestRoute Route;
     public QuestObjectiveType Type;
     public string PrerequisiteId;
@@ -39,6 +47,13 @@ public sealed class QuestDefinition
     public int RewardItemCount;
     public string Title;
     public string Description;
+    public bool Cumulative;
+    public int MinFloor;
+    public int MaxFloor;
+    public bool RequiresElite;
+    public bool RequiresNight;
+    public int TickLimit;
+    public bool ExcludedFromCompletionCount;
 }
 
 public static class QuestDefinitionDatabase
@@ -74,17 +89,19 @@ public static class QuestDefinitionDatabase
         for (int i = 1; i < lines.Length; i++)
         {
             string[] f = lines[i].Split(',');
-            if (f.Length < 20 || string.IsNullOrWhiteSpace(f[0])) continue;
-            if (!Enum.TryParse(f[2].Trim(), true, out QuestRoute route)
-                || !Enum.TryParse(f[3].Trim(), true, out QuestObjectiveType type)) continue;
+            if (f.Length < 27 || string.IsNullOrWhiteSpace(f[0])) continue;
+            if (!Enum.TryParse(f[3].Trim(), true, out QuestRoute route)
+                || !Enum.TryParse(f[4].Trim(), true, out QuestObjectiveType type)) continue;
             var definition = new QuestDefinition
             {
-                Id = f[0].Trim(), Order = Int(f[1]), Route = route, Type = type,
-                PrerequisiteId = f[4].Trim(), TargetItemId = f[5].Trim(), TargetRarity = f[6].Trim(),
-                TargetCategory = f[7].Trim(), TargetCount = Int(f[8]), TargetFloor = Int(f[9]),
-                TargetValue = Int(f[10]), RequiresFoundInRaid = Bool(f[11]), RequiresBossKill = Bool(f[12]),
-                RewardReputation = Int(f[13]), RewardGold = Int(f[14]), RewardItemId = f[15].Trim(),
-                RewardItemCount = Int(f[16]), Title = f[18].Trim(), Description = f[19].Trim()
+                Id = f[0].Trim(), Order = Int(f[1]), MerchantId=f[2].Trim(), Route = route, Type = type,
+                PrerequisiteId = f[5].Trim(), TargetItemId = f[6].Trim(), TargetRarity = f[7].Trim(),
+                TargetCategory = f[8].Trim(), TargetCount = Int(f[9]), TargetFloor = Int(f[10]),
+                TargetValue = Int(f[11]), RequiresFoundInRaid = Bool(f[12]), RequiresBossKill = Bool(f[13]),
+                RewardReputation = Int(f[14]), RewardGold = Int(f[15]), RewardItemId = f[16].Trim(),
+                RewardItemCount = Int(f[17]), Title = f[18].Trim(), Description = f[19].Trim(),
+                Cumulative=Bool(f[20]), MinFloor=Int(f[21]), MaxFloor=Int(f[22]), RequiresElite=Bool(f[23]),
+                RequiresNight=Bool(f[24]), TickLimit=Int(f[25]), ExcludedFromCompletionCount=Bool(f[26])
             };
             byId[definition.Id] = definition;
             all.Add(definition);

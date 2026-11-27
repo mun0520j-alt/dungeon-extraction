@@ -75,9 +75,8 @@ public static partial class LootRuntimeState
 
     public static void RefreshProtectedPocketUnlock()
     {
-        int completed = QuestRuntimeState.CompletedQuestIds.Count;
-        int tier = completed >= M11PouchConfig.NineSlotQuestCount ? 3
-            : completed >= M11PouchConfig.SixSlotQuestCount ? 2 : 1;
+        int tier = QuestRuntimeState.HasCompleted("q_pouch_9") ? 3
+            : QuestRuntimeState.HasCompleted("q_pouch_6") ? 2 : 1;
         if (tier <= protectedPocketTier) return;
         var expanded = new LootGridModel(M11PouchConfig.Width(tier), M11PouchConfig.Height(tier));
         foreach (LootGridPlacement placement in protectedPocket.Placements)

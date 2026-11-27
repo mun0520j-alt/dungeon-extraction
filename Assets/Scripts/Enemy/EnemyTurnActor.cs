@@ -720,6 +720,7 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
         {
             M10RunProgression.RecordEnemyDefeated(m10Definition,
                 isNightEnemy ? M11TimeConfig.NightXpPercent / 100f : 1f);
+            ExpeditionRunRecord.RecordEnemyDefeated(isElite);
             if (isBoss)
             {
                 if (bossTelegraph != null) Destroy(bossTelegraph);
