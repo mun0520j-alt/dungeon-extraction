@@ -26,6 +26,7 @@ public sealed class BaseCampManagementPanel : MonoBehaviour
     private string pendingUniqueSale;
     private bool pendingLevelUp;
     private bool pendingInsuredBasketSale;
+    private string selectedMerchantId = M11MerchantDatabase.Armor;
     private GUIStyle foundInRaidStarStyle;
     private GUIStyle itemRichTextStyle;
 
@@ -64,6 +65,14 @@ public sealed class BaseCampManagementPanel : MonoBehaviour
     {
         GUILayout.BeginArea(area, GUI.skin.box);
         GUILayout.Label($"상인   Gold {LootRuntimeState.Gold}");
+        GUILayout.BeginHorizontal();
+        foreach (M11MerchantDefinition merchant in M11MerchantDatabase.All)
+        {
+            if (GUILayout.Toggle(selectedMerchantId == merchant.Id, merchant.Name, GUI.skin.button))
+                selectedMerchantId = merchant.Id;
+        }
+        GUILayout.EndHorizontal();
+        LootRuntimeState.SetTradingMerchant(selectedMerchantId);
         MerchantMode previousMode = merchantMode;
         GUILayout.BeginHorizontal();
         if (GUILayout.Toggle(merchantMode == MerchantMode.Sell, "판매", GUI.skin.button)) merchantMode = MerchantMode.Sell;
@@ -266,19 +275,24 @@ public sealed class BaseCampManagementPanel : MonoBehaviour
 
     private void DrawQuestPanel()
     {
-        GUILayout.Label($"우호도 Lv.{QuestRuntimeState.ReputationLevel}  {QuestRuntimeState.Reputation}점");
-        int levelBonus = QuestRuntimeState.ReputationLevel - 1;
+        M11MerchantDefinition merchant = M11MerchantDatabase.Find(selectedMerchantId);
+        int reputation = QuestRuntimeState.GetReputation(selectedMerchantId);
+        int reputationLevel = QuestRuntimeState.GetReputationLevel(selectedMerchantId);
+        GUILayout.Label($"{merchant?.Name ?? selectedMerchantId} 우호도 Lv.{reputationLevel}  {reputation}점");
+        GUILayout.Label($"전체 완료 {QuestRuntimeState.CountCoreCompleted()}/40");
+        int levelBonus = reputationLevel - 1;
         GUILayout.Label($"판매 +{Mathf.RoundToInt(levelBonus * M8EconomyConfig.SellBonusPerLevel * 100f)}% / "
             + $"구매 -{Mathf.RoundToInt(levelBonus * M8EconomyConfig.BuyDiscountPerLevel * 100f)}% / "
             + $"보험 반환 +{Mathf.RoundToInt(levelBonus * M8EconomyConfig.InsuranceBonusPerLevel * 100f)}%");
-        if (QuestRuntimeState.CanLevelUp && GUILayout.Button($"우호도 레벨업 ({QuestRuntimeState.NextLevelGoldCost}G)")) pendingLevelUp = true;
+        if (QuestRuntimeState.CanLevelUpMerchant(selectedMerchantId)
+            && GUILayout.Button($"우호도 레벨업 ({QuestRuntimeState.NextLevelGoldCostFor(selectedMerchantId)}G)")) pendingLevelUp = true;
         if (pendingLevelUp)
         {
-            GUILayout.Label($"{QuestRuntimeState.NextLevelGoldCost} Gold를 지불하고 레벨업할까요?");
+            GUILayout.Label($"{QuestRuntimeState.NextLevelGoldCostFor(selectedMerchantId)} Gold를 지불하고 레벨업할까요?");
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("확정"))
             {
-                notice = QuestRuntimeState.TryLevelUp() ? "우호도 레벨 상승" : LootRuntimeState.LastFailureReason;
+                notice = QuestRuntimeState.TryLevelUpMerchant(selectedMerchantId) ? "우호도 레벨 상승" : LootRuntimeState.LastFailureReason;
                 pendingLevelUp = false;
             }
             if (GUILayout.Button("취소")) pendingLevelUp = false;
@@ -311,7 +325,8 @@ public sealed class BaseCampManagementPanel : MonoBehaviour
         if (active == null)
         {
             GUILayout.Label("수락 가능한 퀘스트");
-            foreach (QuestDefinition quest in QuestDefinitionDatabase.All.Where(QuestRuntimeState.CanAccept))
+            foreach (QuestDefinition quest in QuestDefinitionDatabase.All
+                .Where(quest => quest.MerchantId == selectedMerchantId).Where(QuestRuntimeState.CanAccept))
             {
                 GUILayout.BeginHorizontal();
                 GUILayout.Label($"{quest.Title}\n{quest.Description}");
