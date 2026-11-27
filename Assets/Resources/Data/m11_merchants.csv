@@ -1,0 +1,5 @@
+merchant_id,merchant_name,item_tags,matched_sell_pct,unmatched_sell_pct
+weapon,무기상,Weapon,100,60
+armor,방어구상,Armor|Shield,100,60
+supply,잡화상,Consumable|Bag,100,60
+collector,수집상,Junk,100,60
