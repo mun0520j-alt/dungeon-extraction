@@ -39,5 +39,5 @@ C07,7,collector,Common,Delivery,C06,junk_crown_shard:1,,,1,0,0,1,0,70,250,,0,왕
 C08,8,collector,Common,NightEscape,C07,,,Junk,1,0,800,1,0,70,300,,0,달빛 장물,심야에 인레이드 잡템 판매가 합계 800 이상 들고 생환,0,0,0,0,1,0,0
 C09,9,collector,Common,RarityObtain,C08,,Legendary,,1,0,0,1,0,90,400,,0,전설의 흔적,인레이드 Legendary 아이템 1개 들고 생환,0,0,0,0,0,0,0
 C10,10,collector,Common,Delivery,C09,junk_orc_seal:1,,,1,0,0,1,0,120,600,,0,왕의 인장,인레이드 오크 왕의 인장 1개 납품,0,0,0,0,0,0,0
-q_pouch_6,11,supply,Common,BossKill,,,,1,5,0,0,1,0,0,,0,보호 주머니 확장 I,전체 퀘스트 10개 완료 후 심야 미믹 처치 생환,0,0,0,0,1,0,1
+q_pouch_6,11,supply,Common,BossKill,,,,,1,5,0,0,1,0,0,,0,보호 주머니 확장 I,전체 퀘스트 10개 완료 후 심야 미믹 처치 생환,0,0,0,0,1,0,1
 q_pouch_9,12,supply,Common,BossKill,q_pouch_6,,,,1,10,0,0,1,0,0,,0,보호 주머니 확장 II,전체 퀘스트 30개 완료 후 심야 오크 처치 생환,0,0,0,0,1,0,1

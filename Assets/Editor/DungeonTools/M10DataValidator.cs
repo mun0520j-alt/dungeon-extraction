@@ -1,5 +1,6 @@
 #if UNITY_EDITOR
 using System;
+using System.Linq;
 using UnityEditor;
 using UnityEngine;
 
@@ -133,6 +134,27 @@ public static class M10DataValidator
         }
         foreach (string enemyId in new[] { "goblin", "goblin_f3", "goblin_f6", "goblin_f8", "goblin_elite_f3", "goblin_elite_f6" })
             ok &= M10EnemyDatabase.Find(enemyId)?.SpriteKey == "goblin";
+        foreach (var archer in new[]
+        {
+            (floor:3, id:"goblin_archer_f3", baseId:"goblin_f3"),
+            (floor:6, id:"goblin_archer_f6", baseId:"goblin_f6"),
+            (floor:8, id:"goblin_archer_f8", baseId:"goblin_f8")
+        })
+        {
+            M10EnemyDefinition ranged = M10EnemyDatabase.Find(archer.id);
+            M10EnemyDefinition melee = M10EnemyDatabase.Find(archer.baseId);
+            ok &= ranged != null && melee != null && ranged.SpriteKey == "goblin"
+                && ranged.AttackType == "ranged" && ranged.Range == 4
+                && ranged.RangedDamagePercent == 70 && ranged.MeleeDamagePercent == 50
+                && ranged.HP == Mathf.RoundToInt(melee.HP * 0.8f);
+        }
+        for (int floor = 3; floor <= 9; floor++)
+        {
+            if (M10DungeonConfig.IsBossFloor(floor)) continue;
+            ok &= !string.IsNullOrEmpty(M10EnemyDatabase.Floor(floor)?.ArcherId);
+        }
+        ok &= string.IsNullOrEmpty(M10EnemyDatabase.Floor(1)?.ArcherId)
+            && string.IsNullOrEmpty(M10EnemyDatabase.Floor(2)?.ArcherId);
         Color eliteTint = M10DungeonConfig.EliteTint;
         ok &= Mathf.Approximately(eliteTint.r, 1f) && Mathf.Approximately(eliteTint.g, 1f)
             && Mathf.Approximately(eliteTint.b, 1f);
@@ -192,8 +214,23 @@ public static class M10DataValidator
         LootItemData junkCase = LootItemDatabase.FindById("case_junk");
         ok &= potionPouch?.BagGridWidth == 2 && potionPouch.BagGridHeight == 2
             && junkCase?.BagGridWidth == 3 && junkCase.BagGridHeight == 3;
+        ok &= M11MerchantDatabase.All.Count == 4;
+        foreach (LootItemData item in LootItemDatabase.Items)
+            ok &= M11MerchantDatabase.MerchantFor(item) != null;
+        var quests = QuestDefinitionDatabase.All;
+        ok &= quests.Count == 42;
+        foreach (string merchantId in new[] { "weapon", "armor", "supply", "collector" })
+            ok &= quests.Count(q => q.MerchantId == merchantId && !q.ExcludedFromCompletionCount) == 10;
+        foreach (QuestDefinition quest in quests)
+        {
+            ok &= M11MerchantDatabase.Find(quest.MerchantId) != null;
+            if (!string.IsNullOrEmpty(quest.PrerequisiteId))
+                foreach (string id in quest.PrerequisiteId.Split('|')) ok &= quests.Any(q => q.Id == id);
+            if (!string.IsNullOrEmpty(quest.RewardItemId) && quest.RewardItemId != "equipment_epic_random")
+                ok &= LootItemDatabase.FindById(quest.RewardItemId) != null;
+        }
         if (!ok) throw new InvalidOperationException("M11 data validation failed.");
-        Debug.Log("[M11 Validation] PASS — 심야 1800, 7층 폐쇄 2220, 보호 주머니 4/6/9칸, 무게 14, 오크 십자 확인.");
+        Debug.Log("[M11 Validation] PASS — 심야·7층 폐쇄·보호 주머니·오크 십자, 상인 4명·핵심 퀘스트 40개 확인.");
     }
 
     private static void LogMatchup(string label, int level, string weaponId, string shieldId, string armorId, string enemyId)

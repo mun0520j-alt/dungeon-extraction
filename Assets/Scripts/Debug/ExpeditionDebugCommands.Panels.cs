@@ -101,6 +101,19 @@ public sealed partial class ExpeditionDebugCommands
                 : "포션 회복: 없음");
         }
         DrawScrollShopControls();
+        GUILayout.Label("M11 상인·퀘스트 QA");
+        GUILayout.BeginHorizontal();
+        foreach (M11MerchantDefinition merchant in M11MerchantDatabase.All)
+        {
+            string id = merchant.Id;
+            if (GUILayout.Button($"{merchant.Name} Lv3"))
+                QuestRuntimeState.DebugSetMerchantReputation(id, 300, 3);
+        }
+        GUILayout.EndHorizontal();
+        GUILayout.BeginHorizontal();
+        if (GUILayout.Button("현재 퀘스트 즉시 완료")) QuestRuntimeState.DebugCompleteActiveObjective();
+        if (GUILayout.Button("퀘스트 전체 초기화")) QuestRuntimeState.DebugResetAll();
+        GUILayout.EndHorizontal();
     }
 
     // 던전 경과 시간: 현재 값 표시 + 바로 쓰는 버튼(MIA 경계 직전, +10/+100) + 직접 입력
