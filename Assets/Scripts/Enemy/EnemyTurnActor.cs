@@ -15,7 +15,7 @@ using UnityEngine.Tilemaps;
 // 등록되는 게 검증에 필요했고, 생각해보니 나중에 스포너가 Instantiate()로 생성해도 OnEnable은
 // 똑같이 자동 호출되니까 self-register가 Player 전용일 이유가 없었음). 스포너가 생기더라도
 // 스포너 쪽에서 등록 코드를 따로 짤 필요 없이 Instantiate만 하면 이 OnEnable이 알아서 처리한다.
-public class EnemyTurnActor : MonoBehaviour, ITurnActor
+public partial class EnemyTurnActor : MonoBehaviour, ITurnActor
 {
     [Header("행동 타입")]
     [Tooltip("이 몹이 자기 턴에 무엇을 할지 결정한다. 종류가 늘어나면 EnemyBehaviorType enum에 추가한다.")]
@@ -110,6 +110,7 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
                 EliteSpriteOutline.Attach(body, M10DungeonConfig.EliteOutlineColor, M10DungeonConfig.EliteOutlinePixels);
             }
         }
+        ConfigureArcherVisual();
     }
 
     // behaviorType(Idle/Wander)은 "Player를 못 봤을 때의 평소 기본 행동"이고, 추적은 그 위에
@@ -207,6 +208,7 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
             }
         }
         spriteRenderer.enabled = visible;
+        SetArcherVisible(visible);
         spriteRenderer.GetComponent<EliteSpriteOutline>()?.SetVisible(visible);
         if (healthBar != null) healthBar.enabled = visible;
         if (alertIndicatorObject != null && !visible) alertIndicatorObject.SetActive(false);
@@ -283,6 +285,7 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
 
     private void OnDisable()
     {
+        ClearArcherAim();
         if (TickManager.Instance != null)
         {
             TickManager.Instance.UnregisterActor(this);
@@ -310,6 +313,8 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
             RunBossTurn();
             return;
         }
+
+        if (RunArcherTurn()) return;
 
         if (pendingRoomAlert)
         {
@@ -718,6 +723,7 @@ public class EnemyTurnActor : MonoBehaviour, ITurnActor
 
         if (currentHP <= 0)
         {
+            ClearArcherAim();
             M10RunProgression.RecordEnemyDefeated(m10Definition,
                 isNightEnemy ? M11TimeConfig.NightXpPercent / 100f : 1f);
             ExpeditionRunRecord.RecordEnemyDefeated(isElite);

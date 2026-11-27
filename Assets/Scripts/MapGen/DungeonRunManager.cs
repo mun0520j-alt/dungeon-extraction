@@ -470,7 +470,9 @@ public class DungeonRunManager : MonoBehaviour
 
                 bool elite = spawned >= normalTarget;
                 string[] ids = elite ? spawnDefinition?.EliteIds : spawnDefinition?.NormalIds;
-                string id = ids != null && ids.Length > 0 ? ids[rng.Next(ids.Length)] : null;
+                string id = !elite && spawned == normalTarget - 1 && !string.IsNullOrEmpty(spawnDefinition?.ArcherId)
+                    ? spawnDefinition.ArcherId
+                    : ids != null && ids.Length > 0 ? ids[rng.Next(ids.Length)] : null;
                 CreateRuntimeEnemy(floorIndex, spawned, cell, floorTilemap, wallTilemap, M10EnemyDatabase.Find(id));
                 occupied.Add(cell);
                 spawned++;

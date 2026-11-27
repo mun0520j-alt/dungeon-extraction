@@ -1,8 +1,11 @@
-enemy_id,sprite_key,tier,hp,attack,defense,move_cost_mult,behavior,visual_scale,scroll_drop_chance,xp,potion_drop_chance
+enemy_id,sprite_key,tier,hp,attack,defense,move_cost_mult,behavior,visual_scale,scroll_drop_chance,xp,potion_drop_chance,attack_type,range,ranged_damage_pct,melee_damage_pct
 goblin,goblin,normal,126,25,8,1,Wander,1,0,10,0.10
 goblin_f3,goblin,normal,196,38,10,1,Wander,1,0,10,0.10
+goblin_archer_f3,goblin,normal,157,38,10,1,Wander,1,0,10,0.10,ranged,4,70,50
 goblin_f6,goblin,normal,264,64,13,1,Wander,1,0,25,0.10
+goblin_archer_f6,goblin,normal,211,64,13,1,Wander,1,0,25,0.10,ranged,4,70,50
 goblin_f8,goblin,normal,344,91,15,1,Wander,1,0,25,0.10
+goblin_archer_f8,goblin,normal,275,91,15,1,Wander,1,0,25,0.10,ranged,4,70,50
 goblin_elite_f3,goblin,elite,441,61,12,1,Wander,1.15,0.15,40,0.18
 goblin_elite_f6,goblin,elite,595,106,16,1,Wander,1.2,0.2,90,0.25
 tiny_zombie,tiny_zombie,normal,210,50,10,1,Wander,1,0,10,0.05

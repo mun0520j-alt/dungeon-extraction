@@ -8,6 +8,8 @@ public sealed class M10EnemyDefinition
     public string Id, SpriteKey, Tier;
     public int HP, Attack, Defense, XP;
     public float MoveCostMultiplier, VisualScale, ScrollDropChance, PotionDropChance;
+    public string AttackType;
+    public int Range, RangedDamagePercent = 100, MeleeDamagePercent = 100;
     public EnemyBehaviorType Behavior;
     public bool IsElite => string.Equals(Tier, "elite", StringComparison.OrdinalIgnoreCase);
 }
@@ -16,6 +18,7 @@ public sealed class M10FloorSpawnDefinition
 {
     public int Floor, NormalCount, EliteMin, EliteMax;
     public string[] NormalIds, EliteIds;
+    public string ArcherId;
 }
 
 public static class M10EnemyDatabase
@@ -41,7 +44,9 @@ public static class M10EnemyDatabase
                 Enum.TryParse(f[7], true, out EnemyBehaviorType behavior);
                 var d = new M10EnemyDefinition { Id=f[0], SpriteKey=f[1], Tier=f[2], HP=I(f[3]), Attack=I(f[4]), Defense=I(f[5]),
                     MoveCostMultiplier=F(f[6],1), Behavior=behavior, VisualScale=F(f[8],1), ScrollDropChance=F(f[9],0),
-                    XP=I(f[10]), PotionDropChance=F(f[11],0) };
+                    XP=I(f[10]), PotionDropChance=F(f[11],0), AttackType=f.Length > 12 ? f[12] : "melee",
+                    Range=f.Length > 13 ? I(f[13]) : 0, RangedDamagePercent=f.Length > 14 ? I(f[14]) : 100,
+                    MeleeDamagePercent=f.Length > 15 ? I(f[15]) : 100 };
                 enemies[d.Id] = d;
             }
         }
@@ -52,7 +57,7 @@ public static class M10EnemyDatabase
             for (int i = 1; i < lines.Length; i++)
             {
                 string[] f = lines[i].Split(','); if (f.Length < 6) continue;
-                var d = new M10FloorSpawnDefinition { Floor=I(f[0]), NormalIds=Ids(f[1]), NormalCount=I(f[2]), EliteIds=Ids(f[3]), EliteMin=I(f[4]), EliteMax=I(f[5]) };
+                var d = new M10FloorSpawnDefinition { Floor=I(f[0]), NormalIds=Ids(f[1]), NormalCount=I(f[2]), EliteIds=Ids(f[3]), EliteMin=I(f[4]), EliteMax=I(f[5]), ArcherId=f.Length > 6 ? f[6].Trim() : string.Empty };
                 floors[d.Floor] = d;
             }
         }
